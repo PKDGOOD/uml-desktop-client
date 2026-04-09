@@ -1,0 +1,346 @@
+# 구현 계획: UML 데스크탑 클라이언트
+
+## 개요
+
+Electron + React + TypeScript 기반 UML 데스크탑 클라이언트를 구현한다. DSL 파서/직렬화기 → 데이터 모델 → 핵심 엔진(Undo, Sync, Clipboard, LazyLoader, SharedElement) → UI 컴포넌트(Canvas, TextEditor, ProjectTree, Tabs, SplitView) → 내보내기/버전 관리 순서로 점진적으로 구축한다. 각 단계에서 속성 기반 테스트(fast-check)와 단위 테스트(Vitest)를 병행하여 정확성을 검증한다.
+
+## 태스크
+
+- [x] 1. 프로젝트 초기 설정 및 핵심 데이터 모델 정의
+  - [x] 1.1 Electron + React + TypeScript 프로젝트 스캐폴딩 구성
+    - Electron main/renderer 프로세스 구조 설정
+    - React + TypeScript 빌드 설정 (Vite 또는 webpack)
+    - Vitest + fast-check 테스트 환경 설정
+    - Zustand 상태 관리 설치 및 기본 스토어 구성
+    - _요구사항: 1.1_
+  - [x] 1.2 핵심 데이터 모델 타입 정의
+    - `ProjectData`, `ProjectMetadata`, `ProjectTreeNode` 인터페이스 정의
+    - `DiagramData`, `DiagramElement`, `Connector` 인터페이스 정의
+    - `DiagramType`, `ElementType`, `ConnectorType` 타입 정의
+    - `Viewport`, `Position`, `Size`, `ElementProperties` 인터페이스 정의
+    - `Attribute`, `Method`, `Parameter` 인터페이스 정의
+    - _요구사항: 2.1, 2.2, 2.3, 2.4, 2.5, 3.6_
+
+- [x] 2. DSL 파서 및 직렬화기 구현
+  - [x] 2.1 DSL 문법 정의 및 peggy 파서 생성
+    - 클래스 다이어그램 DSL 문법 정의 (class, interface, enum, 관계)
+    - 시퀀스 다이어그램 DSL 문법 정의 (lifeline, message)
+    - 유스케이스 다이어그램 DSL 문법 정의 (actor, usecase, system-boundary)
+    - 액티비티 다이어그램 DSL 문법 정의 (action, decision, fork, join)
+    - 상태 다이어그램 DSL 문법 정의 (state, transition, composite-state)
+    - peggy 파서 생성 및 `DSLParseResult`, `DSLError` 타입 연동
+    - _요구사항: 14.2, 14.3, 14.5_
+  - [x] 2.2 DSL 직렬화기 구현
+    - `DSLSerializer.serialize()` 구현: DiagramData → DSL 텍스트 변환
+    - 각 다이어그램 유형별 직렬화 로직 구현
+    - 레이아웃 정보(position, size) 직렬화 포함
+    - _요구사항: 14.4_
+  - [ ]* 2.3 속성 테스트: DSL 라운드트립 (Property 2)
+    - **Property 2: DSL 라운드트립**
+    - fast-check 생성기 구현: `arbDiagramData`, `arbDiagramElement`, `arbConnector`
+    - DSL_Serializer → DSL_Parser 라운드트립 검증
+    - **검증: 요구사항 14.6, 14.3, 14.4**
+  - [ ]* 2.4 속성 테스트: DSL 파서 오류 보고 완전성 (Property 12)
+    - **Property 12: DSL 파서 오류 보고 완전성**
+    - fast-check 생성기 구현: `arbInvalidDSLText`
+    - 유효하지 않은 DSL 텍스트에 대해 오류 위치(행, 열)와 원인 포함 검증
+    - **검증: 요구사항 14.5, 6.3**
+  - [ ]* 2.5 단위 테스트: DSL 파서/직렬화기
+    - 각 다이어그램 유형별 파싱 스모크 테스트
+    - 오류 메시지 형식 검증
+    - 엣지 케이스 (빈 다이어그램, 특수 문자 이름 등)
+    - _요구사항: 14.3, 14.4, 14.5_
+
+- [x] 3. 프로젝트 파일 파서 및 직렬화기 구현
+  - [x] 3.1 프로젝트 파일 파서 구현
+    - `ProjectFileParser.parseMetadata()` 구현: JSON → ProjectMetadata (지연 로딩용)
+    - `ProjectFileParser.parseDiagram()` 구현: 특정 다이어그램 데이터 파싱
+    - `ProjectFileParser.parseAll()` 구현: 전체 프로젝트 파싱
+    - 유효하지 않은 파일에 대한 오류 위치/원인 보고
+    - _요구사항: 6.1, 6.3, 6.5_
+  - [x] 3.2 프로젝트 파일 직렬화기 구현
+    - `ProjectFileSerializer.serialize()` 구현: ProjectData → JSON 변환
+    - Shared_Element 참조 관계 보존 직렬화
+    - _요구사항: 6.2, 6.6_
+  - [ ]* 3.3 속성 테스트: 프로젝트 파일 라운드트립 (Property 1)
+    - **Property 1: 프로젝트 파일 라운드트립**
+    - fast-check 생성기 구현: `arbProjectData`
+    - Pretty_Printer → Parser 라운드트립 검증
+    - **검증: 요구사항 6.4, 6.1, 6.2**
+  - [ ]* 3.4 속성 테스트: 공유 요소 참조 보존 라운드트립 (Property 3)
+    - **Property 3: 공유 요소 참조 보존 라운드트립**
+    - Shared_Element 포함 프로젝트 데이터 생성기 구현
+    - 직렬화 → 파싱 후 단일 인스턴스 복원 및 참조 관계 보존 검증
+    - **검증: 요구사항 6.6, 6.7**
+
+- [x] 4. 체크포인트 - 파서/직렬화기 검증
+  - 모든 테스트가 통과하는지 확인하고, 질문이 있으면 사용자에게 문의한다.
+
+- [x] 5. Undo/Redo 매니저 구현
+  - [x] 5.1 Command 패턴 기반 UndoManager 구현
+    - `Command` 인터페이스 구현 (execute, undo, description)
+    - `UndoManager` 구현: execute, undo, redo, canUndo, canRedo
+    - 최소 50단계 이력 유지 (maxHistory 설정)
+    - 새 편집 후 redo 이력 초기화 로직
+    - _요구사항: 4.1, 4.2, 4.3, 4.4_
+  - [ ]* 5.2 속성 테스트: 실행 취소/다시 실행 라운드트립 (Property 5)
+    - **Property 5: 실행 취소/다시 실행 라운드트립**
+    - fast-check 생성기 구현: `arbEditCommand`
+    - execute → undo → 이전 상태 복원, undo → redo → 편집 후 상태 동일 검증
+    - **검증: 요구사항 4.1, 4.2**
+  - [ ]* 5.3 속성 테스트: 실행 취소 이력 크기 불변량 (Property 6)
+    - **Property 6: 실행 취소 이력 크기 불변량**
+    - N > 50 편집 작업 시퀀스에서 최소 50단계 이력 유지 검증
+    - **검증: 요구사항 4.3**
+  - [ ]* 5.4 속성 테스트: 새 편집 후 다시 실행 이력 초기화 (Property 7)
+    - **Property 7: 새 편집 후 다시 실행 이력 초기화**
+    - undo 후 새 편집 수행 시 redo 이력이 비어 있는지 검증
+    - **검증: 요구사항 4.4**
+
+- [x] 6. 공유 요소 레지스트리 구현
+  - [x] 6.1 SharedElementRegistry 구현
+    - `register()`, `get()`, `update()`, `removeReference()`, `getReferencingDiagrams()`, `delete()` 구현
+    - 속성 업데이트 시 모든 참조 다이어그램에 변경 전파
+    - 참조 제거 시 원본 및 다른 참조 독립성 보장
+    - _요구사항: 11.1, 11.2, 11.3, 11.4, 11.5_
+  - [ ]* 6.2 속성 테스트: 공유 요소 업데이트 전파 및 참조 독립성 (Property 4)
+    - **Property 4: 공유 요소 업데이트 전파 및 참조 독립성**
+    - 여러 다이어그램에서 참조되는 Shared_Element 속성 수정 → 모든 참조에 반영 검증
+    - 특정 다이어그램에서 참조 제거 → 원본/다른 참조 영향 없음 검증
+    - **검증: 요구사항 11.1, 11.2, 11.3**
+
+- [x] 7. 클립보드 매니저 구현
+  - [x] 7.1 ClipboardManager 구현
+    - `copy()`, `cut()`, `paste()`, `hasContent()` 구현
+    - 복사 시 선택된 요소와 요소 간 Connector 함께 저장
+    - 붙여넣기 시 새 ID 생성, 원본 속성 보존, Connector 관계 재구성
+    - _요구사항: 8.1, 8.2, 8.3, 8.4_
+  - [ ]* 7.2 속성 테스트: 클립보드 복사-붙여넣기 데이터 보존 (Property 11)
+    - **Property 11: 클립보드 복사-붙여넣기 데이터 보존**
+    - 복사 → 붙여넣기 후 원본과 동일한 속성 및 Connector 관계 보존 검증
+    - **검증: 요구사항 8.1, 8.2, 8.4**
+
+- [x] 8. 체크포인트 - 핵심 엔진 검증
+  - 모든 테스트가 통과하는지 확인하고, 질문이 있으면 사용자에게 문의한다.
+
+- [x] 9. Zustand 스토어 및 다이어그램 모델 관리
+  - [x] 9.1 프로젝트 스토어 구현
+    - 프로젝트 메타데이터, 트리 구조, 열린 다이어그램 상태 관리
+    - 활성 다이어그램 탭 상태 관리
+    - 수정 여부(dirty) 플래그 관리
+    - _요구사항: 1.1, 1.2, 10.5_
+  - [x] 9.2 다이어그램 모델 스토어 구현
+    - 활성 다이어그램의 DiagramData 상태 관리
+    - 요소 추가/이동/수정/삭제 액션 구현
+    - Connector 추가/삭제/경유점 변경 액션 구현
+    - 요소 삭제 시 연결된 Connector 연쇄 제거 로직
+    - _요구사항: 3.1, 3.2, 3.4, 3.5, 3.6, 3.7_
+  - [ ]* 9.3 속성 테스트: 요소 삭제 시 커넥터 연쇄 제거 (Property 8)
+    - **Property 8: 요소 삭제 시 커넥터 연쇄 제거**
+    - 임의의 다이어그램에서 요소 삭제 시 해당 요소에 연결된 모든 Connector 제거 검증
+    - **검증: 요구사항 3.4**
+
+- [x] 10. Sync Engine 구현
+  - [x] 10.1 양방향 동기화 엔진 구현
+    - `onTextChange()`: Text Editor 변경 → DSL 파싱 → 모델 업데이트 → Canvas 반영
+    - `onCanvasChange()`: Canvas 변경 → 모델 업데이트 → DSL 직렬화 → Text Editor 반영
+    - 디바운싱 적용 (Text Editor → Canvas: 300ms)
+    - `pause()`, `resume()` 구현 (대량 작업 시)
+    - _요구사항: 15.1, 15.2, 15.5, 15.6_
+  - [x] 10.2 동기화 오류 처리 구현
+    - DSL 구문 오류 시 마지막 유효 상태 Canvas 유지
+    - 오류 위치 Text Editor에 표시
+    - 동기화 중 사용자 입력 비차단 보장
+    - _요구사항: 15.3, 15.4_
+  - [x] 10.3 Sync Engine과 UndoManager 통합
+    - Text Editor와 Canvas 양쪽 변경을 통합 실행 취소 이력으로 관리
+    - _요구사항: 15.7_
+  - [ ]* 10.4 속성 테스트: 양방향 동기화 일관성 (Property 9)
+    - **Property 9: 양방향 동기화 일관성**
+    - Text Editor 또는 Canvas에서의 유효한 변경 후 반대쪽 뷰 반영 결과가 의미적으로 동일한지 검증
+    - **검증: 요구사항 15.1, 15.2, 15.5, 15.6**
+  - [ ]* 10.5 속성 테스트: 동기화 오류 복구 (Property 10)
+    - **Property 10: 동기화 오류 복구**
+    - 유효한 DSL 상태 이후 유효하지 않은 DSL 입력 시 Canvas가 마지막 유효 상태 유지 검증
+    - **검증: 요구사항 15.4**
+
+- [x] 11. Lazy Loader 및 LRU 캐시 구현
+  - [x] 11.1 LazyLoader 구현
+    - `loadProjectMetadata()`: 프로젝트 메타데이터만 로드
+    - `loadDiagram()`: 특정 다이어그램 데이터 로드 (캐시 확인 후)
+    - `getLoadState()`: 다이어그램 로드 상태 반환
+    - 로딩 진행 상태 이벤트 발행
+    - _요구사항: 12.1, 12.2, 12.3, 12.6_
+  - [x] 11.2 LRU 캐시 구현
+    - `LRUCache<K, V>` 구현: get, set, delete, size, maxSize
+    - 메모리 임계값 초과 시 `evictLRU()` 자동 호출
+    - 캐시된 다이어그램 재로드 없이 접근 보장
+    - _요구사항: 12.4, 12.5_
+  - [ ]* 11.3 속성 테스트: LRU 캐시 메모리 관리 (Property 18)
+    - **Property 18: LRU 캐시 메모리 관리**
+    - 임의의 다이어그램 접근 시퀀스에서 임계값 초과 시 LRU 해제 검증
+    - 캐시된 다이어그램 재로드 없이 접근 가능 검증
+    - **검증: 요구사항 12.4, 12.5**
+
+- [x] 12. 체크포인트 - 스토어 및 엔진 통합 검증
+  - 모든 테스트가 통과하는지 확인하고, 질문이 있으면 사용자에게 문의한다.
+
+- [x] 13. Electron Main Process 및 IPC 구현
+  - [x] 13.1 File I/O Manager 구현
+    - 프로젝트 파일 읽기/쓰기 IPC 핸들러 구현
+    - 개별 다이어그램 DSL 파일 읽기/쓰기 구현
+    - 파일 저장 대화 상자 (saveDialog) 연동
+    - 파일 열기 대화 상자 (openDialog) 연동
+    - 파일 I/O 오류 처리 (디스크 공간 부족, 권한 없음 등)
+    - _요구사항: 1.2, 1.3, 5.4_
+  - [x] 13.2 최근 프로젝트 목록 관리 구현
+    - 최근 프로젝트 경로 저장/로드 (electron-store 또는 JSON 파일)
+    - 최대 10개 제한, 역시간순 정렬
+    - _요구사항: 1.5_
+  - [ ]* 13.3 속성 테스트: 최근 프로젝트 목록 크기 불변량 (Property 16)
+    - **Property 16: 최근 프로젝트 목록 크기 불변량**
+    - 임의의 프로젝트 열기 시퀀스에서 목록 최대 10개 초과 불가 및 역시간순 정렬 검증
+    - **검증: 요구사항 1.5**
+
+- [x] 14. Canvas (Konva.js) UI 구현
+  - [x] 14.1 Canvas 기본 렌더링 및 뷰포트 제어 구현
+    - Konva.js Stage/Layer 설정
+    - 마우스 휠 확대/축소 (25% ~ 400%)
+    - 빈 영역 드래그로 뷰포트 패닝
+    - 전체 보기(fit-all) 기능
+    - _요구사항: 7.1, 7.2, 7.3, 7.4_
+  - [x] 14.2 다이어그램 요소 렌더링 구현
+    - 각 ElementType별 Konva Shape 렌더링 (클래스, 액터, 상태 등)
+    - 요소 선택, 드래그 이동, 크기 조절 핸들 구현
+    - Connector 렌더링 (선 스타일, 화살표, 라벨, 다중성)
+    - Connector 경유점 드래그 구현
+    - _요구사항: 3.1, 3.2, 3.5, 3.6, 3.7, 17.1, 17.6_
+  - [x] 14.3 Canvas 요소 편집 기능 구현
+    - 요소 더블클릭 시 Property Panel 연동
+    - 다중 선택 및 정렬/균등 배분 기능
+    - 요소 이동 시 연결된 Connector 경로 자동 재계산
+    - _요구사항: 3.3, 17.2, 17.4, 17.5_
+
+- [x] 15. Text Editor (Monaco Editor) UI 구현
+  - [x] 15.1 Monaco Editor 통합 및 DSL 언어 지원 구현
+    - Monaco Editor React 컴포넌트 통합
+    - DSL 문법 구문 강조(syntax highlighting) 정의
+    - DSL 키워드 및 요소 이름 자동 완성 기능 구현
+    - 행 번호 표시 설정
+    - 인라인 오류 마커 표시 (DSL 파싱 오류)
+    - _요구사항: 14.1, 14.7, 14.8, 14.5_
+  - [x] 15.2 Text Editor와 Sync Engine 연동
+    - Monaco Editor onChange → SyncEngine.onTextChange() 연결
+    - SyncEngine에서 Text Editor 텍스트 업데이트 연결
+    - 대량 DSL 붙여넣기 감지 및 진행 상태 표시
+    - 붙여넣기 시 중복 요소 이름 처리 대화 상자
+    - _요구사항: 15.1, 16.1, 16.2, 16.3, 16.4, 16.5_
+
+- [x] 16. 분할 뷰 및 레이아웃 구현
+  - [x] 16.1 SplitView 컴포넌트 구현
+    - Text Editor(좌측) + Canvas(우측) 분할 레이아웃
+    - 구분선 드래그로 너비 비율 조정
+    - Canvas 전용 / Text Editor 전용 / Split View 모드 전환
+    - 뷰 모드 전환 시 다이어그램 상태 유지
+    - 마지막 선택 뷰 모드 및 구분선 위치 세션 유지
+    - _요구사항: 18.1, 18.2, 18.3, 18.4, 18.5, 18.6_
+
+- [x] 17. Toolbar 및 Property Panel 구현
+  - [x] 17.1 다이어그램 유형별 Toolbar 구현
+    - 다이어그램 유형 선택 UI
+    - 선택된 다이어그램 유형에 따른 도구 모음 동적 표시
+    - 각 도구 클릭 → Canvas 요소 배치 모드 활성화
+    - _요구사항: 2.6, 2.7, 3.1_
+  - [ ]* 17.2 속성 테스트: 다이어그램 유형별 도구 모음 유효성 (Property 17)
+    - **Property 17: 다이어그램 유형별 도구 모음 유효성**
+    - 임의의 다이어그램 유형에 대해 Toolbar 도구가 해당 유형에 유효한 요소 유형의 부분집합인지 검증
+    - **검증: 요구사항 2.7**
+  - [x] 17.3 Property Panel 구현
+    - 선택된 요소의 편집 가능한 속성 표시 (이름, 속성, 메서드 등)
+    - 속성 변경 시 Canvas와 Text Editor에 즉시 반영
+    - Shared_Element 선택 시 참조 다이어그램 목록 표시
+    - _요구사항: 3.3, 17.2, 17.3, 11.4_
+
+- [x] 18. Project Tree 및 다이어그램 탭 구현
+  - [x] 18.1 Project Tree 컴포넌트 구현
+    - 계층적 트리 구조 표시 (폴더, 패키지, 다이어그램)
+    - 폴더 생성, 이름 변경, 삭제 (확인 대화 상자 포함)
+    - 다이어그램 드래그 앤 드롭으로 폴더 이동
+    - 폴더 펼침/접힘 상태 세션 유지
+    - 현재 활성 탭에 해당하는 항목 강조 표시
+    - 폴더 하위 다이어그램 개수 표시
+    - _요구사항: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 13.4, 13.5_
+  - [x] 18.2 Project Tree 검색 기능 구현
+    - 검색어 입력 시 다이어그램 이름/요소 이름 기준 필터링
+    - 검색 결과 선택 시 해당 다이어그램 열기 및 요소 Canvas 중앙 표시
+    - _요구사항: 13.1, 13.2_
+  - [ ]* 18.3 속성 테스트: 프로젝트 트리 검색 필터 정확성 (Property 15)
+    - **Property 15: 프로젝트 트리 검색 필터 정확성**
+    - 임의의 검색어와 프로젝트 트리에 대해 반환된 모든 항목이 검색어와 일치하는지 검증
+    - **검증: 요구사항 13.1**
+  - [x] 18.4 Diagram Tab 컴포넌트 구현
+    - 다이어그램 더블클릭 시 새 탭 열기 (이미 열려 있으면 기존 탭 활성화)
+    - 탭 클릭으로 활성 다이어그램 전환
+    - 탭 닫기 (저장하지 않은 변경사항 확인 대화 상자)
+    - 탭에 다이어그램 이름 및 수정 여부 표시자 표시
+    - _요구사항: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6_
+  - [x] 18.5 Shared_Element 컨텍스트 메뉴 구현
+    - Canvas에서 Shared_Element 우클릭 → "참조 다이어그램으로 이동" 메뉴
+    - 참조 다이어그램 목록 표시 및 선택 시 해당 다이어그램으로 이동
+    - _요구사항: 13.3_
+
+- [x] 19. 체크포인트 - UI 컴포넌트 통합 검증
+  - 모든 테스트가 통과하는지 확인하고, 질문이 있으면 사용자에게 문의한다.
+
+- [x] 20. 내보내기 엔진 구현
+  - [x] 20.1 PNG/SVG/PDF 내보내기 구현
+    - `ExportEngine.exportPNG()`: Konva Stage → PNG 변환 (html2canvas)
+    - `ExportEngine.exportSVG()`: DiagramData → SVG 직접 생성
+    - `ExportEngine.exportPDF()`: SVG → PDF 변환 (jsPDF)
+    - 내보내기 옵션 (scale, backgroundColor, padding) 지원
+    - 파일 저장 대화 상자 연동
+    - 내보내기 오류 시 오류 원인 메시지 표시
+    - _요구사항: 5.1, 5.2, 5.3, 5.4, 5.5_
+
+- [x] 21. 버전 관리 (Version Manager) 구현
+  - [x] 21.1 스냅샷 생성 및 복원 구현
+    - `createSnapshot()`: 현재 프로젝트 상태를 .versions/ 디렉토리에 저장
+    - 스냅샷 설명 메시지 입력 대화 상자
+    - 각 스냅샷에 생성 시각, 설명 메시지, 고유 식별자 기록
+    - `restoreSnapshot()`: 선택된 스냅샷으로 프로젝트 상태 복원
+    - 복원 시 저장하지 않은 변경사항 확인 대화 상자
+    - 스냅샷 없는 상태에서 되돌리기 시 안내 메시지 표시
+    - _요구사항: 19.1, 19.2, 19.3, 19.5, 19.6, 19.8, 19.10_
+  - [x] 21.2 버전 이력 및 Diff Viewer 구현
+    - `getHistory()`: 시간순 스냅샷 목록 표시 UI
+    - `deleteSnapshot()`: 스냅샷 삭제 기능
+    - `diff()`: 두 스냅샷 간 차이점 비교
+    - Diff Viewer UI: 추가/수정/삭제된 요소 및 DSL 텍스트 변경 사항 표시
+    - _요구사항: 19.4, 19.7, 19.9_
+  - [ ]* 21.3 속성 테스트: 스냅샷 복원 라운드트립 (Property 13)
+    - **Property 13: 스냅샷 복원 라운드트립**
+    - 스냅샷 생성 → 프로젝트 수정 → 스냅샷 복원 → 생성 시점 상태와 동일 검증
+    - **검증: 요구사항 19.5**
+  - [ ]* 21.4 속성 테스트: 스냅샷 메타데이터 완전성 및 시간순 정렬 (Property 14)
+    - **Property 14: 스냅샷 메타데이터 완전성 및 시간순 정렬**
+    - 임의의 스냅샷 시퀀스에서 각 스냅샷이 생성 시각, 설명, 고유 ID를 포함하고 시간순 정렬 검증
+    - **검증: 요구사항 19.3, 19.4**
+
+- [x] 22. 프로젝트 생성/저장/열기 통합 및 저장 확인 대화 상자
+  - [x] 22.1 프로젝트 생성/저장/열기 워크플로우 통합
+    - 새 프로젝트 생성 시 빈 Canvas 포함 프로젝트 초기화
+    - 프로젝트 저장: Zustand 스토어 → ProjectFileSerializer → File I/O
+    - 프로젝트 열기: File I/O → ProjectFileParser → Zustand 스토어 → Canvas 복원
+    - 저장하지 않은 변경사항 있을 때 닫기 시 확인 대화 상자
+    - _요구사항: 1.1, 1.2, 1.3, 1.4_
+
+- [x] 23. 최종 체크포인트 - 전체 통합 검증
+  - 모든 테스트가 통과하는지 확인하고, 질문이 있으면 사용자에게 문의한다.
+
+## 참고 사항
+
+- `*` 표시된 태스크는 선택 사항이며 빠른 MVP를 위해 건너뛸 수 있다
+- 각 태스크는 특정 요구사항을 참조하여 추적 가능성을 보장한다
+- 체크포인트에서 점진적 검증을 수행한다
+- 속성 테스트(Property-Based Test)는 설계 문서의 18개 정확성 속성을 검증한다
+- 단위 테스트는 구체적인 시나리오와 엣지 케이스를 검증한다
