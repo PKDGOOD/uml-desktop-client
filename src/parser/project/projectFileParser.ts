@@ -1,0 +1,235 @@
+import type {
+  ProjectData,
+  ProjectMetadata,
+  ProjectTreeNode,
+  DiagramData,
+  DiagramElement,
+} from '@/types';
+
+export interface ProjectFileParseError {
+  message: string;
+  position?: { line: number; column: number; offset: number };
+  path?: string;
+}
+
+export type ProjectFileParseResult<T> =
+  | { success: true; data: T }
+  | { success: false; errors: ProjectFileParseError[] };
+
+/**
+ * Parses JSON position info from a SyntaxError message.
+ * JSON.parse errors typically include "at position N" in the message.
+ */
+function extractJsonErrorPosition(
+  content: string,
+  error: unknown,
+): { line: number; column: number; offset: number } | undefined {
+  if (!(error instanceof SyntaxError)) return undefined;
+
+  // Try "at position N" format (older Node / some engines)
+  let match = error.message.match(/position\s+(\d+)/i);
+  if (!match) {
+    // Try "at line N column M" format
+    const lineColMatch = error.message.match(/line\s+(\d+)\s+column\s+(\d+)/i);
+    if (lineColMatch) {
+      return {
+        line: parseInt(lineColMatch[1], 10),
+        column: parseInt(lineColMatch[2], 10),
+        offset: 0,
+      };
+    }
+    // Fallback: find the problematic token in the content
+    const tokenMatch = error.message.match(/Unexpected token '(.)'|Unexpected token (.)/);
+    if (tokenMatch) {
+      const token = tokenMatch[1] || tokenMatch[2];
+      // Find first occurrence of unexpected token that's not inside a string
+      const idx = findUnexpectedTokenPosition(content, token);
+      if (idx >= 0) {
+        return offsetToPosition(content, idx);
+      }
+    }
+    return undefined;
+  }
+
+  const offset = parseInt(match[1], 10);
+  return offsetToPosition(content, offset);
+}
+
+function offsetToPosition(
+  content: string,
+  offset: number,
+): { line: number; column: number; offset: number } {
+  let line = 1;
+  let column = 1;
+  for (let i = 0; i < offset && i < content.length; i++) {
+    if (content[i] === '\n') {
+      line++;
+      column = 1;
+    } else {
+      column++;
+    }
+  }
+  return { line, column, offset };
+}
+
+function findUnexpectedTokenPosition(content: string, token: string): number {
+  // Simple heuristic: scan for the token outside of string literals
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === '\\' && inString) {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString && ch === token) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function tryParseJson(content: string): ProjectFileParseResult<unknown> {
+  try {
+    return { success: true, data: JSON.parse(content) };
+  } catch (err) {
+    const position = extractJsonErrorPosition(content, err);
+    const message =
+      err instanceof Error ? `Invalid JSON: ${err.message}` : 'Invalid JSON';
+    return { success: false, errors: [{ message, position }] };
+  }
+}
+
+function validateMetadata(
+  obj: Record<string, unknown>,
+): ProjectFileParseError[] {
+  const errors: ProjectFileParseError[] = [];
+  if (!obj.metadata || typeof obj.metadata !== 'object') {
+    errors.push({ message: 'Missing required field: metadata', path: 'metadata' });
+  } else {
+    const meta = obj.metadata as Record<string, unknown>;
+    if (typeof meta.name !== 'string')
+      errors.push({ message: 'Missing required field: metadata.name', path: 'metadata.name' });
+    if (typeof meta.version !== 'string')
+      errors.push({ message: 'Missing required field: metadata.version', path: 'metadata.version' });
+    if (typeof meta.createdAt !== 'string')
+      errors.push({ message: 'Missing required field: metadata.createdAt', path: 'metadata.createdAt' });
+    if (typeof meta.updatedAt !== 'string')
+      errors.push({ message: 'Missing required field: metadata.updatedAt', path: 'metadata.updatedAt' });
+    if (!meta.diagramIndex || typeof meta.diagramIndex !== 'object')
+      errors.push({ message: 'Missing required field: metadata.diagramIndex', path: 'metadata.diagramIndex' });
+  }
+  if (!Array.isArray(obj.tree)) {
+    errors.push({ message: 'Missing required field: tree', path: 'tree' });
+  }
+  if (!obj.sharedElements || typeof obj.sharedElements !== 'object') {
+    errors.push({ message: 'Missing required field: sharedElements', path: 'sharedElements' });
+  }
+  return errors;
+}
+
+export const ProjectFileParser = {
+  /**
+   * Parse only metadata, tree, and sharedElements (for lazy loading).
+   * Does NOT parse diagrams.
+   */
+  parseMetadata(
+    content: string,
+  ): ProjectFileParseResult<{
+    metadata: ProjectMetadata;
+    tree: ProjectTreeNode[];
+    sharedElements: Record<string, DiagramElement>;
+  }> {
+    const jsonResult = tryParseJson(content);
+    if (!jsonResult.success) return jsonResult;
+
+    const obj = jsonResult.data as Record<string, unknown>;
+    const validationErrors = validateMetadata(obj);
+    if (validationErrors.length > 0) {
+      return { success: false, errors: validationErrors };
+    }
+
+    return {
+      success: true,
+      data: {
+        metadata: obj.metadata as ProjectMetadata,
+        tree: obj.tree as ProjectTreeNode[],
+        sharedElements: obj.sharedElements as Record<string, DiagramElement>,
+      },
+    };
+  },
+
+  /**
+   * Parse a specific diagram from the diagrams section.
+   */
+  parseDiagram(
+    content: string,
+    diagramId: string,
+  ): ProjectFileParseResult<DiagramData> {
+    const jsonResult = tryParseJson(content);
+    if (!jsonResult.success) return jsonResult;
+
+    const obj = jsonResult.data as Record<string, unknown>;
+    if (!obj.diagrams || typeof obj.diagrams !== 'object') {
+      return {
+        success: false,
+        errors: [{ message: 'Missing required field: diagrams', path: 'diagrams' }],
+      };
+    }
+
+    const diagrams = obj.diagrams as Record<string, unknown>;
+    if (!(diagramId in diagrams)) {
+      return {
+        success: false,
+        errors: [
+          {
+            message: `Diagram not found: "${diagramId}"`,
+            path: `diagrams.${diagramId}`,
+          },
+        ],
+      };
+    }
+
+    return { success: true, data: diagrams[diagramId] as DiagramData };
+  },
+
+  /**
+   * Parse the entire project file.
+   */
+  parseAll(content: string): ProjectFileParseResult<ProjectData> {
+    const jsonResult = tryParseJson(content);
+    if (!jsonResult.success) return jsonResult;
+
+    const obj = jsonResult.data as Record<string, unknown>;
+    const validationErrors = validateMetadata(obj);
+
+    if (!obj.diagrams || typeof obj.diagrams !== 'object') {
+      validationErrors.push({
+        message: 'Missing required field: diagrams',
+        path: 'diagrams',
+      });
+    }
+
+    if (validationErrors.length > 0) {
+      return { success: false, errors: validationErrors };
+    }
+
+    return {
+      success: true,
+      data: {
+        metadata: obj.metadata as ProjectMetadata,
+        tree: obj.tree as ProjectTreeNode[],
+        sharedElements: obj.sharedElements as Record<string, DiagramElement>,
+        diagrams: obj.diagrams as Record<string, DiagramData>,
+      },
+    };
+  },
+};
