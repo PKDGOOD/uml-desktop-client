@@ -99,6 +99,10 @@ export type ConnectorType =
   // 액티비티/상태 다이어그램
   | 'transition';
 
+export type CanvasTool =
+  | { kind: 'element'; type: ElementType }
+  | { kind: 'connector'; type: ConnectorType };
+
 export interface ConnectorProperties {
   lineStyle?: 'solid' | 'dashed';
   arrowStyle?: 'open' | 'closed' | 'diamond' | 'diamond-filled';

@@ -3,7 +3,7 @@
 // =============================================================================
 
 import React, { useState, useCallback } from 'react';
-import type { DiagramType, ElementType } from '../../types';
+import type { CanvasTool, ConnectorType, DiagramType, ElementType } from '../../types';
 
 /** Tools available per diagram type */
 export const DIAGRAM_TOOLS: Record<DiagramType, { type: ElementType; label: string }[]> = {
@@ -37,6 +37,13 @@ export const DIAGRAM_TOOLS: Record<DiagramType, { type: ElementType; label: stri
   ],
 };
 
+const CLASS_CONNECTOR_TOOLS: { type: ConnectorType; label: string }[] = [
+  { type: 'directed-association', label: 'Association' },
+  { type: 'dependency', label: 'Dependency' },
+  { type: 'inheritance', label: 'Inheritance' },
+  { type: 'composition', label: 'Composition' },
+];
+
 const DIAGRAM_TYPE_LABELS: Record<DiagramType, string> = {
   class: 'Class Diagram',
   sequence: 'Sequence Diagram',
@@ -50,10 +57,10 @@ export interface ToolbarProps {
   diagramType: DiagramType;
   /** Called when diagram type changes */
   onDiagramTypeChange: (type: DiagramType) => void;
-  /** Called when a tool is clicked to activate element placement mode */
-  onToolSelect: (elementType: ElementType) => void;
+  /** Called when a tool is clicked to activate canvas creation mode */
+  onToolSelect: (tool: CanvasTool) => void;
   /** Currently active tool (for highlighting) */
-  activeTool?: ElementType | null;
+  activeTool?: CanvasTool | null;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -149,22 +156,47 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       {tools.map((tool) => (
         <button
           key={tool.type}
-          onClick={() => onToolSelect(tool.type)}
+          onClick={() => onToolSelect({ kind: 'element', type: tool.type })}
           title={tool.label}
           style={{
             padding: '4px 10px',
             fontSize: 12,
             border: '1px solid',
-            borderColor: activeTool === tool.type ? '#1976D2' : '#ccc',
+            borderColor: activeTool?.kind === 'element' && activeTool.type === tool.type ? '#1976D2' : '#ccc',
             borderRadius: 3,
-            background: activeTool === tool.type ? '#e3f2fd' : '#fff',
-            color: activeTool === tool.type ? '#1976D2' : '#333',
+            background: activeTool?.kind === 'element' && activeTool.type === tool.type ? '#e3f2fd' : '#fff',
+            color: activeTool?.kind === 'element' && activeTool.type === tool.type ? '#1976D2' : '#333',
             cursor: 'pointer',
           }}
         >
           {tool.label}
         </button>
       ))}
+
+      {diagramType === 'class' && (
+        <>
+          <div style={{ width: 1, height: 24, background: '#ddd' }} />
+          {CLASS_CONNECTOR_TOOLS.map((tool) => (
+            <button
+              key={tool.type}
+              onClick={() => onToolSelect({ kind: 'connector', type: tool.type })}
+              title={tool.label}
+              style={{
+                padding: '4px 10px',
+                fontSize: 12,
+                border: '1px solid',
+                borderColor: activeTool?.kind === 'connector' && activeTool.type === tool.type ? '#1976D2' : '#ccc',
+                borderRadius: 3,
+                background: activeTool?.kind === 'connector' && activeTool.type === tool.type ? '#e3f2fd' : '#fff',
+                color: activeTool?.kind === 'connector' && activeTool.type === tool.type ? '#1976D2' : '#333',
+                cursor: 'pointer',
+              }}
+            >
+              {tool.label}
+            </button>
+          ))}
+        </>
+      )}
     </div>
   );
 };

@@ -1,4 +1,6 @@
 import type {
+  Connector,
+  ConnectorType,
   DiagramElement,
   DiagramType,
   ElementProperties,
@@ -39,6 +41,13 @@ const CLASS_DIAGRAM_TOOLS = new Set<ElementType>([
   'enum',
 ]);
 
+const CLASS_CONNECTOR_TOOLS = new Set<ConnectorType>([
+  'directed-association',
+  'dependency',
+  'inheritance',
+  'composition',
+]);
+
 function nextElementName(baseName: string, elements: DiagramElement[]): string {
   const names = new Set(elements.map((element) => element.properties.name));
   if (!names.has(baseName)) return baseName;
@@ -50,8 +59,8 @@ function nextElementName(baseName: string, elements: DiagramElement[]): string {
   return `${baseName}${suffix}`;
 }
 
-function createElementId(type: ElementType): string {
-  return `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+function createCanvasId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 export function createCanvasElement(
@@ -68,7 +77,7 @@ export function createCanvasElement(
   if (!defaults) return null;
 
   return {
-    id: createElementId(elementType),
+    id: createCanvasId(elementType),
     type: elementType,
     position,
     size: defaults.size,
@@ -76,5 +85,28 @@ export function createCanvasElement(
       name: nextElementName(defaults.baseName, existingElements),
       ...defaults.properties,
     },
+  };
+}
+
+export function createCanvasConnector(
+  diagramType: DiagramType,
+  connectorType: ConnectorType,
+  sourceId: string,
+  targetId: string,
+): Connector | null {
+  if (
+    diagramType !== 'class' ||
+    sourceId === targetId ||
+    !CLASS_CONNECTOR_TOOLS.has(connectorType)
+  ) {
+    return null;
+  }
+
+  return {
+    id: createCanvasId(connectorType),
+    type: connectorType,
+    sourceId,
+    targetId,
+    properties: {},
   };
 }
