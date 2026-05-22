@@ -8,7 +8,8 @@ import { useDiagramStore } from '../../store/diagramStore';
 import { useCanvasControls } from './useCanvasControls';
 import { ElementRenderer } from './ElementRenderer';
 import { ConnectorRenderer } from './ConnectorRenderer';
-import type { Position, Size, CanvasChange, DiagramElement } from '../../types';
+import { createCanvasElement } from '../../engine/elementFactory';
+import type { Position, Size, CanvasChange, ElementType } from '../../types';
 
 export interface UMLCanvasProps {
   width: number;
@@ -19,6 +20,8 @@ export interface UMLCanvasProps {
   onElementDoubleClick?: (elementId: string) => void;
   /** Called when selection changes */
   onSelectionChange?: (selectedIds: string[]) => void;
+  /** Active element placement tool */
+  activeTool?: ElementType | null;
 }
 
 export const UMLCanvas: React.FC<UMLCanvasProps> = ({
@@ -27,6 +30,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
   onCanvasChange,
   onElementDoubleClick,
   onSelectionChange,
+  activeTool = null,
 }) => {
   const diagram = useDiagramStore((s) => s.diagram);
   const { viewport, stageRef, handleWheel, setViewport, fitAll, handleDragEnd } =
@@ -108,6 +112,16 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
       const x = (pos.x - viewport.x) / viewport.zoom;
       const y = (pos.y - viewport.y) / viewport.zoom;
 
+      if (activeTool && diagram) {
+        const element = createCanvasElement(diagram.type, activeTool, { x, y }, elements);
+        if (element) {
+          onCanvasChange?.({ type: 'element-add', element });
+          setSelectedElementIds(new Set([element.id]));
+          setSelectedConnectorIds(new Set());
+          return;
+        }
+      }
+
       if (!e.evt.shiftKey) {
         clearSelection();
       }
@@ -115,7 +129,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
       isSelecting.current = true;
       setSelectionRect({ start: { x, y }, end: { x, y } });
     },
-    [viewport, clearSelection],
+    [activeTool, clearSelection, diagram, elements, onCanvasChange, viewport],
   );
 
   const handleStageMouseMove = useCallback(
@@ -316,7 +330,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
         scaleY={viewport.zoom}
         x={viewport.x}
         y={viewport.y}
-        draggable
+        draggable={!activeTool}
         onWheel={handleWheel}
         onDragEnd={handleDragEnd}
         onMouseDown={handleStageMouseDown}

@@ -232,6 +232,7 @@ const App: React.FC = () => {
   const [dslErrors, setDslErrors] = useState<DSLError[]>([]);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const canvasContainerRef = useRef<HTMLDivElement>(null);
+  const activeDiagramIdRef = useRef<string | null>(null);
 
   // SyncEngine and UndoManager refs
   const undoManagerRef = useRef(new UndoManager());
@@ -242,6 +243,17 @@ const App: React.FC = () => {
     syncEngineRef.current = new SyncEngine({
       onDiagramUpdate: (diagram) => {
         diagramStore.setDiagram(diagram);
+        setProjectData((current) => {
+          if (!current) return current;
+          const diagramId = activeDiagramIdRef.current ?? diagram.id;
+          return {
+            ...current,
+            diagrams: {
+              ...current.diagrams,
+              [diagramId]: diagram,
+            },
+          };
+        });
       },
       onTextUpdate: (text) => {
         setDslText(text);
@@ -253,6 +265,10 @@ const App: React.FC = () => {
       debounceMs: 300,
     });
   }, []);
+
+  useEffect(() => {
+    activeDiagramIdRef.current = projectStore.activeDiagramId;
+  }, [projectStore.activeDiagramId]);
 
   // Auto-load example project on mount
   useEffect(() => {
@@ -308,6 +324,7 @@ const App: React.FC = () => {
     const project = createEmptyProject('New Project');
     setProjectData(project);
     setProjectFilePath(null);
+    projectStore.reset();
     projectStore.setMetadata(project.metadata);
     projectStore.setTree(project.tree);
     projectStore.setDirty(false);
@@ -330,7 +347,11 @@ const App: React.FC = () => {
     if (!projectData) return;
 
     const currentDiagram = diagramStore.diagram;
-    const updatedData = { ...projectData };
+    const updatedData = {
+      ...projectData,
+      metadata: projectStore.metadata ?? projectData.metadata,
+      tree: projectStore.tree,
+    };
     if (currentDiagram && projectStore.activeDiagramId) {
       updatedData.diagrams = {
         ...updatedData.diagrams,
@@ -393,9 +414,6 @@ const App: React.FC = () => {
       const project = result.data;
       setProjectData(project);
       setProjectFilePath(filePath);
-      projectStore.setMetadata(project.metadata);
-      projectStore.setTree(project.tree);
-      projectStore.setDirty(false);
       projectStore.reset();
       projectStore.setMetadata(project.metadata);
       projectStore.setTree(project.tree);
@@ -450,6 +468,14 @@ const App: React.FC = () => {
 
   const handleDiagramOpen = useCallback(
     (diagramId: string) => {
+      const currentDiagram = diagramStore.getDiagram();
+      const currentDiagramId = projectStore.activeDiagramId;
+      if (currentDiagram && currentDiagramId) {
+        setProjectData((current) => current && ({
+          ...current,
+          diagrams: { ...current.diagrams, [currentDiagramId]: currentDiagram },
+        }));
+      }
       projectStore.openDiagram(diagramId);
       if (projectData?.diagrams[diagramId]) {
         const diagram = projectData.diagrams[diagramId];
@@ -464,6 +490,14 @@ const App: React.FC = () => {
 
   const handleTabClick = useCallback(
     (diagramId: string) => {
+      const currentDiagram = diagramStore.getDiagram();
+      const currentDiagramId = projectStore.activeDiagramId;
+      if (currentDiagram && currentDiagramId) {
+        setProjectData((current) => current && ({
+          ...current,
+          diagrams: { ...current.diagrams, [currentDiagramId]: currentDiagram },
+        }));
+      }
       projectStore.setActiveDiagram(diagramId);
       if (projectData?.diagrams[diagramId]) {
         const diagram = projectData.diagrams[diagramId];
@@ -478,14 +512,41 @@ const App: React.FC = () => {
 
   const handleTabClose = useCallback(
     (diagramId: string) => {
+      const currentDiagram = diagramStore.getDiagram();
+      if (currentDiagram && projectStore.activeDiagramId === diagramId) {
+        setProjectData((current) => current && ({
+          ...current,
+          diagrams: { ...current.diagrams, [diagramId]: currentDiagram },
+        }));
+      }
+
+      const remainingDiagramIds = projectStore.openDiagramIds.filter((id) => id !== diagramId);
+      const nextActiveId = projectStore.activeDiagramId === diagramId
+        ? remainingDiagramIds[remainingDiagramIds.length - 1] ?? null
+        : projectStore.activeDiagramId;
+
       projectStore.closeDiagram(diagramId);
+
+      if (nextActiveId && projectData?.diagrams[nextActiveId]) {
+        const nextDiagram = projectData.diagrams[nextActiveId];
+        diagramStore.setDiagram(nextDiagram);
+        syncEngineRef.current?.setDiagram(nextDiagram);
+        setDslText(serializeDSL(nextDiagram));
+        setDiagramType(nextDiagram.type);
+        setSelectedElement(null);
+      } else if (!nextActiveId) {
+        diagramStore.reset();
+        setDslText('');
+        setSelectedElement(null);
+      }
     },
-    [projectStore],
+    [diagramStore, projectData, projectStore],
   );
 
   const handleTreeChange = useCallback(
     (tree: ProjectTreeNode[]) => {
       projectStore.setTree(tree);
+      setProjectData((current) => current && ({ ...current, tree }));
       projectStore.setDirty(true);
     },
     [projectStore],
@@ -500,6 +561,13 @@ const App: React.FC = () => {
       // Sync text editor
       const diagram = diagramStore.getDiagram();
       if (diagram) {
+        setProjectData((current) => current && ({
+          ...current,
+          diagrams: {
+            ...current.diagrams,
+            [diagram.id]: diagram,
+          },
+        }));
         syncEngineRef.current?.setDiagram(diagram);
         setDslText(serializeDSL(diagram));
       }
@@ -595,6 +663,7 @@ const App: React.FC = () => {
                 <UMLCanvas
                   width={canvasSize.width}
                   height={canvasSize.height}
+                  activeTool={activeTool}
                   onCanvasChange={handleCanvasChange}
                   onElementDoubleClick={handleElementDoubleClick}
                   onSelectionChange={handleSelectionChange}

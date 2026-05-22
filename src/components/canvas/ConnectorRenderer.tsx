@@ -135,10 +135,11 @@ export const ConnectorRenderer: React.FC<ConnectorRendererProps> = ({
     onWaypointDragEnd(connector.id, newWaypoints);
   };
 
-  // Label position: midpoint of the line
-  const midIdx = Math.floor(allPoints.length / 4) * 2;
-  const labelX = (allPoints[midIdx] + allPoints[midIdx + 2]) / 2;
-  const labelY = (allPoints[midIdx + 1] + allPoints[midIdx + 3]) / 2;
+  // Label position: midpoint of the middle segment.
+  const segmentCount = allPoints.length / 2 - 1;
+  const segmentStartIndex = Math.floor((segmentCount - 1) / 2) * 2;
+  const labelX = (allPoints[segmentStartIndex] + allPoints[segmentStartIndex + 2]) / 2;
+  const labelY = (allPoints[segmentStartIndex + 1] + allPoints[segmentStartIndex + 3]) / 2;
 
   return (
     <Group onClick={handleClick} onTap={handleClick}>
