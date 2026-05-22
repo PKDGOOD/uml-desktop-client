@@ -8,8 +8,8 @@ import { useDiagramStore } from '../../store/diagramStore';
 import { useCanvasControls } from './useCanvasControls';
 import { ElementRenderer } from './ElementRenderer';
 import { ConnectorRenderer } from './ConnectorRenderer';
-import { createCanvasElement } from '../../engine/elementFactory';
-import type { Position, Size, CanvasChange, ElementType } from '../../types';
+import { createCanvasConnector, createCanvasElement } from '../../engine/elementFactory';
+import type { CanvasTool, Position, Size, CanvasChange } from '../../types';
 
 export interface UMLCanvasProps {
   width: number;
@@ -21,7 +21,7 @@ export interface UMLCanvasProps {
   /** Called when selection changes */
   onSelectionChange?: (selectedIds: string[]) => void;
   /** Active element placement tool */
-  activeTool?: ElementType | null;
+  activeTool?: CanvasTool | null;
 }
 
 export const UMLCanvas: React.FC<UMLCanvasProps> = ({
@@ -38,6 +38,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
 
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
   const [selectedConnectorIds, setSelectedConnectorIds] = useState<Set<string>>(new Set());
+  const [connectorSourceId, setConnectorSourceId] = useState<string | null>(null);
   const [selectionRect, setSelectionRect] = useState<{
     start: Position;
     end: Position;
@@ -57,12 +58,43 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
     if (diagram?.viewport) {
       setViewport(diagram.viewport);
     }
+    setConnectorSourceId(null);
+    clearSelection();
   }, [diagram?.id]);
+
+  useEffect(() => {
+    if (activeTool?.kind !== 'connector') {
+      setConnectorSourceId(null);
+    }
+  }, [activeTool]);
 
   // --- Selection ---
 
   const handleElementSelect = useCallback(
     (elementId: string, shiftKey: boolean) => {
+      if (activeTool?.kind === 'connector' && diagram) {
+        if (!connectorSourceId) {
+          setConnectorSourceId(elementId);
+          setSelectedElementIds(new Set([elementId]));
+          setSelectedConnectorIds(new Set());
+          return;
+        }
+
+        const connector = createCanvasConnector(
+          diagram.type,
+          activeTool.type,
+          connectorSourceId,
+          elementId,
+        );
+        if (connector) {
+          onCanvasChange?.({ type: 'connector-add', connector });
+          setSelectedElementIds(new Set());
+          setSelectedConnectorIds(new Set([connector.id]));
+        }
+        setConnectorSourceId(null);
+        return;
+      }
+
       setSelectedConnectorIds(new Set());
       setSelectedElementIds((prev) => {
         const next = new Set(shiftKey ? prev : []);
@@ -74,7 +106,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
         return next;
       });
     },
-    [],
+    [activeTool, connectorSourceId, diagram, onCanvasChange],
   );
 
   const handleConnectorSelect = useCallback(
@@ -98,6 +130,33 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
     setSelectedConnectorIds(new Set());
   }, []);
 
+  const isTypingTarget = (target: EventTarget | null): boolean => {
+    if (!(target instanceof HTMLElement)) return false;
+    return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.key !== 'Delete' && event.key !== 'Backspace') || isTypingTarget(event.target)) {
+        return;
+      }
+
+      if (selectedElementIds.size === 0 && selectedConnectorIds.size === 0) return;
+
+      event.preventDefault();
+      for (const connectorId of selectedConnectorIds) {
+        onCanvasChange?.({ type: 'connector-delete', connectorId });
+      }
+      for (const elementId of selectedElementIds) {
+        onCanvasChange?.({ type: 'element-delete', elementId });
+      }
+      clearSelection();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [clearSelection, onCanvasChange, selectedConnectorIds, selectedElementIds]);
+
   // --- Drag selection box ---
 
   const handleStageMouseDown = useCallback(
@@ -112,8 +171,8 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
       const x = (pos.x - viewport.x) / viewport.zoom;
       const y = (pos.y - viewport.y) / viewport.zoom;
 
-      if (activeTool && diagram) {
-        const element = createCanvasElement(diagram.type, activeTool, { x, y }, elements);
+      if (activeTool?.kind === 'element' && diagram) {
+        const element = createCanvasElement(diagram.type, activeTool.type, { x, y }, elements);
         if (element) {
           onCanvasChange?.({ type: 'element-add', element });
           setSelectedElementIds(new Set([element.id]));

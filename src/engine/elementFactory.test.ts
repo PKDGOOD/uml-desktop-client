@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createCanvasElement } from './elementFactory';
+import { createCanvasConnector, createCanvasElement } from './elementFactory';
 import type { DiagramElement } from '../types';
 
 function makeElement(name: string): DiagramElement {
@@ -38,5 +38,21 @@ describe('createCanvasElement', () => {
   it('does not create unsupported diagram elements yet', () => {
     expect(createCanvasElement('class', 'note', { x: 0, y: 0 }, [])).toBeNull();
     expect(createCanvasElement('sequence', 'lifeline', { x: 0, y: 0 }, [])).toBeNull();
+  });
+});
+
+describe('createCanvasConnector', () => {
+  it('creates class diagram connector data for two different elements', () => {
+    expect(createCanvasConnector('class', 'inheritance', 'child', 'parent')).toMatchObject({
+      type: 'inheritance',
+      sourceId: 'child',
+      targetId: 'parent',
+      properties: {},
+    });
+  });
+
+  it('rejects self links and unsupported connector flows', () => {
+    expect(createCanvasConnector('class', 'dependency', 'a', 'a')).toBeNull();
+    expect(createCanvasConnector('sequence', 'sync-message', 'a', 'b')).toBeNull();
   });
 });

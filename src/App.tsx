@@ -21,7 +21,7 @@ import type {
   ProjectData,
   ProjectTreeNode,
   DiagramType,
-  ElementType,
+  CanvasTool,
   DiagramElement,
   ElementProperties,
   DiagramData,
@@ -226,7 +226,7 @@ const App: React.FC = () => {
   const [projectFilePath, setProjectFilePath] = useState<string | null>(null);
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
   const [selectedElement, setSelectedElement] = useState<DiagramElement | null>(null);
-  const [activeTool, setActiveTool] = useState<ElementType | null>(null);
+  const [activeTool, setActiveTool] = useState<CanvasTool | null>(null);
   const [diagramType, setDiagramType] = useState<DiagramType>('class');
   const [dslText, setDslText] = useState('');
   const [dslErrors, setDslErrors] = useState<DSLError[]>([]);
