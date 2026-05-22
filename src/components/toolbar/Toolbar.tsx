@@ -12,7 +12,6 @@ export const DIAGRAM_TOOLS: Record<DiagramType, { type: ElementType; label: stri
     { type: 'interface', label: 'Interface' },
     { type: 'abstract-class', label: 'Abstract Class' },
     { type: 'enum', label: 'Enum' },
-    { type: 'note', label: 'Note' },
   ],
   sequence: [
     { type: 'lifeline', label: 'Lifeline' },
