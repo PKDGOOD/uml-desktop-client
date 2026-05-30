@@ -173,6 +173,20 @@ describe('UndoManager', () => {
     expect(counter.value).toBe(1);
   });
 
+  it('clear drops undo and redo history', () => {
+    const mgr = new UndoManager();
+    const counter = { value: 0 };
+    mgr.execute(makeCounterCommand(counter, 1, 'a'));
+    mgr.undo();
+
+    mgr.clear();
+
+    expect(mgr.canUndo()).toBe(false);
+    expect(mgr.canRedo()).toBe(false);
+    expect(mgr.undoStackSize).toBe(0);
+    expect(mgr.redoStackSize).toBe(0);
+  });
+
   it('interleaved undo/redo/execute maintains correct state', () => {
     const mgr = new UndoManager();
     const counter = { value: 0 };
