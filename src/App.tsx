@@ -238,6 +238,10 @@ const App: React.FC = () => {
   const undoManagerRef = useRef(new UndoManager());
   const syncEngineRef = useRef<SyncEngine | null>(null);
 
+  const resetDiagramHistory = useCallback(() => {
+    undoManagerRef.current.clear();
+  }, []);
+
   // Initialize SyncEngine
   useEffect(() => {
     syncEngineRef.current = new SyncEngine({
@@ -282,11 +286,12 @@ const App: React.FC = () => {
     if (firstDiagramId) {
       projectStore.openDiagram(firstDiagramId);
       const diagram = project.diagrams[firstDiagramId];
+      resetDiagramHistory();
       diagramStore.setDiagram(diagram);
       syncEngineRef.current?.setDiagram(diagram);
       setDslText(serializeDSL(diagram));
     }
-  }, []);
+  }, [resetDiagramHistory]);
 
   // Resize canvas to fit container
   useEffect(() => {
@@ -333,11 +338,12 @@ const App: React.FC = () => {
     if (firstDiagramId) {
       projectStore.openDiagram(firstDiagramId);
       const diagram = project.diagrams[firstDiagramId];
+      resetDiagramHistory();
       diagramStore.setDiagram(diagram);
       syncEngineRef.current?.setDiagram(diagram);
       setDslText(serializeDSL(diagram));
     }
-  }, [confirmUnsavedChanges, projectStore, diagramStore]);
+  }, [confirmUnsavedChanges, diagramStore, projectStore, resetDiagramHistory]);
 
   // ==========================================================================
   // Save Project
@@ -422,6 +428,7 @@ const App: React.FC = () => {
       if (firstId) {
         projectStore.openDiagram(firstId);
         const diagram = project.diagrams[firstId];
+        resetDiagramHistory();
         diagramStore.setDiagram(diagram);
         syncEngineRef.current?.setDiagram(diagram);
         setDslText(serializeDSL(diagram));
@@ -431,7 +438,7 @@ const App: React.FC = () => {
     } catch (err) {
       alert(`Failed to open project: ${(err as Error).message}`);
     }
-  }, [confirmUnsavedChanges, projectStore, diagramStore]);
+  }, [confirmUnsavedChanges, diagramStore, projectStore, resetDiagramHistory]);
 
   // ==========================================================================
   // SyncEngine handlers
@@ -447,6 +454,44 @@ const App: React.FC = () => {
     syncEngineRef.current?.onCanvasChange(change);
     projectStore.setDirty(true);
   }, [projectStore]);
+
+  const handleUndo = useCallback(() => {
+    if (!undoManagerRef.current.canUndo()) return;
+    undoManagerRef.current.undo();
+    projectStore.setDirty(true);
+  }, [projectStore]);
+
+  const handleRedo = useCallback(() => {
+    if (!undoManagerRef.current.canRedo()) return;
+    undoManagerRef.current.redo();
+    projectStore.setDirty(true);
+  }, [projectStore]);
+
+  useEffect(() => {
+    const isTypingTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+      return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
+    };
+
+    const handleHistoryShortcut = (event: KeyboardEvent) => {
+      if (isTypingTarget(event.target) || !(event.metaKey || event.ctrlKey)) return;
+
+      const key = event.key.toLowerCase();
+      if (key === 'z' && event.shiftKey) {
+        event.preventDefault();
+        handleRedo();
+      } else if (key === 'z') {
+        event.preventDefault();
+        handleUndo();
+      } else if (key === 'y') {
+        event.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleHistoryShortcut);
+    return () => window.removeEventListener('keydown', handleHistoryShortcut);
+  }, [handleRedo, handleUndo]);
 
   const handleElementDoubleClick = useCallback((elementId: string) => {
     const el = diagramStore.diagram?.elements.find((e) => e.id === elementId);
@@ -479,13 +524,14 @@ const App: React.FC = () => {
       projectStore.openDiagram(diagramId);
       if (projectData?.diagrams[diagramId]) {
         const diagram = projectData.diagrams[diagramId];
+        resetDiagramHistory();
         diagramStore.setDiagram(diagram);
         syncEngineRef.current?.setDiagram(diagram);
         setDslText(serializeDSL(diagram));
         setDiagramType(diagram.type);
       }
     },
-    [projectStore, diagramStore, projectData],
+    [diagramStore, projectData, projectStore, resetDiagramHistory],
   );
 
   const handleTabClick = useCallback(
@@ -501,13 +547,14 @@ const App: React.FC = () => {
       projectStore.setActiveDiagram(diagramId);
       if (projectData?.diagrams[diagramId]) {
         const diagram = projectData.diagrams[diagramId];
+        resetDiagramHistory();
         diagramStore.setDiagram(diagram);
         syncEngineRef.current?.setDiagram(diagram);
         setDslText(serializeDSL(diagram));
         setDiagramType(diagram.type);
       }
     },
-    [projectStore, diagramStore, projectData],
+    [diagramStore, projectData, projectStore, resetDiagramHistory],
   );
 
   const handleTabClose = useCallback(
@@ -529,6 +576,7 @@ const App: React.FC = () => {
 
       if (nextActiveId && projectData?.diagrams[nextActiveId]) {
         const nextDiagram = projectData.diagrams[nextActiveId];
+        resetDiagramHistory();
         diagramStore.setDiagram(nextDiagram);
         syncEngineRef.current?.setDiagram(nextDiagram);
         setDslText(serializeDSL(nextDiagram));
@@ -536,11 +584,12 @@ const App: React.FC = () => {
         setSelectedElement(null);
       } else if (!nextActiveId) {
         diagramStore.reset();
+        resetDiagramHistory();
         setDslText('');
         setSelectedElement(null);
       }
     },
-    [diagramStore, projectData, projectStore],
+    [diagramStore, projectData, projectStore, resetDiagramHistory],
   );
 
   const handleTreeChange = useCallback(
@@ -585,39 +634,64 @@ const App: React.FC = () => {
     dirty: projectStore.dirty,
   }));
 
+  const activeDiagram = diagramStore.diagram;
+  const diagramElements = projectData
+    ? Object.fromEntries(
+        Object.entries(projectData.diagrams).map(([id, diagram]) => [
+          id,
+          diagram.elements.map((element) => element.properties.name),
+        ]),
+      )
+    : {};
+  const activeToolLabel = activeTool ? activeTool.type.replace(/-/g, ' ') : 'Select';
+
   // ==========================================================================
   // Render
   // ==========================================================================
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', fontFamily: 'sans-serif' }}>
+    <div className="app-shell">
       {/* Menu bar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '4px 12px',
-          borderBottom: '1px solid #ddd',
-          background: '#f0f0f0',
-          flexShrink: 0,
-        }}
-      >
-        <button onClick={handleNewProject} style={menuBtnStyle}>New</button>
-        <button onClick={handleOpenProject} style={menuBtnStyle}>Open</button>
-        <button onClick={handleSaveProject} style={menuBtnStyle}>Save</button>
-        <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 12, color: '#666' }}>
-          {projectStore.metadata?.name ?? 'No Project'}
-          {projectStore.dirty ? ' •' : ''}
-        </span>
+      <div className="app-menubar">
+        <div className="app-brand" title="UML Studio">
+          <div className="app-brand-mark">U</div>
+          <span>UML Studio</span>
+        </div>
+        <button onClick={handleNewProject} className="menu-button">New</button>
+        <button onClick={handleOpenProject} className="menu-button">Open</button>
+        <button onClick={handleSaveProject} className="menu-button">Save</button>
+        <button
+          onClick={handleUndo}
+          disabled={!undoManagerRef.current.canUndo()}
+          className="menu-button"
+          title="Undo (Cmd/Ctrl+Z)"
+        >
+          Undo
+        </button>
+        <button
+          onClick={handleRedo}
+          disabled={!undoManagerRef.current.canRedo()}
+          className="menu-button"
+          title="Redo (Cmd/Ctrl+Shift+Z)"
+        >
+          Redo
+        </button>
+        <div className="app-spacer" />
+        <div className="project-chip" title={projectFilePath ?? undefined}>
+          <span>{projectStore.metadata?.name ?? 'No Project'}</span>
+          {projectStore.dirty && <span className="dirty-dot" title="Unsaved changes" />}
+        </div>
       </div>
 
       {/* Toolbar */}
       <Toolbar
         diagramType={diagramType}
         onDiagramTypeChange={setDiagramType}
-        onToolSelect={setActiveTool}
+        onToolSelect={(tool) => {
+          setActiveTool((current) =>
+            current?.kind === tool.kind && current.type === tool.type ? null : tool,
+          );
+        }}
         activeTool={activeTool}
       />
 
@@ -630,26 +704,21 @@ const App: React.FC = () => {
       />
 
       {/* Main content area */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div className="app-main">
         {/* Left sidebar: Project Tree */}
-        <div
-          style={{
-            width: 220,
-            borderRight: '1px solid #ddd',
-            overflow: 'hidden',
-            flexShrink: 0,
-          }}
-        >
+        <div className="sidebar sidebar-left">
           <ProjectTree
             tree={projectStore.tree}
             activeDiagramId={projectStore.activeDiagramId}
             onDiagramOpen={handleDiagramOpen}
             onTreeChange={handleTreeChange}
+            onSearchResultClick={(diagramId) => handleDiagramOpen(diagramId)}
+            diagramElements={diagramElements}
           />
         </div>
 
         {/* Center: Split View (Editor + Canvas) */}
-        <div style={{ flex: 1, overflow: 'hidden' }}>
+        <div className="workspace">
           <SplitView
             editorPanel={
               <DSLEditor
@@ -674,31 +743,24 @@ const App: React.FC = () => {
         </div>
 
         {/* Right sidebar: Property Panel */}
-        <div
-          style={{
-            width: 240,
-            borderLeft: '1px solid #ddd',
-            overflow: 'hidden',
-            flexShrink: 0,
-          }}
-        >
+        <div className="sidebar sidebar-right">
           <PropertyPanel
             element={selectedElement}
             onPropertyChange={handlePropertyChange}
           />
         </div>
       </div>
+      <div className="status-bar">
+        <span className="status-pill">{activeDiagram?.name ?? 'No diagram'}</span>
+        <span className="status-pill">{activeDiagram?.elements.length ?? 0} elements</span>
+        <span className="status-pill">{activeDiagram?.connectors.length ?? 0} connectors</span>
+        <span className="status-pill">Tool: {activeToolLabel}</span>
+        {dslErrors.length > 0 && (
+          <span className="status-pill status-error">{dslErrors.length} DSL errors</span>
+        )}
+      </div>
     </div>
   );
-};
-
-const menuBtnStyle: React.CSSProperties = {
-  padding: '4px 12px',
-  fontSize: 12,
-  border: '1px solid #ccc',
-  borderRadius: 3,
-  background: '#fff',
-  cursor: 'pointer',
 };
 
 export default App;

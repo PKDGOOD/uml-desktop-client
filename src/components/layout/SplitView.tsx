@@ -91,32 +91,15 @@ export const SplitView: React.FC<SplitViewProps> = ({ editorPanel, canvasPanel }
   return (
     <div
       ref={containerRef}
-      style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}
+      className="split-view"
     >
       {/* View mode toggle buttons */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 4,
-          padding: '4px 8px',
-          borderBottom: '1px solid #ddd',
-          background: '#fafafa',
-          flexShrink: 0,
-        }}
-      >
+      <div className="view-toggle">
         {(['editor-only', 'split', 'canvas-only'] as ViewMode[]).map((mode) => (
           <button
             key={mode}
             onClick={() => toggleMode(mode)}
-            style={{
-              padding: '3px 10px',
-              fontSize: 12,
-              border: '1px solid #ccc',
-              borderRadius: 3,
-              background: viewMode === mode ? '#1976D2' : '#fff',
-              color: viewMode === mode ? '#fff' : '#333',
-              cursor: 'pointer',
-            }}
+            className={`view-mode-button${viewMode === mode ? ' is-active' : ''}`}
           >
             {mode === 'editor-only' ? 'Editor' : mode === 'canvas-only' ? 'Canvas' : 'Split'}
           </button>
@@ -124,14 +107,13 @@ export const SplitView: React.FC<SplitViewProps> = ({ editorPanel, canvasPanel }
       </div>
 
       {/* Panels */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div className="split-panels">
         {/* Editor panel */}
         {viewMode !== 'canvas-only' && (
           <div
+            className="split-panel"
             style={{
               width: viewMode === 'editor-only' ? '100%' : `${ratio * 100}%`,
-              height: '100%',
-              overflow: 'hidden',
             }}
           >
             {editorPanel}
@@ -142,31 +124,16 @@ export const SplitView: React.FC<SplitViewProps> = ({ editorPanel, canvasPanel }
         {viewMode === 'split' && (
           <div
             onMouseDown={handleMouseDown}
-            style={{
-              width: 5,
-              cursor: 'col-resize',
-              background: isDragging.current ? '#1976D2' : '#ddd',
-              flexShrink: 0,
-              transition: 'background 150ms',
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLDivElement).style.background = '#bbb';
-            }}
-            onMouseLeave={(e) => {
-              if (!isDragging.current) {
-                (e.currentTarget as HTMLDivElement).style.background = '#ddd';
-              }
-            }}
+            className={`split-divider${isDragging.current ? ' is-dragging' : ''}`}
           />
         )}
 
         {/* Canvas panel */}
         {viewMode !== 'editor-only' && (
           <div
+            className="split-panel"
             style={{
               width: viewMode === 'canvas-only' ? '100%' : `${(1 - ratio) * 100}%`,
-              height: '100%',
-              overflow: 'hidden',
             }}
           >
             {canvasPanel}

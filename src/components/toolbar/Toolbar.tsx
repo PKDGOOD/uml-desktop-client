@@ -82,65 +82,22 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const tools = DIAGRAM_TOOLS[diagramType] ?? [];
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '6px 12px',
-        borderBottom: '1px solid #ddd',
-        background: '#fafafa',
-        flexShrink: 0,
-      }}
-    >
+    <div className="toolbar">
       {/* Diagram type selector dropdown */}
-      <div style={{ position: 'relative' }}>
+      <div className="diagram-select">
         <button
           onClick={() => setDropdownOpen((o) => !o)}
-          style={{
-            padding: '4px 12px',
-            fontSize: 12,
-            border: '1px solid #ccc',
-            borderRadius: 3,
-            background: '#fff',
-            cursor: 'pointer',
-            minWidth: 140,
-            textAlign: 'left',
-          }}
+          className="tool-button diagram-select-button"
         >
-          {DIAGRAM_TYPE_LABELS[diagramType]} ▾
+          {DIAGRAM_TYPE_LABELS[diagramType]} v
         </button>
         {dropdownOpen && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              zIndex: 100,
-              background: '#fff',
-              border: '1px solid #ccc',
-              borderRadius: 3,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-              minWidth: 160,
-            }}
-          >
+          <div className="diagram-select-menu">
             {(Object.keys(DIAGRAM_TYPE_LABELS) as DiagramType[]).map((type) => (
               <div
                 key={type}
                 onClick={() => handleDiagramTypeSelect(type)}
-                style={{
-                  padding: '6px 12px',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  background: type === diagramType ? '#e3f2fd' : 'transparent',
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.background = '#f5f5f5';
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.background =
-                    type === diagramType ? '#e3f2fd' : 'transparent';
-                }}
+                className={`diagram-select-item${type === diagramType ? ' is-active' : ''}`}
               >
                 {DIAGRAM_TYPE_LABELS[type]}
               </div>
@@ -150,51 +107,41 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       </div>
 
       {/* Separator */}
-      <div style={{ width: 1, height: 24, background: '#ddd' }} />
+      <div className="toolbar-separator" />
 
       {/* Tool palette */}
-      {tools.map((tool) => (
-        <button
-          key={tool.type}
-          onClick={() => onToolSelect({ kind: 'element', type: tool.type })}
-          title={tool.label}
-          style={{
-            padding: '4px 10px',
-            fontSize: 12,
-            border: '1px solid',
-            borderColor: activeTool?.kind === 'element' && activeTool.type === tool.type ? '#1976D2' : '#ccc',
-            borderRadius: 3,
-            background: activeTool?.kind === 'element' && activeTool.type === tool.type ? '#e3f2fd' : '#fff',
-            color: activeTool?.kind === 'element' && activeTool.type === tool.type ? '#1976D2' : '#333',
-            cursor: 'pointer',
-          }}
-        >
-          {tool.label}
-        </button>
-      ))}
+      <div className="toolbar-group">
+        {tools.map((tool) => (
+          <button
+            key={tool.type}
+            onClick={() => onToolSelect({ kind: 'element', type: tool.type })}
+            title={tool.label}
+            className={`tool-button${
+              activeTool?.kind === 'element' && activeTool.type === tool.type ? ' is-active' : ''
+            }`}
+          >
+            {tool.label}
+          </button>
+        ))}
+      </div>
 
       {diagramType === 'class' && (
         <>
-          <div style={{ width: 1, height: 24, background: '#ddd' }} />
-          {CLASS_CONNECTOR_TOOLS.map((tool) => (
-            <button
-              key={tool.type}
-              onClick={() => onToolSelect({ kind: 'connector', type: tool.type })}
-              title={tool.label}
-              style={{
-                padding: '4px 10px',
-                fontSize: 12,
-                border: '1px solid',
-                borderColor: activeTool?.kind === 'connector' && activeTool.type === tool.type ? '#1976D2' : '#ccc',
-                borderRadius: 3,
-                background: activeTool?.kind === 'connector' && activeTool.type === tool.type ? '#e3f2fd' : '#fff',
-                color: activeTool?.kind === 'connector' && activeTool.type === tool.type ? '#1976D2' : '#333',
-                cursor: 'pointer',
-              }}
-            >
-              {tool.label}
-            </button>
-          ))}
+          <div className="toolbar-separator" />
+          <div className="toolbar-group">
+            {CLASS_CONNECTOR_TOOLS.map((tool) => (
+              <button
+                key={tool.type}
+                onClick={() => onToolSelect({ kind: 'connector', type: tool.type })}
+                title={tool.label}
+                className={`tool-button${
+                  activeTool?.kind === 'connector' && activeTool.type === tool.type ? ' is-active' : ''
+                }`}
+              >
+                {tool.label}
+              </button>
+            ))}
+          </div>
         </>
       )}
     </div>

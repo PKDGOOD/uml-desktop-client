@@ -3,7 +3,7 @@
 // =============================================================================
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Stage, Layer, Rect } from 'react-konva';
+import { Stage, Layer, Rect, Line } from 'react-konva';
 import { useDiagramStore } from '../../store/diagramStore';
 import { useCanvasControls } from './useCanvasControls';
 import { ElementRenderer } from './ElementRenderer';
@@ -47,6 +47,26 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
 
   const elements = diagram?.elements ?? [];
   const connectors = diagram?.connectors ?? [];
+  const gridSize = 40;
+  const gridLines = React.useMemo(() => {
+    const lines: { points: number[]; major: boolean }[] = [];
+    const worldLeft = -viewport.x / viewport.zoom;
+    const worldTop = -viewport.y / viewport.zoom;
+    const worldRight = worldLeft + width / viewport.zoom;
+    const worldBottom = worldTop + height / viewport.zoom;
+    const startX = Math.floor(worldLeft / gridSize) * gridSize;
+    const endX = Math.ceil(worldRight / gridSize) * gridSize;
+    const startY = Math.floor(worldTop / gridSize) * gridSize;
+    const endY = Math.ceil(worldBottom / gridSize) * gridSize;
+
+    for (let x = startX; x <= endX; x += gridSize) {
+      lines.push({ points: [x, worldTop, x, worldBottom], major: x % (gridSize * 4) === 0 });
+    }
+    for (let y = startY; y <= endY; y += gridSize) {
+      lines.push({ points: [worldLeft, y, worldRight, y], major: y % (gridSize * 4) === 0 });
+    }
+    return lines;
+  }, [height, viewport.x, viewport.y, viewport.zoom, width]);
 
   // Notify parent of selection changes
   useEffect(() => {
@@ -380,7 +400,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
     : null;
 
   return (
-    <div style={{ position: 'relative', width, height, overflow: 'hidden' }}>
+    <div className="canvas-shell" style={{ width, height }}>
       <Stage
         ref={stageRef}
         width={width}
@@ -396,6 +416,23 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
         onMouseMove={handleStageMouseMove}
         onMouseUp={handleStageMouseUp}
       >
+        <Layer listening={false}>
+          <Rect
+            x={-viewport.x / viewport.zoom}
+            y={-viewport.y / viewport.zoom}
+            width={width / viewport.zoom}
+            height={height / viewport.zoom}
+            fill="#f8fafc"
+          />
+          {gridLines.map((line, index) => (
+            <Line
+              key={index}
+              points={line.points}
+              stroke={line.major ? '#dbe4ef' : '#edf2f7'}
+              strokeWidth={line.major ? 1 : 0.7}
+            />
+          ))}
+        </Layer>
         <Layer>
           {/* Connectors rendered below elements */}
           {connectors.map((conn) => (
@@ -438,39 +475,25 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
         </Layer>
       </Stage>
 
+      {activeTool?.kind === 'connector' && (
+        <div className="canvas-hint">
+          {connectorSourceId ? 'Choose the target element to finish the connector.' : 'Choose a source element to start the connector.'}
+        </div>
+      )}
+
       {/* Fit-all button */}
-      <button
-        onClick={handleFitAll}
-        style={{
-          position: 'absolute',
-          bottom: 12,
-          right: 12,
-          padding: '6px 12px',
-          fontSize: 12,
-          background: '#fff',
-          border: '1px solid #ccc',
-          borderRadius: 4,
-          cursor: 'pointer',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-        }}
-        title="Fit all elements in view"
-      >
-        Fit All
-      </button>
+      <div className="canvas-controls">
+        <button
+          onClick={handleFitAll}
+          className="canvas-floating-button"
+          title="Fit all elements in view"
+        >
+          Fit All
+        </button>
+      </div>
 
       {/* Zoom indicator */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 12,
-          left: 12,
-          padding: '4px 8px',
-          fontSize: 11,
-          background: 'rgba(255,255,255,0.9)',
-          border: '1px solid #ddd',
-          borderRadius: 4,
-        }}
-      >
+      <div className="zoom-badge">
         {Math.round(viewport.zoom * 100)}%
       </div>
     </div>

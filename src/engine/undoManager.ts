@@ -34,6 +34,11 @@ export class UndoManager {
     this.undoStack.push(command);
   }
 
+  clear(): void {
+    this.undoStack = [];
+    this.redoStack = [];
+  }
+
   canUndo(): boolean {
     return this.undoStack.length > 0;
   }

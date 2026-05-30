@@ -38,6 +38,20 @@ function persistExpanded(expanded: Set<string>) {
   } catch { /* ignore */ }
 }
 
+function collectDefaultExpanded(nodes: ProjectTreeNode[]): string[] {
+  const ids: string[] = [];
+  const walk = (node: ProjectTreeNode) => {
+    if (node.type === 'folder' && node.expanded) {
+      ids.push(node.id);
+    }
+    for (const child of node.children ?? []) {
+      walk(child);
+    }
+  };
+  for (const node of nodes) walk(node);
+  return ids;
+}
+
 /** Count diagrams under a folder (recursive). */
 function countDiagrams(node: ProjectTreeNode): number {
   if (node.type === 'diagram') return 1;
@@ -142,6 +156,14 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
   const [renameValue, setRenameValue] = useState('');
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (expanded.size > 0) return;
+    const defaults = collectDefaultExpanded(tree);
+    if (defaults.length > 0) {
+      setExpanded(new Set(defaults));
+    }
+  }, [expanded.size, tree]);
 
   // Persist expanded state
   useEffect(() => {
@@ -270,15 +292,9 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
     return (
       <div key={node.id}>
         <div
+          className={`tree-node${isActive ? ' is-active' : ''}${isDragOver ? ' is-drag-over' : ''}`}
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            padding: '3px 6px',
             paddingLeft: depth * 16 + 6,
-            fontSize: 12,
-            cursor: 'pointer',
-            background: isActive ? '#e3f2fd' : isDragOver ? '#f0f0f0' : 'transparent',
-            borderLeft: isActive ? '3px solid #1976D2' : '3px solid transparent',
           }}
           onClick={() => {
             if (isFolder) toggleExpand(node.id);
@@ -294,14 +310,14 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
         >
           {/* Expand/collapse icon */}
           {isFolder && (
-            <span style={{ marginRight: 4, fontSize: 10, width: 12 }}>
-              {isExpanded ? '▾' : '▸'}
+            <span className="tree-caret">
+              {isExpanded ? 'v' : '>'}
             </span>
           )}
-          {!isFolder && <span style={{ marginRight: 4, width: 12 }} />}
+          {!isFolder && <span className="tree-caret" />}
 
           {/* Icon */}
-          <span style={{ marginRight: 4 }}>{isFolder ? '📁' : '📄'}</span>
+          <span className="tree-icon">{isFolder ? 'F' : node.diagramType?.slice(0, 1).toUpperCase() ?? 'D'}</span>
 
           {/* Name or rename input */}
           {renamingId === node.id ? (
@@ -314,36 +330,37 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
                 if (e.key === 'Enter') handleFinishRename();
                 if (e.key === 'Escape') setRenamingId(null);
               }}
-              style={{ fontSize: 12, border: '1px solid #1976D2', borderRadius: 2, padding: '1px 4px', flex: 1 }}
+              className="field-input"
+              style={{ flex: 1, minHeight: 24 }}
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <span style={{ flex: 1 }}>{node.name}</span>
+            <span className="tree-name">{node.name}</span>
           )}
 
           {/* Diagram count for folders */}
           {isFolder && (
-            <span style={{ fontSize: 10, color: '#999', marginLeft: 4 }}>
+            <span className="tree-count">
               ({countDiagrams(node)})
             </span>
           )}
 
           {/* Folder actions */}
           {isFolder && renamingId !== node.id && (
-            <span style={{ display: 'flex', gap: 2, marginLeft: 4 }}>
+            <span className="tree-actions">
               <button
                 onClick={(e) => { e.stopPropagation(); handleCreateFolder(node.id); }}
-                style={treeActionBtnStyle}
+                className="tree-action-button"
                 title="New subfolder"
               >+</button>
               <button
                 onClick={(e) => { e.stopPropagation(); handleStartRename(node.id, node.name); }}
-                style={treeActionBtnStyle}
+                className="tree-action-button"
                 title="Rename"
-              >✎</button>
+              >Ren</button>
               <button
                 onClick={(e) => { e.stopPropagation(); handleDeleteFolder(node.id, node.name); }}
-                style={treeActionBtnStyle}
+                className="tree-action-button"
                 title="Delete"
               >×</button>
             </span>
@@ -357,50 +374,41 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', fontSize: 13 }}>
+    <div className="tree-root">
+      <div className="panel-header">
+        <div className="panel-title">Project</div>
+        <button
+          onClick={() => handleCreateFolder(null)}
+          className="tree-action-button"
+          title="New folder"
+        >
+          +
+        </button>
+      </div>
       {/* Search input */}
-      <div style={{ padding: 6, borderBottom: '1px solid #eee' }}>
+      <div className="tree-search">
         <input
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search diagrams & elements..."
-          style={{
-            width: '100%',
-            padding: '4px 8px',
-            fontSize: 12,
-            border: '1px solid #ccc',
-            borderRadius: 3,
-            boxSizing: 'border-box',
-          }}
         />
       </div>
 
       {/* Search results */}
       {searchQuery.trim() && (
-        <div style={{ borderBottom: '1px solid #eee', maxHeight: 200, overflowY: 'auto' }}>
+        <div className="search-results">
           {searchResults.length === 0 ? (
-            <div style={{ padding: 8, fontSize: 12, color: '#888' }}>No results</div>
+            <div className="search-result">No results</div>
           ) : (
             searchResults.map((r, i) => (
               <div
                 key={`${r.diagramId}-${r.elementName ?? ''}-${i}`}
                 onClick={() => onSearchResultClick?.(r.diagramId, r.elementName)}
-                style={{
-                  padding: '4px 8px',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  borderBottom: '1px solid #f5f5f5',
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.background = '#f5f5f5';
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLDivElement).style.background = 'transparent';
-                }}
+                className="search-result"
               >
                 <div>{r.name}</div>
                 {r.elementName && (
-                  <div style={{ fontSize: 11, color: '#666' }}>→ {r.elementName}</div>
+                  <div className="search-result-subtitle">in {r.elementName}</div>
                 )}
               </div>
             ))
@@ -409,28 +417,9 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
       )}
 
       {/* Tree */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
-        {/* Root-level create folder button */}
-        <div style={{ padding: '2px 6px', marginBottom: 4 }}>
-          <button
-            onClick={() => handleCreateFolder(null)}
-            style={{ ...treeActionBtnStyle, fontSize: 11, padding: '2px 8px' }}
-          >
-            + New Folder
-          </button>
-        </div>
+      <div className="tree-list">
         {tree.map((node) => renderNode(node, 0))}
       </div>
     </div>
   );
-};
-
-const treeActionBtnStyle: React.CSSProperties = {
-  padding: '1px 4px',
-  fontSize: 11,
-  border: '1px solid #ddd',
-  borderRadius: 2,
-  background: '#fff',
-  cursor: 'pointer',
-  lineHeight: 1,
 };

@@ -111,8 +111,14 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
 
   if (!element) {
     return (
-      <div style={{ padding: 12, color: '#888', fontSize: 13 }}>
-        No element selected
+      <div className="property-panel">
+        <div className="panel-header">
+          <div className="panel-title">Properties</div>
+        </div>
+        <div className="empty-panel">
+          <div className="empty-panel-title">No element selected</div>
+          <div>Select a shape on the canvas to edit its name, visibility, attributes, and methods.</div>
+        </div>
       </div>
     );
   }
@@ -122,38 +128,42 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const hasMethods = ['class', 'interface', 'abstract-class'].includes(element.type);
 
   return (
-    <div style={{ padding: 8, fontSize: 13, overflowY: 'auto', height: '100%' }}>
-      <div style={{ fontWeight: 600, marginBottom: 8 }}>Properties</div>
+    <div className="property-panel">
+      <div className="panel-header">
+        <div className="panel-title">Properties</div>
+        <div className="panel-title">{element.type}</div>
+      </div>
+      <div className="property-body">
 
       {/* Name */}
-      <label style={labelStyle}>Name</label>
+      <label className="field-label">Name</label>
       <input
         value={properties.name}
         onChange={handleNameChange}
-        style={inputStyle}
+        className="field-input"
       />
 
       {/* Type (read-only) */}
-      <label style={labelStyle}>Type</label>
-      <div style={{ ...inputStyle, background: '#f5f5f5', cursor: 'default' }}>
+      <label className="field-label">Type</label>
+      <div className="field-input" style={{ background: '#eef2f7', cursor: 'default' }}>
         {element.type}
       </div>
 
       {/* Stereotype */}
-      <label style={labelStyle}>Stereotype</label>
+      <label className="field-label">Stereotype</label>
       <input
         value={properties.stereotype ?? ''}
         onChange={handleStereotypeChange}
         placeholder="e.g. «entity»"
-        style={inputStyle}
+        className="field-input"
       />
 
       {/* Visibility */}
-      <label style={labelStyle}>Visibility</label>
+      <label className="field-label">Visibility</label>
       <select
         value={properties.visibility ?? 'public'}
         onChange={handleVisibilityChange}
-        style={inputStyle}
+        className="field-select"
       >
         <option value="public">public (+)</option>
         <option value="private">private (-)</option>
@@ -166,32 +176,35 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
         <>
           <div
             onClick={() => setAttributesExpanded((v) => !v)}
-            style={sectionHeaderStyle}
+            className="section-header"
           >
-            {attributesExpanded ? '▾' : '▸'} Attributes ({properties.attributes?.length ?? 0})
+            <span>{attributesExpanded ? 'v' : '>'} Attributes</span>
+            <span>{properties.attributes?.length ?? 0}</span>
           </div>
           {attributesExpanded && (
-            <div style={{ marginLeft: 8 }}>
+            <div>
               {(properties.attributes ?? []).map((attr, i) => (
-                <div key={i} style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                <div key={i} className="property-row">
                   <input
                     value={attr.name}
                     onChange={(e) => handleAttributeChange(i, 'name', e.target.value)}
-                    style={{ ...inputStyle, flex: 1 }}
+                    className="field-input"
+                    style={{ flex: 1 }}
                     placeholder="name"
                   />
                   <input
                     value={attr.type}
                     onChange={(e) => handleAttributeChange(i, 'type', e.target.value)}
-                    style={{ ...inputStyle, flex: 1 }}
+                    className="field-input"
+                    style={{ flex: 1 }}
                     placeholder="type"
                   />
-                  <button onClick={() => handleRemoveAttribute(i)} style={removeButtonStyle}>
+                  <button onClick={() => handleRemoveAttribute(i)} className="panel-button danger">
                     ×
                   </button>
                 </div>
               ))}
-              <button onClick={handleAddAttribute} style={addButtonStyle}>
+              <button onClick={handleAddAttribute} className="panel-button">
                 + Add Attribute
               </button>
             </div>
@@ -204,32 +217,35 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
         <>
           <div
             onClick={() => setMethodsExpanded((v) => !v)}
-            style={sectionHeaderStyle}
+            className="section-header"
           >
-            {methodsExpanded ? '▾' : '▸'} Methods ({properties.methods?.length ?? 0})
+            <span>{methodsExpanded ? 'v' : '>'} Methods</span>
+            <span>{properties.methods?.length ?? 0}</span>
           </div>
           {methodsExpanded && (
-            <div style={{ marginLeft: 8 }}>
+            <div>
               {(properties.methods ?? []).map((method, i) => (
-                <div key={i} style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                <div key={i} className="property-row">
                   <input
                     value={method.name}
                     onChange={(e) => handleMethodChange(i, 'name', e.target.value)}
-                    style={{ ...inputStyle, flex: 1 }}
+                    className="field-input"
+                    style={{ flex: 1 }}
                     placeholder="name"
                   />
                   <input
                     value={method.returnType}
                     onChange={(e) => handleMethodChange(i, 'returnType', e.target.value)}
-                    style={{ ...inputStyle, width: 60 }}
+                    className="field-input"
+                    style={{ width: 70 }}
                     placeholder="return"
                   />
-                  <button onClick={() => handleRemoveMethod(i)} style={removeButtonStyle}>
+                  <button onClick={() => handleRemoveMethod(i)} className="panel-button danger">
                     ×
                   </button>
                 </div>
               ))}
-              <button onClick={handleAddMethod} style={addButtonStyle}>
+              <button onClick={handleAddMethod} className="panel-button">
                 + Add Method
               </button>
             </div>
@@ -240,7 +256,7 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
       {/* Shared element referencing diagrams */}
       {element.sharedRefId && referencingDiagrams.length > 0 && (
         <>
-          <div style={{ ...sectionHeaderStyle, marginTop: 12 }}>
+          <div className="section-header">
             Referencing Diagrams ({referencingDiagrams.length})
           </div>
           <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12 }}>
@@ -252,55 +268,7 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
           </ul>
         </>
       )}
+      </div>
     </div>
   );
-};
-
-// --- Styles ---
-
-const labelStyle: React.CSSProperties = {
-  display: 'block',
-  fontSize: 11,
-  color: '#666',
-  marginTop: 8,
-  marginBottom: 2,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: '100%',
-  padding: '4px 6px',
-  fontSize: 12,
-  border: '1px solid #ccc',
-  borderRadius: 3,
-  boxSizing: 'border-box',
-};
-
-const sectionHeaderStyle: React.CSSProperties = {
-  marginTop: 12,
-  marginBottom: 4,
-  fontWeight: 600,
-  fontSize: 12,
-  cursor: 'pointer',
-  userSelect: 'none',
-};
-
-const addButtonStyle: React.CSSProperties = {
-  padding: '2px 8px',
-  fontSize: 11,
-  border: '1px solid #ccc',
-  borderRadius: 3,
-  background: '#fff',
-  cursor: 'pointer',
-  marginTop: 4,
-};
-
-const removeButtonStyle: React.CSSProperties = {
-  padding: '2px 6px',
-  fontSize: 14,
-  border: '1px solid #ccc',
-  borderRadius: 3,
-  background: '#fff',
-  cursor: 'pointer',
-  color: '#c00',
-  lineHeight: 1,
 };
