@@ -1,5 +1,7 @@
 # 설계 문서: UML 데스크탑 클라이언트
 
+> **Archived, Korean only.** This initial spec is superseded by the English [product specification](../../../product-spec.md) and is not maintained or translated. 초기 기록으로만 보존하며, 현재 기준은 영문 제품 기획안입니다.
+
 ## 개요
 
 UML 데스크탑 클라이언트는 텍스트 DSL과 GUI Canvas를 실시간 양방향 동기화하는 하이브리드 UML 편집기이다. Electron + React 기반 크로스 플랫폼 데스크탑 애플리케이션으로, 로컬 파일 시스템에 모든 데이터를 저장한다.

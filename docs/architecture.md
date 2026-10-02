@@ -15,8 +15,8 @@ electron/                 Main process, preload, file I/O, recent project paths
 scripts/                  Repository validation and license-notice generation
 examples/                 Synthetic DSL examples that repository checks parse
 docs/                     Current architecture, roadmap, process, review records
+docs/ko/                  Korean translations and the archived Korean-only initial specs
 .github/                  CI, dependency updates, contribution forms, ownership
-.kiro/specs/               Historical requirements and design (Korean)
 ```
 
 Tests are colocated with source as `*.test.ts`.

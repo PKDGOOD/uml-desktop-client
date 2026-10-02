@@ -2,7 +2,7 @@
 
 Status: **execution started, 2026-09-27; 145 leaf tasks**. The [execution ledger](execution-status.md) records each completed or active task and its evidence. Unlisted tasks remain **Planned**. The plan itself is not completion or publication evidence.
 
-[한국어 실행 계획](ko/atomic-execution-plan.md) · [Product specification](product-spec.md) · [Milestones](public-alpha-plan.md)
+[Korean atomic execution plan](ko/atomic-execution-plan.md) · [Product specification](product-spec.md) · [Milestones](public-alpha-plan.md)
 
 ## How to execute this backlog
 

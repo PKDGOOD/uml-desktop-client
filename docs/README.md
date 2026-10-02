@@ -7,9 +7,9 @@
 - [Architecture](architecture.md)
 - [Roadmap](roadmap.md)
 - [Public alpha product specification: users, workflows, screens and behavior](product-spec.md)
-- [한국어 제품 기획안](ko/product-spec.md)
+- [Korean product specification](ko/product-spec.md)
 - [Public alpha execution plan: milestones, work packages and release gates](public-alpha-plan.md)
-- [Atomic execution backlog: 145 tasks with dependencies and completion evidence](atomic-execution-plan.md) ([한국어](ko/atomic-execution-plan.md))
+- [Atomic execution backlog: 145 tasks with dependencies and completion evidence](atomic-execution-plan.md) ([Korean](ko/atomic-execution-plan.md))
 - [Execution status and current evidence](execution-status.md)
 - [Baseline, known-failure and packaged test procedures](testing.md)
 - [Contribution guide](../CONTRIBUTING.md)
@@ -22,11 +22,11 @@
 
 ## Historical design and review
 
-The original Korean specifications remain in their tool-owned location:
+The initial specifications were written in Korean only. They are superseded by the [product specification](product-spec.md) and kept untranslated as an archive:
 
-- [Requirements](../.kiro/specs/uml-desktop-client/requirements.md)
-- [Initial design](../.kiro/specs/uml-desktop-client/design.md)
-- [Initial implementation checklist](../.kiro/specs/uml-desktop-client/tasks.md)
-- [Commercial-readiness review, 2026-09-26 (Korean)](reviews/2026-09-26-commercial-readiness.md)
+- [Requirements (Korean)](ko/archive/kiro-specs/requirements.md)
+- [Initial design (Korean)](ko/archive/kiro-specs/design.md)
+- [Initial implementation checklist (Korean)](ko/archive/kiro-specs/tasks.md)
+- [Commercial-readiness review, 2026-09-26](reviews/2026-09-26-commercial-readiness.md) ([Korean original](ko/reviews/2026-09-26-commercial-readiness.md))
 
 Checked tasks in the initial documents are not proof of current product readiness. Use the README for connected features, known limitations for risks, the product specification for proposed alpha behavior and acceptance scenarios, and the execution plan/roadmap for delivery work. Keep review reports as dated evidence; record fixes and validation in issues/PRs and the roadmap.

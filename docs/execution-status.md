@@ -2,7 +2,7 @@
 
 Updated: **2026-09-27**. This is the live ledger for the [145-task backlog](atomic-execution-plan.md). “Done” below means locally implemented and verified, with a self-review; it does not mean merged, independently reviewed, remotely tested or released. Implementer: Codex. Maintainer review remains pending in A01.12.
 
-[한국어 실행 계획](ko/atomic-execution-plan.md) · [Baseline evidence](reviews/2026-09-27-execution-baseline.md) · [Repeat the checks](testing.md)
+[Korean atomic execution plan](ko/atomic-execution-plan.md) · [Baseline evidence](reviews/2026-09-27-execution-baseline.md) · [Repeat the checks](testing.md)
 
 ## Current batch
 
