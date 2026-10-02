@@ -38,7 +38,7 @@
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-konva": "^19.2.3",
-    "zustand": "^5.0.12"
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@types/react": "^19.2.14",
