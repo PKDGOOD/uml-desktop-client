@@ -35,13 +35,13 @@
     "konva": "^10.2.3",
     "monaco-editor": "^0.55.1",
     "peggy": "^5.1.0",
-    "react": "^19.2.5",
+    "react": "^19.3.0",
     "react-dom": "^19.2.5",
     "react-konva": "^19.2.3",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
-    "@types/react": "^19.2.14",
+    "@types/react": "^19.3.0",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "electron": "^41.2.0",
