@@ -9,6 +9,7 @@ import { useCanvasControls } from './useCanvasControls';
 import { ElementRenderer } from './ElementRenderer';
 import { ConnectorRenderer } from './ConnectorRenderer';
 import { createCanvasConnector, createCanvasElement } from '../../engine/elementFactory';
+import { ClipboardManager } from '../../engine/clipboardManager';
 import type { CanvasTool, Position, Size, CanvasChange } from '../../types';
 
 export interface UMLCanvasProps {
@@ -22,6 +23,7 @@ export interface UMLCanvasProps {
   onSelectionChange?: (selectedIds: string[]) => void;
   /** Active element placement tool */
   activeTool?: CanvasTool | null;
+  readOnly?: boolean;
 }
 
 export const UMLCanvas: React.FC<UMLCanvasProps> = ({
@@ -31,6 +33,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
   onElementDoubleClick,
   onSelectionChange,
   activeTool = null,
+  readOnly = false,
 }) => {
   const diagram = useDiagramStore((s) => s.diagram);
   const { viewport, stageRef, handleWheel, setViewport, fitAll, handleDragEnd } =
@@ -44,6 +47,9 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
     end: Position;
   } | null>(null);
   const isSelecting = useRef(false);
+  const clipboard = useRef(new ClipboardManager());
+  const [copiedType, setCopiedType] = useState<string | null>(null);
+  const pasteOffset = useRef(24);
 
   const elements = diagram?.elements ?? [];
   const connectors = diagram?.connectors ?? [];
@@ -150,6 +156,39 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
     setSelectedConnectorIds(new Set());
   }, []);
 
+  const copySelection = useCallback((cut = false) => {
+    if (readOnly || !diagram) return;
+    const selected = elements.filter((element) => selectedElementIds.has(element.id));
+    if (!selected.length) return;
+    clipboard.current.copy(selected, connectors.filter((connector) => selectedElementIds.has(connector.sourceId) && selectedElementIds.has(connector.targetId)));
+    setCopiedType(diagram.type);
+    pasteOffset.current = 24;
+    if (cut) {
+      onCanvasChange?.({ type: 'batch', changes: selected.map((element) => ({ type: 'element-delete', elementId: element.id })) });
+      clearSelection();
+    }
+  }, [readOnly, diagram, elements, connectors, selectedElementIds, onCanvasChange, clearSelection]);
+
+  const pasteSelection = useCallback(() => {
+    if (readOnly || !diagram || copiedType !== diagram.type || !clipboard.current.hasContent()) return;
+    const pasted = clipboard.current.paste({ x: -viewport.x / viewport.zoom + pasteOffset.current, y: -viewport.y / viewport.zoom + pasteOffset.current });
+    const names = new Set(elements.map((element) => element.properties.name));
+    for (const element of pasted.elements) {
+      const base = element.properties.name;
+      let name = base, suffix = 2;
+      while (names.has(name)) name = `${base}${suffix++}`;
+      element.properties.name = name;
+      names.add(name);
+    }
+    onCanvasChange?.({ type: 'batch', changes: [
+      ...pasted.elements.map((element): CanvasChange => ({ type: 'element-add', element })),
+      ...pasted.connectors.map((connector): CanvasChange => ({ type: 'connector-add', connector })),
+    ] });
+    pasteOffset.current += 24;
+    setSelectedElementIds(new Set(pasted.elements.map((element) => element.id)));
+    setSelectedConnectorIds(new Set());
+  }, [readOnly, diagram, copiedType, viewport, elements, onCanvasChange]);
+
   const isTypingTarget = (target: EventTarget | null): boolean => {
     if (!(target instanceof HTMLElement)) return false;
     return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
@@ -157,6 +196,16 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (readOnly || isTypingTarget(event.target)) return;
+      if ((event.metaKey || event.ctrlKey) && !event.altKey) {
+        const key = event.key.toLowerCase();
+        if ((key === 'c' || key === 'x') && selectedElementIds.size) {
+          event.preventDefault(); copySelection(key === 'x'); return;
+        }
+        if (key === 'v' && copiedType === diagram?.type && clipboard.current.hasContent()) {
+          event.preventDefault(); pasteSelection(); return;
+        }
+      }
       if ((event.key !== 'Delete' && event.key !== 'Backspace') || isTypingTarget(event.target)) {
         return;
       }
@@ -164,23 +213,22 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
       if (selectedElementIds.size === 0 && selectedConnectorIds.size === 0) return;
 
       event.preventDefault();
-      for (const connectorId of selectedConnectorIds) {
-        onCanvasChange?.({ type: 'connector-delete', connectorId });
-      }
-      for (const elementId of selectedElementIds) {
-        onCanvasChange?.({ type: 'element-delete', elementId });
-      }
+      onCanvasChange?.({ type: 'batch', changes: [
+        ...[...selectedConnectorIds].map((connectorId): CanvasChange => ({ type: 'connector-delete', connectorId })),
+        ...[...selectedElementIds].map((elementId): CanvasChange => ({ type: 'element-delete', elementId })),
+      ] });
       clearSelection();
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [clearSelection, onCanvasChange, selectedConnectorIds, selectedElementIds]);
+  }, [clearSelection, onCanvasChange, readOnly, selectedConnectorIds, selectedElementIds, copySelection, pasteSelection, copiedType, diagram?.type]);
 
   // --- Drag selection box ---
 
   const handleStageMouseDown = useCallback(
     (e: any) => {
+      if (readOnly) return;
       // Only start selection if clicking on the stage background
       if (e.target !== e.target.getStage()) return;
       const stage = e.target.getStage();
@@ -208,7 +256,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
       isSelecting.current = true;
       setSelectionRect({ start: { x, y }, end: { x, y } });
     },
-    [activeTool, clearSelection, diagram, elements, onCanvasChange, viewport],
+    [activeTool, clearSelection, diagram, elements, onCanvasChange, readOnly, viewport],
   );
 
   const handleStageMouseMove = useCallback(
@@ -433,12 +481,13 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
             />
           ))}
         </Layer>
-        <Layer>
+        <Layer listening={!readOnly}>
           {/* Connectors rendered below elements */}
-          {connectors.map((conn) => (
+          {connectors.map((conn, index) => (
             <ConnectorRenderer
               key={conn.id}
               connector={conn}
+              sequenceIndex={diagram?.type === 'sequence' ? index : undefined}
               elements={elements}
               isSelected={selectedConnectorIds.has(conn.id)}
               onSelect={handleConnectorSelect}
@@ -483,6 +532,9 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
 
       {/* Fit-all button */}
       <div className="canvas-controls">
+        <button className="canvas-floating-button" disabled={readOnly || !selectedElementIds.size} onClick={() => copySelection()} title="Copy selected shapes (Cmd/Ctrl+C)">Copy</button>
+        <button className="canvas-floating-button" disabled={readOnly || !selectedElementIds.size} onClick={() => copySelection(true)} title="Cut selected shapes (Cmd/Ctrl+X)">Cut</button>
+        <button className="canvas-floating-button" disabled={readOnly || copiedType !== diagram?.type} onClick={pasteSelection} title="Paste shapes (Cmd/Ctrl+V)">Paste</button>
         <button
           onClick={handleFitAll}
           className="canvas-floating-button"

@@ -1,0 +1,12 @@
+@class-diagram "Order system"
+
+class Order {
+  - id: string
+  + addItem(item: OrderItem): void
+}
+
+class OrderItem {
+  - quantity: number
+}
+
+Order "1" --> "*" OrderItem : contains

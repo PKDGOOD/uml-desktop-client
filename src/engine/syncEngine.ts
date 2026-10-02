@@ -32,6 +32,9 @@ export class SyncEngine {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly debounceMs: number;
   private syncing = false;
+  private pendingText: string | null = null;
+  private currentText = '';
+  private currentErrors: DSLError[] = [];
 
   private readonly onDiagramUpdate: (diagram: DiagramData) => void;
   private readonly onTextUpdate: (text: string) => void;
@@ -49,13 +52,59 @@ export class SyncEngine {
   /**
    * Set the current diagram directly (e.g. when loading a diagram).
    */
-  setDiagram(diagram: DiagramData): void {
+  setDiagram(diagram: DiagramData, text = serializeDSL(diagram)): void {
+    this.cancelPendingText();
     this.currentDiagram = deepClone(diagram);
     this.lastValidDiagram = deepClone(diagram);
+    this.currentText = text;
+    const result = parseDSL(text);
+    this.currentErrors = result.success ? [] : result.errors;
   }
 
   getDiagram(): DiagramData | null {
     return this.currentDiagram;
+  }
+
+  getText(): string {
+    return this.currentText;
+  }
+
+  getErrors(): DSLError[] {
+    return this.currentErrors;
+  }
+
+  /** Commit the latest keystroke before saving, switching tabs or editing the canvas. */
+  flushPendingText(): boolean {
+    const text = this.pendingText;
+    this.cancelPendingText();
+    if (text !== null) this.processTextChange(text);
+    return this.currentErrors.length === 0;
+  }
+
+  private cancelPendingText(): void {
+    if (this.debounceTimer !== null) clearTimeout(this.debounceTimer);
+    this.debounceTimer = null;
+    this.pendingText = null;
+  }
+
+  dispose(): void {
+    this.cancelPendingText();
+    this.paused = true;
+  }
+
+  private reportErrors(errors: DSLError[]): void {
+    this.currentErrors = errors;
+    this.onErrors(errors);
+  }
+
+  private restore(diagram: DiagramData, text: string): void {
+    this.cancelPendingText();
+    this.currentDiagram = deepClone(diagram);
+    this.lastValidDiagram = deepClone(diagram);
+    this.currentText = text;
+    this.onDiagramUpdate(deepClone(diagram));
+    this.onTextUpdate(text);
+    this.reportErrors([]);
   }
 
   /**
@@ -69,9 +118,9 @@ export class SyncEngine {
       clearTimeout(this.debounceTimer);
     }
 
+    this.pendingText = newText;
     this.debounceTimer = setTimeout(() => {
-      this.debounceTimer = null;
-      this.processTextChange(newText);
+      this.flushPendingText();
     }, this.debounceMs);
   }
 
@@ -81,6 +130,8 @@ export class SyncEngine {
 
     try {
       const result = parseDSL(newText);
+      const oldText = this.currentText;
+      this.currentText = newText;
 
       if (result.success) {
         const oldDiagram = this.currentDiagram ? deepClone(this.currentDiagram) : null;
@@ -95,18 +146,12 @@ export class SyncEngine {
           const diagramForUndo = deepClone(newDiagram);
           const command: Command = {
             description: 'Text edit',
-            execute: () => {
-              this.currentDiagram = deepClone(diagramForUndo);
-              this.lastValidDiagram = deepClone(diagramForUndo);
-              this.onDiagramUpdate(deepClone(diagramForUndo));
-            },
+            execute: () => this.restore(diagramForUndo, newText),
             undo: () => {
               if (oldDiagram) {
-                this.currentDiagram = deepClone(oldDiagram);
-                this.lastValidDiagram = deepClone(oldDiagram);
-                this.onDiagramUpdate(deepClone(oldDiagram));
-                const text = serializeDSL(oldDiagram);
-                this.onTextUpdate(text);
+                // An invalid draft has no corresponding canvas state to restore.
+                const previous = parseDSL(oldText);
+                this.restore(oldDiagram, previous.success ? oldText : serializeDSL(oldDiagram));
               }
             },
           };
@@ -118,10 +163,10 @@ export class SyncEngine {
         }
 
         // Clear errors on success
-        this.onErrors([]);
+        this.reportErrors([]);
       } else {
         // Parse error: keep last valid state, report errors
-        this.onErrors(result.errors);
+        this.reportErrors(result.errors);
       }
     } finally {
       this.syncing = false;
@@ -132,19 +177,22 @@ export class SyncEngine {
    * Canvas changed → update model → serialize to DSL → notify Text Editor.
    * Canvas changes are applied immediately (no debouncing).
    */
-  onCanvasChange(change: CanvasChange): void {
-    if (this.paused) return;
-    if (this.syncing) return;
-    if (!this.currentDiagram) return;
+  onCanvasChange(change: CanvasChange): boolean {
+    if (this.paused || this.syncing || !this.currentDiagram) return false;
+    // Keep an invalid draft intact instead of replacing it with generated text.
+    if (!this.flushPendingText()) return false;
 
     this.syncing = true;
 
     try {
       const oldDiagram = deepClone(this.currentDiagram);
+      const oldText = this.currentText;
 
       const applyChange = (diagram: DiagramData, ch: CanvasChange): DiagramData => {
         const d = deepClone(diagram);
         switch (ch.type) {
+          case 'batch':
+            return ch.changes.reduce((current, item) => applyChange(current, item), d);
           case 'element-add':
             d.elements.push(deepClone(ch.element));
             break;
@@ -193,29 +241,14 @@ export class SyncEngine {
         const oldDiagramCopy = deepClone(oldDiagram);
         const command: Command = {
           description: `Canvas: ${change.type}`,
-          execute: () => {
-            this.currentDiagram = deepClone(diagramForUndo);
-            this.lastValidDiagram = deepClone(diagramForUndo);
-            this.onDiagramUpdate(deepClone(diagramForUndo));
-            const text = serializeDSL(diagramForUndo);
-            this.onTextUpdate(text);
-          },
-          undo: () => {
-            this.currentDiagram = deepClone(oldDiagramCopy);
-            this.lastValidDiagram = deepClone(oldDiagramCopy);
-            this.onDiagramUpdate(deepClone(oldDiagramCopy));
-            const text = serializeDSL(oldDiagramCopy);
-            this.onTextUpdate(text);
-          },
+          execute: () => this.restore(diagramForUndo, serializeDSL(diagramForUndo)),
+          undo: () => this.restore(oldDiagramCopy, oldText),
         };
         this.undoManager.execute(command);
       } else {
-        this.currentDiagram = newDiagram;
-        this.lastValidDiagram = deepClone(newDiagram);
-        this.onDiagramUpdate(deepClone(newDiagram));
-        const text = serializeDSL(newDiagram);
-        this.onTextUpdate(text);
+        this.restore(newDiagram, serializeDSL(newDiagram));
       }
+      return true;
     } finally {
       this.syncing = false;
     }
@@ -226,10 +259,7 @@ export class SyncEngine {
    */
   pause(): void {
     this.paused = true;
-    if (this.debounceTimer !== null) {
-      clearTimeout(this.debounceTimer);
-      this.debounceTimer = null;
-    }
+    this.cancelPendingText();
   }
 
   /**
@@ -261,15 +291,36 @@ function preserveIds(oldDiagram: DiagramData, newDiagram: DiagramData): void {
   newDiagram.id = oldDiagram.id;
   newDiagram.viewport = oldDiagram.viewport;
 
-  const oldByName = new Map<string, DiagramElement>();
+  const oldByName = new Map<string, DiagramElement[]>();
   for (const el of oldDiagram.elements) {
-    oldByName.set(el.properties.name, el);
+    const key = `${el.type}:${el.properties.name}`;
+    oldByName.set(key, [...(oldByName.get(key) ?? []), el]);
   }
 
+  const idMap = new Map<string, string>();
   for (const el of newDiagram.elements) {
-    const old = oldByName.get(el.properties.name);
+    const old = oldByName.get(`${el.type}:${el.properties.name}`)?.shift();
     if (old) {
+      idMap.set(el.id, old.id);
       el.id = old.id;
+      el.sharedRefId = old.sharedRefId;
+    }
+  }
+
+  // Remap endpoints before matching connectors, including parallel sequence messages.
+  const remaining = [...oldDiagram.connectors];
+  for (const connector of newDiagram.connectors) {
+    connector.sourceId = idMap.get(connector.sourceId) ?? connector.sourceId;
+    connector.targetId = idMap.get(connector.targetId) ?? connector.targetId;
+    const matches = (old: Connector) => old.type === connector.type
+      && old.sourceId === connector.sourceId && old.targetId === connector.targetId;
+    let index = remaining.findIndex((old) => matches(old) && old.label === connector.label);
+    if (index < 0) index = remaining.findIndex(matches);
+    if (index >= 0) {
+      const [old] = remaining.splice(index, 1);
+      connector.id = old.id;
+      connector.waypoints = old.waypoints;
+      connector.properties = { ...old.properties, ...connector.properties };
     }
   }
 }

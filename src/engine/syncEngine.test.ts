@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SyncEngine, SyncEngineOptions } from './syncEngine';
 import { UndoManager } from './undoManager';
+import { serializeDSL } from '../parser/dsl/serializer';
 import type {
   DiagramData,
   DSLError,
@@ -75,6 +76,84 @@ class Order {
 `;
 
 const INVALID_DSL = `@class-diagram "Test"\n\nclass {{{ invalid`;
+
+describe('SyncEngine draft safety', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('remaps both connector endpoints to preserved IDs after a text edit', () => {
+    const { engine } = createEngine();
+    const diagram = makeDiagram({
+      elements: [makeElement('existing-a', 'A'), makeElement('existing-b', 'B')],
+      connectors: [{ ...makeConnector('existing-link', 'existing-a', 'existing-b'),
+        waypoints: [{ x: 50, y: 75 }] }],
+    });
+    diagram.elements[0].sharedRefId = 'shared-a';
+    engine.setDiagram(diagram);
+    engine.onTextChange(serializeDSL(diagram).replace('"Test"', '"Renamed"'));
+    engine.flushPendingText();
+    expect(engine.getDiagram()?.connectors[0]).toMatchObject({
+      id: 'existing-link', sourceId: 'existing-a', targetId: 'existing-b', waypoints: [{ x: 50, y: 75 }],
+    });
+    expect(engine.getDiagram()?.elements[0].sharedRefId).toBe('shared-a');
+  });
+
+  it('does not reuse an ID for multiple parallel connectors', () => {
+    const { engine } = createEngine();
+    const diagram = makeDiagram({
+      elements: [makeElement('a', 'A'), makeElement('b', 'B')],
+      connectors: [{ ...makeConnector('first', 'a', 'b'), label: 'one' },
+        { ...makeConnector('second', 'a', 'b'), label: 'two' }],
+    });
+    engine.setDiagram(diagram);
+    engine.onTextChange(serializeDSL({ ...diagram, connectors: [...diagram.connectors].reverse() }));
+    engine.flushPendingText();
+    expect(engine.getDiagram()?.connectors.map((c) => c.id)).toEqual(['second', 'first']);
+  });
+
+  it('cancels a pending edit when a different diagram is set', () => {
+    const { engine, onDiagramUpdate } = createEngine();
+    engine.setDiagram(makeDiagram());
+    engine.onTextChange(VALID_CLASS_DSL);
+    engine.setDiagram(makeDiagram({ id: 'other', name: 'Other' }));
+    vi.runAllTimers();
+    expect(onDiagramUpdate).not.toHaveBeenCalled();
+    expect(engine.getDiagram()?.id).toBe('other');
+  });
+
+  it('flushes a text edit before applying a canvas edit', () => {
+    const { engine } = createEngine();
+    engine.setDiagram(makeDiagram({ elements: [makeElement('order', 'Order')] }));
+    engine.onTextChange(VALID_CLASS_DSL);
+    engine.onCanvasChange({ type: 'element-move', elementId: 'order', position: { x: 99, y: 88 } });
+    vi.runAllTimers();
+    expect(engine.getDiagram()?.elements[0]).toMatchObject({
+      position: { x: 99, y: 88 }, properties: { attributes: [{ name: 'id', type: 'string', visibility: 'private' }] },
+    });
+  });
+
+  it('does not overwrite an invalid draft with a canvas change', () => {
+    const { engine, onTextUpdate } = createEngine();
+    engine.setDiagram(makeDiagram({ elements: [makeElement('order', 'Order')] }));
+    engine.onTextChange(INVALID_DSL);
+    expect(engine.onCanvasChange({ type: 'element-delete', elementId: 'order' })).toBe(false);
+    expect(engine.getText()).toBe(INVALID_DSL);
+    expect(engine.getDiagram()?.elements).toHaveLength(1);
+    expect(onTextUpdate).not.toHaveBeenCalled();
+  });
+
+  it('updates the editor as well as the canvas when redoing a text edit', () => {
+    const history = new UndoManager();
+    const { engine, onTextUpdate } = createEngine({ undoManager: history });
+    engine.setDiagram(makeDiagram());
+    engine.onTextChange(VALID_CLASS_DSL);
+    engine.flushPendingText();
+    history.undo();
+    history.redo();
+    expect(onTextUpdate).toHaveBeenLastCalledWith(VALID_CLASS_DSL);
+    expect(engine.getText()).toBe(VALID_CLASS_DSL);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Task 10.1: Bidirectional Sync Engine

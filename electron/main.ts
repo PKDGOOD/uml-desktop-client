@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
 import path from 'path';
 import { registerFileIOHandlers } from './fileIO';
 import { registerRecentProjectsHandlers } from './recentProjects';
@@ -14,6 +14,17 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
+  });
+
+  mainWindow.webContents.on('will-prevent-unload', (event) => {
+    if (!mainWindow) return;
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: 'warning', title: 'Unsaved changes',
+      message: 'Close without saving your changes?',
+      detail: 'Choose Keep editing to return to the project and save it.',
+      buttons: ['Keep editing', 'Close without saving'], defaultId: 0, cancelId: 0,
+    });
+    if (choice === 1) event.preventDefault();
   });
 
   if (process.env.VITE_DEV_SERVER_URL) {

@@ -44,7 +44,7 @@
 // ============ Top-level ============
 
 Diagram
-  = _ header:DiagramHeader _ NL* body:BodyItem* _ {
+  = (_ NL)* _ header:DiagramHeader _ NL* body:BodyItem* _ {
       const elements = [];
       const connectors = [];
       let elementIndex = 0;
@@ -83,6 +83,9 @@ Diagram
 
       // Resolve connector source/target names to IDs
       for (const conn of connectors) {
+        if (conn.type === 'transition' && (header.type === 'class' || header.type === 'usecase')) {
+          conn.type = 'directed-association';
+        }
         if (nameToId[conn.sourceId]) conn.sourceId = nameToId[conn.sourceId];
         if (nameToId[conn.targetId]) conn.targetId = nameToId[conn.targetId];
         delete conn._nodeType;
@@ -531,7 +534,7 @@ TransitionDef
 // ============ Primitives ============
 
 QuotedString
-  = '"' chars:[^"]* '"' { return chars.join(''); }
+  = '"' ("\\" . / [^"\\])* '"' { return JSON.parse(text()); }
 
 IdentifierOrQuoted
   = QuotedString
@@ -548,7 +551,7 @@ Integer
 
 // Horizontal whitespace (no newlines)
 _ "whitespace"
-  = [ \t]*
+  = [ \t]* ("//" [^\n\r]*)?
 
 // Required horizontal whitespace
 S "required space"

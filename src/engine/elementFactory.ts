@@ -34,19 +34,18 @@ const ELEMENT_DEFAULTS: Partial<
   },
 };
 
-const CLASS_DIAGRAM_TOOLS = new Set<ElementType>([
-  'class',
-  'interface',
-  'abstract-class',
-  'enum',
-]);
-
-const CLASS_CONNECTOR_TOOLS = new Set<ConnectorType>([
-  'directed-association',
-  'dependency',
-  'inheritance',
-  'composition',
-]);
+export const ELEMENT_TYPES: Record<DiagramType, ElementType[]> = {
+  class: ['class', 'interface', 'abstract-class', 'enum'],
+  sequence: ['lifeline'], usecase: ['actor', 'usecase', 'system-boundary'],
+  activity: ['action', 'decision', 'fork', 'join', 'initial-node', 'final-node'],
+  state: ['state', 'composite-state', 'initial-state', 'final-state'],
+};
+export const CONNECTOR_TYPES: Record<DiagramType, ConnectorType[]> = {
+  class: ['association', 'directed-association', 'dependency', 'inheritance', 'realization', 'composition', 'aggregation'],
+  sequence: ['sync-message', 'async-message', 'return-message'],
+  usecase: ['association', 'directed-association', 'include', 'extend'],
+  activity: ['transition'], state: ['transition'],
+};
 
 function nextElementName(baseName: string, elements: DiagramElement[]): string {
   const names = new Set(elements.map((element) => element.properties.name));
@@ -69,11 +68,21 @@ export function createCanvasElement(
   position: Position,
   existingElements: DiagramElement[],
 ): DiagramElement | null {
-  if (diagramType !== 'class' || !CLASS_DIAGRAM_TOOLS.has(elementType)) {
+  if (!ELEMENT_TYPES[diagramType].includes(elementType)) {
     return null;
   }
 
-  const defaults = ELEMENT_DEFAULTS[elementType];
+  const dimensions: Partial<Record<ElementType, Size>> = {
+    lifeline: { width: 120, height: 400 }, actor: { width: 70, height: 100 },
+    usecase: { width: 170, height: 70 }, 'system-boundary': { width: 420, height: 320 },
+    decision: { width: 90, height: 90 }, fork: { width: 180, height: 10 }, join: { width: 180, height: 10 },
+    'initial-node': { width: 30, height: 30 }, 'final-node': { width: 30, height: 30 },
+    'initial-state': { width: 30, height: 30 }, 'final-state': { width: 30, height: 30 },
+  };
+  const defaults = ELEMENT_DEFAULTS[elementType] ?? {
+    baseName: elementType.split('-').map((part) => part[0].toUpperCase() + part.slice(1)).join(''),
+    size: dimensions[elementType] ?? { width: 180, height: 80 },
+  };
   if (!defaults) return null;
 
   return {
@@ -95,9 +104,8 @@ export function createCanvasConnector(
   targetId: string,
 ): Connector | null {
   if (
-    diagramType !== 'class' ||
     sourceId === targetId ||
-    !CLASS_CONNECTOR_TOOLS.has(connectorType)
+    !CONNECTOR_TYPES[diagramType].includes(connectorType)
   ) {
     return null;
   }
@@ -107,6 +115,7 @@ export function createCanvasConnector(
     type: connectorType,
     sourceId,
     targetId,
+    ...(diagramType === 'sequence' ? { label: 'message()' } : {}),
     properties: {},
   };
 }

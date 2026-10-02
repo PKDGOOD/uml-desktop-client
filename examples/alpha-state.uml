@@ -1,0 +1,10 @@
+@state-diagram "주문 상태 - state acceptance"
+initial-state Start @pos(30, 40)
+composite-state Active @pos(150, 40) @size(450, 300) {
+  state Inside @pos(200, 100) @size(220, 100)
+}
+state Outside @pos(720, 80) @size(220, 100)
+final-state End @pos(1040, 120)
+Start --> Inside : created
+Inside --> Outside : cancel - 취소 요청
+Outside --> End : closed

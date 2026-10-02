@@ -1,0 +1,10 @@
+@usecase-diagram "주문 관리 - use case acceptance"
+actor "고객" @pos(30, 130) @size(70, 100)
+system-boundary OrderSystem @pos(180, 40) @size(450, 350) {
+  usecase CancelOrder @pos(220, 90) @size(180, 70)
+  usecase RefundPayment @pos(400, 220) @size(180, 70)
+}
+usecase ContactSupport @pos(740, 120) @size(180, 70)
+"고객" -- CancelOrder
+CancelOrder ..> RefundPayment <<include>>
+ContactSupport ..> CancelOrder <<extend>>

@@ -12,6 +12,7 @@ export const ProjectFileSerializer = {
         tree: project.tree,
         sharedElements: project.sharedElements,
         diagrams: project.diagrams,
+        diagramTexts: project.diagramTexts,
       },
       null,
       2,
