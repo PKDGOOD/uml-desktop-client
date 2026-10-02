@@ -60,17 +60,17 @@ export interface ElementProperties {
 // --- Element Types ---
 
 export type ElementType =
-  // 클래스 다이어그램
+  // Class diagram
   | 'class' | 'interface' | 'abstract-class' | 'enum'
-  // 시퀀스 다이어그램
+  // Sequence diagram
   | 'lifeline' | 'activation' | 'message'
-  // 유스케이스 다이어그램
+  // Use case diagram
   | 'actor' | 'usecase' | 'system-boundary'
-  // 액티비티 다이어그램
+  // Activity diagram
   | 'action' | 'decision' | 'fork' | 'join' | 'initial-node' | 'final-node'
-  // 상태 다이어그램
+  // State diagram
   | 'state' | 'initial-state' | 'final-state' | 'composite-state'
-  // 공통
+  // Shared
   | 'note' | 'package';
 
 // --- Diagram Element ---
@@ -81,7 +81,7 @@ export interface DiagramElement {
   position: Position;
   size: Size;
   properties: ElementProperties;
-  /** 공유 요소인 경우 참조 ID */
+  /** Reference ID when this element is shared */
   sharedRefId?: string;
 }
 
@@ -92,11 +92,11 @@ export type ConnectorType =
   | 'aggregation' | 'composition'
   | 'inheritance' | 'realization'
   | 'dependency' | 'usage'
-  // 시퀀스 다이어그램
+  // Sequence diagram
   | 'sync-message' | 'async-message' | 'return-message'
-  // 유스케이스 다이어그램
+  // Use case diagram
   | 'include' | 'extend'
-  // 액티비티/상태 다이어그램
+  // Activity/state diagram
   | 'transition';
 
 export type CanvasTool =
@@ -146,7 +146,7 @@ export interface ProjectMetadata {
   version: string;
   createdAt: string;
   updatedAt: string;
-  /** 다이어그램 ID → 메타데이터 (지연 로딩용) */
+  /** Diagram ID → metadata (for lazy loading) */
   diagramIndex: Record<string, DiagramMeta>;
 }
 
@@ -210,7 +210,7 @@ export interface SnapshotEntry {
   id: string;
   createdAt: string;
   message: string;
-  /** 스냅샷 디렉토리 상대 경로 */
+  /** Snapshot directory path, relative to the project */
   path: string;
 }
 
