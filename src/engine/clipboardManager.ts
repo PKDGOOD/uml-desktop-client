@@ -82,6 +82,7 @@ export class ClipboardManager {
         cloned.id = generateId();
         cloned.sourceId = newSourceId;
         cloned.targetId = newTargetId;
+        cloned.waypoints = cloned.waypoints?.map((point) => ({ x: point.x + offsetX, y: point.y + offsetY }));
         newConnectors.push(cloned);
       }
     }

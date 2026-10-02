@@ -87,6 +87,12 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
 
   const renderShape = () => {
     switch (type) {
+      case 'lifeline':
+        return <>
+          <Rect width={size.width} height={40} fill={colors.fill} stroke={stroke} />
+          <Text text={properties.name} width={size.width} height={40} align="center" verticalAlign="middle" fontSize={12} />
+          <Line points={[size.width / 2, 40, size.width / 2, size.height]} stroke={stroke} dash={[7, 5]} hitStrokeWidth={20} />
+        </>;
       case 'actor':
         return <ActorShape size={size} colors={colors} stroke={stroke} />;
       case 'initial-state':
@@ -109,6 +115,7 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
 
   return (
     <Group
+      _useStrictMode
       x={position.x}
       y={position.y}
       draggable

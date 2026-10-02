@@ -12,9 +12,12 @@ import { PropertyPanel } from './components/properties/PropertyPanel';
 import { Toolbar } from './components/toolbar/Toolbar';
 import { UMLCanvas } from './components/canvas/UMLCanvas';
 import { DSLEditor } from './components/editor/DSLEditor';
-import { SyncEngine } from './engine/syncEngine';
-import { UndoManager } from './engine/undoManager';
-import { serializeDSL } from './parser/dsl/serializer';
+import { ProjectSession } from './engine/projectSession';
+import { downloadProject, downloadArtifact } from './engine/browserProjectFile';
+import { createProject } from './engine/projectFactory';
+import { CreateDialog } from './components/project/CreateDialog';
+import { HistoryDialog } from './components/project/HistoryDialog';
+import { ExportEngine } from './engine/exportEngine';
 import { ProjectFileSerializer } from './parser/project/projectFileSerializer';
 import { ProjectFileParser } from './parser/project/projectFileParser';
 import type {
@@ -35,6 +38,7 @@ import type {
 
 interface ElectronAPI {
   saveProject(filePath: string, data: string): Promise<void>;
+  saveExport(name: string, format: 'svg' | 'png', data: string): Promise<boolean>;
   loadProject(filePath: string): Promise<string>;
   showSaveDialog(options: {
     title?: string;
@@ -60,7 +64,7 @@ declare global {
 // Helper: create empty project
 // =============================================================================
 
-function createEmptyProject(name: string): ProjectData {
+function createExampleProject(name: string): ProjectData {
   const now = new Date().toISOString();
 
   // --- 1. Class Diagram: Order System ---
@@ -231,418 +235,342 @@ const App: React.FC = () => {
   const [dslText, setDslText] = useState('');
   const [dslErrors, setDslErrors] = useState<DSLError[]>([]);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
-  const canvasContainerRef = useRef<HTMLDivElement>(null);
-  const activeDiagramIdRef = useRef<string | null>(null);
+  const [fileBusy, setFileBusy] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [propertiesOpen, setPropertiesOpen] = useState(false);
+  const [createMode, setCreateMode] = useState<'project' | 'diagram' | null>(null);
+  const [projectGeneration, setProjectGeneration] = useState(0);
+  const [fileNotice, setFileNotice] = useState<{ text: string; error?: boolean } | null>(null);
+  const workspaceRef = useRef<ProjectSession | null>(null);
+  const fileBusyRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const canvasObserverRef = useRef<ResizeObserver | null>(null);
 
-  // SyncEngine and UndoManager refs
-  const undoManagerRef = useRef(new UndoManager());
-  const syncEngineRef = useRef<SyncEngine | null>(null);
-
-  const resetDiagramHistory = useCallback(() => {
-    undoManagerRef.current.clear();
-  }, []);
-
-  // Initialize SyncEngine
-  useEffect(() => {
-    syncEngineRef.current = new SyncEngine({
-      onDiagramUpdate: (diagram) => {
-        diagramStore.setDiagram(diagram);
-        setProjectData((current) => {
-          if (!current) return current;
-          const diagramId = activeDiagramIdRef.current ?? diagram.id;
-          return {
-            ...current,
-            diagrams: {
-              ...current.diagrams,
-              [diagramId]: diagram,
-            },
-          };
-        });
-      },
-      onTextUpdate: (text) => {
-        setDslText(text);
-      },
-      onErrors: (errors) => {
-        setDslErrors(errors);
-      },
-      undoManager: undoManagerRef.current,
-      debounceMs: 300,
-    });
-  }, []);
-
-  useEffect(() => {
-    activeDiagramIdRef.current = projectStore.activeDiagramId;
-  }, [projectStore.activeDiagramId]);
-
-  // Auto-load example project on mount
-  useEffect(() => {
-    const project = createEmptyProject('New Project');
-    setProjectData(project);
-    projectStore.setMetadata(project.metadata);
-    projectStore.setTree(project.tree);
-    projectStore.setDirty(false);
-
-    const firstDiagramId = Object.keys(project.diagrams)[0];
-    if (firstDiagramId) {
-      projectStore.openDiagram(firstDiagramId);
-      const diagram = project.diagrams[firstDiagramId];
-      resetDiagramHistory();
-      diagramStore.setDiagram(diagram);
-      syncEngineRef.current?.setDiagram(diagram);
-      setDslText(serializeDSL(diagram));
+  const refreshWorkspace = useCallback(() => {
+    const workspace = workspaceRef.current;
+    if (!workspace) return;
+    const store = useProjectStore.getState();
+    setProjectData(workspace.project);
+    store.setMetadata(workspace.project.metadata);
+    store.setTree(workspace.project.tree);
+    store.setDirty(workspace.dirty);
+    for (const id of store.openDiagramIds) {
+      if (!Object.prototype.hasOwnProperty.call(workspace.project.diagrams, id)) store.closeDiagram(id);
     }
-  }, [resetDiagramHistory]);
-
-  // Resize canvas to fit container
-  useEffect(() => {
-    const updateSize = () => {
-      if (canvasContainerRef.current) {
-        setCanvasSize({
-          width: canvasContainerRef.current.clientWidth,
-          height: canvasContainerRef.current.clientHeight,
-        });
-      }
-    };
-    updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
-  }, []);
-
-  // ==========================================================================
-  // Unsaved changes confirmation
-  // ==========================================================================
-
-  const confirmUnsavedChanges = useCallback((): boolean => {
-    if (!projectStore.dirty) return true;
-    return window.confirm(
-      'You have unsaved changes. Do you want to continue without saving?',
-    );
-  }, [projectStore.dirty]);
-
-  // ==========================================================================
-  // New Project
-  // ==========================================================================
-
-  const handleNewProject = useCallback(() => {
-    if (!confirmUnsavedChanges()) return;
-
-    const project = createEmptyProject('New Project');
-    setProjectData(project);
-    setProjectFilePath(null);
-    projectStore.reset();
-    projectStore.setMetadata(project.metadata);
-    projectStore.setTree(project.tree);
-    projectStore.setDirty(false);
-
-    const firstDiagramId = Object.keys(project.diagrams)[0];
-    if (firstDiagramId) {
-      projectStore.openDiagram(firstDiagramId);
-      const diagram = project.diagrams[firstDiagramId];
-      resetDiagramHistory();
-      diagramStore.setDiagram(diagram);
-      syncEngineRef.current?.setDiagram(diagram);
-      setDslText(serializeDSL(diagram));
-    }
-  }, [confirmUnsavedChanges, diagramStore, projectStore, resetDiagramHistory]);
-
-  // ==========================================================================
-  // Save Project
-  // ==========================================================================
-
-  const handleSaveProject = useCallback(async () => {
-    if (!projectData) return;
-
-    const currentDiagram = diagramStore.diagram;
-    const updatedData = {
-      ...projectData,
-      metadata: projectStore.metadata ?? projectData.metadata,
-      tree: projectStore.tree,
-    };
-    if (currentDiagram && projectStore.activeDiagramId) {
-      updatedData.diagrams = {
-        ...updatedData.diagrams,
-        [projectStore.activeDiagramId]: currentDiagram,
-      };
-    }
-    updatedData.metadata = {
-      ...updatedData.metadata,
-      updatedAt: new Date().toISOString(),
-    };
-
-    const serialized = ProjectFileSerializer.serialize(updatedData);
-
-    let savePath = projectFilePath;
-    if (!savePath && window.electronAPI) {
-      savePath = await window.electronAPI.showSaveDialog({
-        title: 'Save Project',
-        defaultPath: `${updatedData.metadata.name}.uml.json`,
-        filters: [{ name: 'UML Project', extensions: ['uml.json'] }],
-      });
-      if (!savePath) return;
-    }
-
-    if (savePath && window.electronAPI) {
-      try {
-        await window.electronAPI.saveProject(savePath, serialized);
-        setProjectFilePath(savePath);
-        setProjectData(updatedData);
-        projectStore.setDirty(false);
-        await window.electronAPI.addRecentProject(savePath);
-      } catch (err) {
-        alert(`Failed to save project: ${(err as Error).message}`);
-      }
-    }
-  }, [projectData, projectFilePath, diagramStore.diagram, projectStore]);
-
-  // ==========================================================================
-  // Open Project
-  // ==========================================================================
-
-  const handleOpenProject = useCallback(async () => {
-    if (!confirmUnsavedChanges()) return;
-    if (!window.electronAPI) return;
-
-    const filePath = await window.electronAPI.showOpenDialog({
-      title: 'Open Project',
-      filters: [{ name: 'UML Project', extensions: ['uml.json'] }],
-      properties: ['openFile'],
-    });
-    if (!filePath) return;
-
-    try {
-      const content = await window.electronAPI.loadProject(filePath);
-      const result = ProjectFileParser.parseAll(content);
-      if (!result.success) {
-        alert(`Failed to parse project: ${result.errors.map((e) => e.message).join('\n')}`);
-        return;
-      }
-
-      const project = result.data;
-      setProjectData(project);
-      setProjectFilePath(filePath);
-      projectStore.reset();
-      projectStore.setMetadata(project.metadata);
-      projectStore.setTree(project.tree);
-
-      const firstId = Object.keys(project.diagrams)[0];
-      if (firstId) {
-        projectStore.openDiagram(firstId);
-        const diagram = project.diagrams[firstId];
-        resetDiagramHistory();
-        diagramStore.setDiagram(diagram);
-        syncEngineRef.current?.setDiagram(diagram);
-        setDslText(serializeDSL(diagram));
-      }
-
-      await window.electronAPI.addRecentProject(filePath);
-    } catch (err) {
-      alert(`Failed to open project: ${(err as Error).message}`);
-    }
-  }, [confirmUnsavedChanges, diagramStore, projectStore, resetDiagramHistory]);
-
-  // ==========================================================================
-  // SyncEngine handlers
-  // ==========================================================================
-
-  const handleDslChange = useCallback((text: string) => {
-    setDslText(text);
-    syncEngineRef.current?.onTextChange(text);
-    projectStore.setDirty(true);
-  }, [projectStore]);
-
-  const handleCanvasChange = useCallback((change: CanvasChange) => {
-    syncEngineRef.current?.onCanvasChange(change);
-    projectStore.setDirty(true);
-  }, [projectStore]);
-
-  const handleUndo = useCallback(() => {
-    if (!undoManagerRef.current.canUndo()) return;
-    undoManagerRef.current.undo();
-    projectStore.setDirty(true);
-  }, [projectStore]);
-
-  const handleRedo = useCallback(() => {
-    if (!undoManagerRef.current.canRedo()) return;
-    undoManagerRef.current.redo();
-    projectStore.setDirty(true);
-  }, [projectStore]);
-
-  useEffect(() => {
-    const isTypingTarget = (target: EventTarget | null): boolean => {
-      if (!(target instanceof HTMLElement)) return false;
-      return target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName);
-    };
-
-    const handleHistoryShortcut = (event: KeyboardEvent) => {
-      if (isTypingTarget(event.target) || !(event.metaKey || event.ctrlKey)) return;
-
-      const key = event.key.toLowerCase();
-      if (key === 'z' && event.shiftKey) {
-        event.preventDefault();
-        handleRedo();
-      } else if (key === 'z') {
-        event.preventDefault();
-        handleUndo();
-      } else if (key === 'y') {
-        event.preventDefault();
-        handleRedo();
-      }
-    };
-
-    window.addEventListener('keydown', handleHistoryShortcut);
-    return () => window.removeEventListener('keydown', handleHistoryShortcut);
-  }, [handleRedo, handleUndo]);
-
-  const handleElementDoubleClick = useCallback((elementId: string) => {
-    const el = diagramStore.diagram?.elements.find((e) => e.id === elementId);
-    if (el) setSelectedElement(el);
-  }, [diagramStore.diagram]);
-
-  const handleSelectionChange = useCallback((selectedIds: string[]) => {
-    if (selectedIds.length === 1) {
-      const el = diagramStore.diagram?.elements.find((e) => e.id === selectedIds[0]);
-      if (el) setSelectedElement(el);
+    const id = useProjectStore.getState().activeDiagramId;
+    const session = id ? workspace.getSession(id) : undefined;
+    const diagram = session?.sync.getDiagram();
+    if (id && diagram && session) {
+      useDiagramStore.getState().setDiagram(diagram);
+      setDslText(workspace.text(id));
+      setDslErrors(session.sync.getErrors());
+      setDiagramType(diagram.type);
+      setSelectedElement((selected) => selected
+        ? diagram.elements.find((element) => element.id === selected.id) ?? null : null);
     } else {
+      useDiagramStore.getState().reset();
+      setDslText('');
+      setDslErrors([]);
       setSelectedElement(null);
     }
-  }, [diagramStore.diagram]);
+  }, []);
 
-  // ==========================================================================
-  // Diagram tab management
-  // ==========================================================================
+  const replaceProject = useCallback((project: ProjectData, filePath: string | null) => {
+    workspaceRef.current?.dispose();
+    workspaceRef.current = new ProjectSession(project, refreshWorkspace);
+    setProjectGeneration((generation) => generation + 1);
+    const store = useProjectStore.getState();
+    store.reset();
+    const firstId = Object.keys(project.diagrams)[0];
+    if (firstId) store.openDiagram(firstId);
+    setProjectFilePath(filePath);
+    setSelectedElement(null);
+    setActiveTool(null);
+    refreshWorkspace();
+  }, [refreshWorkspace]);
 
-  const handleDiagramOpen = useCallback(
-    (diagramId: string) => {
-      const currentDiagram = diagramStore.getDiagram();
-      const currentDiagramId = projectStore.activeDiagramId;
-      if (currentDiagram && currentDiagramId) {
-        setProjectData((current) => current && ({
-          ...current,
-          diagrams: { ...current.diagrams, [currentDiagramId]: currentDiagram },
-        }));
-      }
-      projectStore.openDiagram(diagramId);
-      if (projectData?.diagrams[diagramId]) {
-        const diagram = projectData.diagrams[diagramId];
-        resetDiagramHistory();
-        diagramStore.setDiagram(diagram);
-        syncEngineRef.current?.setDiagram(diagram);
-        setDslText(serializeDSL(diagram));
-        setDiagramType(diagram.type);
-      }
-    },
-    [diagramStore, projectData, projectStore, resetDiagramHistory],
-  );
+  useEffect(() => {
+    replaceProject(createProject('Untitled Project'), null);
+    return () => workspaceRef.current?.dispose();
+  }, [replaceProject]);
 
-  const handleTabClick = useCallback(
-    (diagramId: string) => {
-      const currentDiagram = diagramStore.getDiagram();
-      const currentDiagramId = projectStore.activeDiagramId;
-      if (currentDiagram && currentDiagramId) {
-        setProjectData((current) => current && ({
-          ...current,
-          diagrams: { ...current.diagrams, [currentDiagramId]: currentDiagram },
-        }));
-      }
-      projectStore.setActiveDiagram(diagramId);
-      if (projectData?.diagrams[diagramId]) {
-        const diagram = projectData.diagrams[diagramId];
-        resetDiagramHistory();
-        diagramStore.setDiagram(diagram);
-        syncEngineRef.current?.setDiagram(diagram);
-        setDslText(serializeDSL(diagram));
-        setDiagramType(diagram.type);
-      }
-    },
-    [diagramStore, projectData, projectStore, resetDiagramHistory],
-  );
+  // Observe the actual panel, including splitter drags and view-mode changes.
+  const canvasContainerRef = useCallback((node: HTMLDivElement | null) => {
+    canvasObserverRef.current?.disconnect();
+    if (!node) return;
+    const updateSize = () => setCanvasSize({ width: node.clientWidth, height: node.clientHeight });
+    updateSize();
+    canvasObserverRef.current = new ResizeObserver(updateSize);
+    canvasObserverRef.current.observe(node);
+  }, []);
 
-  const handleTabClose = useCallback(
-    (diagramId: string) => {
-      const currentDiagram = diagramStore.getDiagram();
-      if (currentDiagram && projectStore.activeDiagramId === diagramId) {
-        setProjectData((current) => current && ({
-          ...current,
-          diagrams: { ...current.diagrams, [diagramId]: currentDiagram },
-        }));
-      }
+  const confirmUnsavedChanges = useCallback(() => !workspaceRef.current?.dirty || window.confirm(
+    'You have unsaved changes. Continue without saving?',
+  ), []);
 
-      const remainingDiagramIds = projectStore.openDiagramIds.filter((id) => id !== diagramId);
-      const nextActiveId = projectStore.activeDiagramId === diagramId
-        ? remainingDiagramIds[remainingDiagramIds.length - 1] ?? null
-        : projectStore.activeDiagramId;
+  useEffect(() => {
+    if (!projectStore.dirty) return;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    return () => window.removeEventListener('beforeunload', beforeUnload);
+  }, [projectStore.dirty]);
 
-      projectStore.closeDiagram(diagramId);
+  const handleNewProject = useCallback(() => {
+    if (!fileBusyRef.current) setCreateMode('project');
+  }, []);
 
-      if (nextActiveId && projectData?.diagrams[nextActiveId]) {
-        const nextDiagram = projectData.diagrams[nextActiveId];
-        resetDiagramHistory();
-        diagramStore.setDiagram(nextDiagram);
-        syncEngineRef.current?.setDiagram(nextDiagram);
-        setDslText(serializeDSL(nextDiagram));
-        setDiagramType(nextDiagram.type);
+  const handleCreate = useCallback((name: string, type: DiagramType, folder: string) => {
+    if (fileBusyRef.current) return;
+    if (createMode === 'project') {
+      if (!confirmUnsavedChanges()) return;
+      replaceProject(createProject(name), null);
+    } else {
+      const id = workspaceRef.current?.addDiagram(name, type, folder);
+      if (id) {
+        useProjectStore.getState().openDiagram(id);
         setSelectedElement(null);
-      } else if (!nextActiveId) {
-        diagramStore.reset();
-        resetDiagramHistory();
-        setDslText('');
-        setSelectedElement(null);
+        setActiveTool(null);
+        refreshWorkspace();
       }
-    },
-    [diagramStore, projectData, projectStore, resetDiagramHistory],
-  );
+    }
+    setCreateMode(null);
+    setFileNotice(null);
+  }, [createMode, confirmUnsavedChanges, replaceProject, refreshWorkspace]);
 
-  const handleTreeChange = useCallback(
-    (tree: ProjectTreeNode[]) => {
-      projectStore.setTree(tree);
-      setProjectData((current) => current && ({ ...current, tree }));
-      projectStore.setDirty(true);
-    },
-    [projectStore],
-  );
+  const handleExamples = useCallback(() => {
+    if (fileBusyRef.current || !confirmUnsavedChanges()) return;
+    replaceProject(createExampleProject('Example Project'), null);
+    setFileNotice(null);
+  }, [confirmUnsavedChanges, replaceProject]);
 
-  const handlePropertyChange = useCallback(
-    (elementId: string, properties: Partial<ElementProperties>) => {
-      diagramStore.updateElementProperties(elementId, properties);
-      projectStore.setDirty(true);
-      const updated = diagramStore.diagram?.elements.find((e) => e.id === elementId);
-      if (updated) setSelectedElement({ ...updated, properties: { ...updated.properties, ...properties } });
-      // Sync text editor
-      const diagram = diagramStore.getDiagram();
-      if (diagram) {
-        setProjectData((current) => current && ({
-          ...current,
-          diagrams: {
-            ...current.diagrams,
-            [diagram.id]: diagram,
-          },
-        }));
-        syncEngineRef.current?.setDiagram(diagram);
-        setDslText(serializeDSL(diagram));
+  const handleExport = useCallback(async (format: 'svg' | 'png') => {
+    const id = useProjectStore.getState().activeDiagramId;
+    const session = id ? workspaceRef.current?.getSession(id) : undefined;
+    if (!session || fileBusyRef.current) return;
+    if (!session.sync.flushPendingText()) {
+      setFileNotice({ text: 'Fix the DSL errors before exporting. Save still keeps your draft.', error: true });
+      return;
+    }
+    const diagram = session.sync.getDiagram();
+    if (!diagram) return;
+    fileBusyRef.current = true;
+    setFileBusy(true);
+    try {
+      const data = format === 'svg' ? ExportEngine.exportSVG(diagram) : await ExportEngine.exportPNG(diagram);
+      if (window.electronAPI) {
+        const saved = await window.electronAPI.saveExport(diagram.name, format, data);
+        if (!saved) return;
+      } else downloadArtifact(data, `${diagram.name}.${format}`, format === 'svg' ? 'image/svg+xml' : 'image/png');
+      setFileNotice({ text: `${format.toUpperCase()} export ${window.electronAPI ? 'saved' : 'download started'}.` });
+    } catch (error) {
+      setFileNotice({ text: `Could not export: ${(error as Error).message}`, error: true });
+    } finally { fileBusyRef.current = false; setFileBusy(false); }
+  }, []);
+
+  const rememberProject = async (filePath: string) => {
+    try {
+      await window.electronAPI?.addRecentProject(filePath);
+    } catch {
+      // A recent-file list failure must not turn a successful save/open into a failure.
+    }
+  };
+
+  const handleSaveProject = useCallback(async () => {
+    const workspace = workspaceRef.current;
+    if (!workspace || fileBusyRef.current) return;
+    fileBusyRef.current = true;
+    setFileBusy(true);
+    setFileNotice({ text: 'Saving project…' });
+    try {
+      let savePath = projectFilePath;
+      const api = window.electronAPI;
+      if (api && !savePath) {
+        savePath = await api.showSaveDialog({
+          title: 'Save Project',
+          defaultPath: `${workspace.project.metadata.name}.uml.json`,
+          filters: [{ name: 'UML Project', extensions: ['uml.json'] }],
+        });
+        if (!savePath) {
+          setFileNotice(null);
+          return;
+        }
       }
-    },
-    [diagramStore, projectStore],
-  );
+      const snapshot = workspace.snapshot();
+      const serialized = ProjectFileSerializer.serialize(snapshot.project);
+      if (api && savePath) {
+        await api.saveProject(savePath, serialized);
+        setProjectFilePath(savePath);
+      } else {
+        downloadProject(serialized, snapshot.project.metadata.name);
+        // A browser request has no persistence acknowledgement. Keep the saved
+        // revision unchanged so blocked/cancelled downloads retain dirty guards.
+        setFileNotice({ text: workspace.dirty
+          ? 'Download requested (.uml.json). Verify the file; changes remain unsaved.'
+          : 'Download requested (.uml.json). Verify the file before closing.' });
+        return;
+      }
+      workspace.markSaved(snapshot.revision, snapshot.project.metadata.updatedAt);
+      setFileNotice({ text: workspace.dirty
+        ? 'Saved. Newer edits are still unsaved.'
+        : 'Project saved.' });
+      if (api && savePath) await rememberProject(savePath);
+    } catch (error) {
+      setFileNotice({ text: `Could not save project: ${(error as Error).message}`, error: true });
+    } finally {
+      fileBusyRef.current = false;
+      setFileBusy(false);
+    }
+  }, [projectFilePath]);
 
-  // ==========================================================================
-  // Build tab info
-  // ==========================================================================
+  const loadProjectContent = useCallback((content: string, path: string | null): boolean => {
+    const result = ProjectFileParser.parseAll(content);
+    if (!result.success) {
+      setFileNotice({ text: `Could not open project: ${result.errors.map((error) => error.message).join('; ')}`, error: true });
+      return false;
+    }
+    // Check after reading so edits made while the picker/read was pending are protected.
+    if (!confirmUnsavedChanges()) return false;
+    replaceProject(result.data, path);
+    setFileNotice({ text: 'Project opened.' });
+    return true;
+  }, [confirmUnsavedChanges, replaceProject]);
+
+  const handleOpenProject = useCallback(async () => {
+    if (fileBusyRef.current) return;
+    const api = window.electronAPI;
+    if (!api) {
+      fileInputRef.current?.click();
+      return;
+    }
+    fileBusyRef.current = true;
+    setFileBusy(true);
+    try {
+      const path = await api.showOpenDialog({
+        title: 'Open Project',
+        filters: [{ name: 'UML Project', extensions: ['uml.json'] }],
+        properties: ['openFile'],
+      });
+      if (path && loadProjectContent(await api.loadProject(path), path)) await rememberProject(path);
+    } catch (error) {
+      setFileNotice({ text: `Could not open project: ${(error as Error).message}`, error: true });
+    } finally {
+      fileBusyRef.current = false;
+      setFileBusy(false);
+    }
+  }, [loadProjectContent]);
+
+  const handleBrowserFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || fileBusyRef.current) return;
+    fileBusyRef.current = true;
+    setFileBusy(true);
+    try {
+      loadProjectContent(await file.text(), null);
+    } catch (error) {
+      setFileNotice({ text: `Could not open project: ${(error as Error).message}`, error: true });
+    } finally {
+      fileBusyRef.current = false;
+      setFileBusy(false);
+    }
+  }, [loadProjectContent]);
+
+  const handleDslChange = useCallback((text: string) => {
+    const id = useProjectStore.getState().activeDiagramId;
+    if (id) workspaceRef.current?.editText(id, text);
+  }, []);
+
+  const handleCanvasChange = useCallback((change: CanvasChange) => {
+    const id = useProjectStore.getState().activeDiagramId;
+    if (id && !workspaceRef.current?.editCanvas(id, change)) {
+      setFileNotice({ text: 'Fix the DSL errors before editing the canvas. Your draft can still be saved.', error: true });
+      refreshWorkspace();
+    }
+  }, [refreshWorkspace]);
+
+  const handleUndo = useCallback(() => {
+    const id = useProjectStore.getState().activeDiagramId;
+    if (id) workspaceRef.current?.undo(id);
+  }, []);
+
+  const handleRedo = useCallback(() => {
+    const id = useProjectStore.getState().activeDiagramId;
+    if (id) workspaceRef.current?.redo(id);
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (key === 's' || key === 'o') {
+        event.preventDefault();
+        if (key === 's') void handleSaveProject();
+        else void handleOpenProject();
+        return;
+      }
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+      if (key === 'z' || key === 'y') {
+        event.preventDefault();
+        if (key === 'y' || event.shiftKey) handleRedo();
+        else handleUndo();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [handleSaveProject, handleOpenProject, handleUndo, handleRedo]);
+
+  const handleSelectionChange = useCallback((ids: string[]) => {
+    setSelectedElement(ids.length === 1
+      ? useDiagramStore.getState().diagram?.elements.find((element) => element.id === ids[0]) ?? null
+      : null);
+  }, []);
+
+  const handleDiagramOpen = useCallback((id: string) => {
+    const workspace = workspaceRef.current;
+    const store = useProjectStore.getState();
+    if (!workspace?.getSession(id) || store.activeDiagramId === id) return;
+    if (store.activeDiagramId) workspace.getSession(store.activeDiagramId)?.sync.flushPendingText();
+    store.openDiagram(id);
+    setSelectedElement(null);
+    setActiveTool(null);
+    refreshWorkspace();
+  }, [refreshWorkspace]);
+
+  const handleTabClose = useCallback((id: string) => {
+    const store = useProjectStore.getState();
+    workspaceRef.current?.getSession(id)?.sync.flushPendingText();
+    const wasActive = store.activeDiagramId === id;
+    store.closeDiagram(id);
+    if (wasActive) {
+      setSelectedElement(null);
+      setActiveTool(null);
+      refreshWorkspace();
+    }
+  }, [refreshWorkspace]);
+
+  const handleTreeChange = useCallback((tree: ProjectTreeNode[]) => {
+    workspaceRef.current?.setTree(tree);
+  }, []);
+
+  const handlePropertyChange = useCallback((elementId: string, properties: Partial<ElementProperties>) => {
+    handleCanvasChange({ type: 'element-update', elementId, properties });
+  }, [handleCanvasChange]);
 
   const tabs: DiagramTabInfo[] = projectStore.openDiagramIds.map((id) => ({
     id,
-    name: projectData?.diagrams[id]?.name ?? projectStore.metadata?.diagramIndex[id]?.name ?? id,
+    name: projectData?.diagrams[id]?.name ?? id,
     dirty: projectStore.dirty,
   }));
-
   const activeDiagram = diagramStore.diagram;
-  const diagramElements = projectData
-    ? Object.fromEntries(
-        Object.entries(projectData.diagrams).map(([id, diagram]) => [
-          id,
-          diagram.elements.map((element) => element.properties.name),
-        ]),
-      )
-    : {};
+  const activeSession = projectStore.activeDiagramId
+    ? workspaceRef.current?.getSession(projectStore.activeDiagramId) : undefined;
+  const diagramElements = Object.fromEntries(Object.entries(projectData?.diagrams ?? {}).map(([id, diagram]) => [
+    id, diagram.elements.map((element) => element.properties.name),
+  ]));
   const activeToolLabel = activeTool ? activeTool.type.replace(/-/g, ' ') : 'Select';
 
   // ==========================================================================
@@ -651,18 +579,30 @@ const App: React.FC = () => {
 
   return (
     <div className="app-shell">
+      {createMode && <CreateDialog mode={createMode} tree={projectStore.tree} onCancel={() => setCreateMode(null)} onCreate={handleCreate} />}
+      {historyOpen && projectData && <HistoryDialog project={projectData}
+        getSnapshot={() => workspaceRef.current!.snapshot().project}
+        onClose={() => setHistoryOpen(false)}
+        onRestore={(project) => {
+          replaceProject(project, projectFilePath);
+          workspaceRef.current?.markUnsaved();
+          setHistoryOpen(false);
+          setFileNotice({ text: 'Snapshot restored. Save to update your project file.' });
+        }} />}
       {/* Menu bar */}
       <div className="app-menubar">
         <div className="app-brand" title="UML Studio">
           <div className="app-brand-mark">U</div>
           <span>UML Studio</span>
         </div>
-        <button onClick={handleNewProject} className="menu-button">New</button>
-        <button onClick={handleOpenProject} className="menu-button">Open</button>
-        <button onClick={handleSaveProject} className="menu-button">Save</button>
+        <button onClick={handleNewProject} disabled={fileBusy} className="menu-button">New</button>
+        <button onClick={() => setCreateMode('diagram')} disabled={fileBusy} className="menu-button">+ Diagram</button>
+        <button onClick={handleExamples} disabled={fileBusy} className="menu-button">Examples</button>
+        <button onClick={handleOpenProject} disabled={fileBusy} title="Open project (Cmd/Ctrl+O)" className="menu-button">Open</button>
+        <button onClick={handleSaveProject} disabled={fileBusy} title="Save project (Cmd/Ctrl+S)" className="menu-button">{fileBusy ? 'Working…' : 'Save'}</button>
         <button
           onClick={handleUndo}
-          disabled={!undoManagerRef.current.canUndo()}
+          disabled={!activeSession?.history.canUndo() || dslErrors.length > 0}
           className="menu-button"
           title="Undo (Cmd/Ctrl+Z)"
         >
@@ -670,12 +610,16 @@ const App: React.FC = () => {
         </button>
         <button
           onClick={handleRedo}
-          disabled={!undoManagerRef.current.canRedo()}
+          disabled={!activeSession?.history.canRedo() || dslErrors.length > 0}
           className="menu-button"
           title="Redo (Cmd/Ctrl+Shift+Z)"
         >
           Redo
         </button>
+        <button className="menu-button" disabled={fileBusy} onClick={() => setHistoryOpen(true)}>History</button>
+        <button className="menu-button properties-toggle" aria-expanded={propertiesOpen} onClick={() => setPropertiesOpen((open) => !open)}>Properties</button>
+        <button onClick={() => handleExport('svg')} disabled={fileBusy || !activeDiagram?.elements.length || dslErrors.length > 0} className="menu-button">Export SVG</button>
+        <button onClick={() => handleExport('png')} disabled={fileBusy || !activeDiagram?.elements.length || dslErrors.length > 0} className="menu-button">Export PNG</button>
         <div className="app-spacer" />
         <div className="project-chip" title={projectFilePath ?? undefined}>
           <span>{projectStore.metadata?.name ?? 'No Project'}</span>
@@ -683,10 +627,18 @@ const App: React.FC = () => {
         </div>
       </div>
 
+      <input ref={fileInputRef} type="file" accept=".uml.json,.json,application/json" hidden onChange={handleBrowserFile} aria-label="Open UML project file" />
+      {fileNotice && (
+        <div className={`file-notice${fileNotice.error ? ' is-error' : ''}`} role={fileNotice.error ? 'alert' : 'status'}>
+          <span>{fileNotice.text}</span>
+          <button onClick={() => setFileNotice(null)} className="tree-action-button" aria-label="Dismiss notification">×</button>
+        </div>
+      )}
+
       {/* Toolbar */}
       <Toolbar
         diagramType={diagramType}
-        onDiagramTypeChange={setDiagramType}
+        disabled={!activeDiagram || dslErrors.length > 0}
         onToolSelect={(tool) => {
           setActiveTool((current) =>
             current?.kind === tool.kind && current.type === tool.type ? null : tool,
@@ -699,7 +651,7 @@ const App: React.FC = () => {
       <DiagramTabs
         tabs={tabs}
         activeTabId={projectStore.activeDiagramId}
-        onTabClick={handleTabClick}
+        onTabClick={handleDiagramOpen}
         onTabClose={handleTabClose}
       />
 
@@ -708,6 +660,7 @@ const App: React.FC = () => {
         {/* Left sidebar: Project Tree */}
         <div className="sidebar sidebar-left">
           <ProjectTree
+            key={projectGeneration}
             tree={projectStore.tree}
             activeDiagramId={projectStore.activeDiagramId}
             onDiagramOpen={handleDiagramOpen}
@@ -719,9 +672,17 @@ const App: React.FC = () => {
 
         {/* Center: Split View (Editor + Canvas) */}
         <div className="workspace">
-          <SplitView
+          {!activeDiagram ? <div className="workspace-empty">
+            <div className="app-brand-mark">U</div>
+            <h1>Start your next diagram</h1>
+            <p>Create a class, sequence, use case, activity, or state diagram.</p>
+            <button className="menu-button" onClick={() => setCreateMode('diagram')}>Create diagram</button>
+            <p>Open a saved project or choose Examples to explore.</p>
+          </div> : <SplitView
             editorPanel={
               <DSLEditor
+                key={`${projectGeneration}:${projectStore.activeDiagramId ?? 'empty'}`}
+                readOnly={!activeDiagram}
                 value={dslText}
                 onChange={handleDslChange}
                 errors={dslErrors}
@@ -732,18 +693,19 @@ const App: React.FC = () => {
                 <UMLCanvas
                   width={canvasSize.width}
                   height={canvasSize.height}
+                  readOnly={dslErrors.length > 0 || !activeDiagram}
                   activeTool={activeTool}
                   onCanvasChange={handleCanvasChange}
-                  onElementDoubleClick={handleElementDoubleClick}
+                  onElementDoubleClick={(id) => { handleSelectionChange([id]); setPropertiesOpen(true); }}
                   onSelectionChange={handleSelectionChange}
                 />
               </div>
             }
-          />
+          />}
         </div>
 
         {/* Right sidebar: Property Panel */}
-        <div className="sidebar sidebar-right">
+        <div className={`sidebar sidebar-right${propertiesOpen ? ' is-open' : ''}`}>
           <PropertyPanel
             element={selectedElement}
             onPropertyChange={handlePropertyChange}
@@ -755,6 +717,8 @@ const App: React.FC = () => {
         <span className="status-pill">{activeDiagram?.elements.length ?? 0} elements</span>
         <span className="status-pill">{activeDiagram?.connectors.length ?? 0} connectors</span>
         <span className="status-pill">Tool: {activeToolLabel}</span>
+        <span className="app-spacer" />
+        <span className="status-pill">{projectStore.dirty ? 'Unsaved changes' : 'No unsaved changes'}</span>
         {dslErrors.length > 0 && (
           <span className="status-pill status-error">{dslErrors.length} DSL errors</span>
         )}

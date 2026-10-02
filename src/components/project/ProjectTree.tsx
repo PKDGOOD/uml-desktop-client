@@ -150,20 +150,12 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
   onSearchResultClick,
   diagramElements,
 }) => {
-  const [expanded, setExpanded] = useState<Set<string>>(getPersistedExpanded);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set([...getPersistedExpanded(), ...collectDefaultExpanded(tree)]));
   const [searchQuery, setSearchQuery] = useState('');
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (expanded.size > 0) return;
-    const defaults = collectDefaultExpanded(tree);
-    if (defaults.length > 0) {
-      setExpanded(new Set(defaults));
-    }
-  }, [expanded.size, tree]);
 
   // Persist expanded state
   useEffect(() => {
@@ -234,7 +226,7 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
 
   const handleDeleteFolder = useCallback(
     (nodeId: string, nodeName: string) => {
-      if (!window.confirm(`Delete folder "${nodeName}" and all its contents?`)) return;
+      if (!window.confirm(`Delete "${nodeName}" and its contents? This cannot be undone.`)) return;
       const [newTree] = removeNode(cloneTree(tree), nodeId);
       onTreeChange(newTree);
     },
@@ -346,9 +338,9 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
           )}
 
           {/* Folder actions */}
-          {isFolder && renamingId !== node.id && (
+          {renamingId !== node.id && (
             <span className="tree-actions">
-              <button
+              {isFolder && <><button
                 onClick={(e) => { e.stopPropagation(); handleCreateFolder(node.id); }}
                 className="tree-action-button"
                 title="New subfolder"
@@ -357,7 +349,7 @@ export const ProjectTree: React.FC<ProjectTreeProps> = ({
                 onClick={(e) => { e.stopPropagation(); handleStartRename(node.id, node.name); }}
                 className="tree-action-button"
                 title="Rename"
-              >Ren</button>
+              >Ren</button></>}
               <button
                 onClick={(e) => { e.stopPropagation(); handleDeleteFolder(node.id, node.name); }}
                 className="tree-action-button"

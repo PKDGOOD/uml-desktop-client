@@ -5,6 +5,18 @@ beforeEach(() => {
   resetParser();
 });
 
+it('accepts comments before the header and inside class declarations', () => {
+  const result = parseDSL('\n// design notes\n@class-diagram "Comments"\nclass Order {\n  // identifier\n  - id: string // internal\n}\n');
+  expect(result.success).toBe(true);
+  if (result.success) expect(result.diagram.elements[0].properties.attributes?.[0].name).toBe('id');
+});
+
+it('reports error lines relative to the original text including leading blank lines', () => {
+  const result = parseDSL('\n\n@class-diagram "Broken"\n\nclass {{{');
+  expect(result.success).toBe(false);
+  if (!result.success) expect(result.errors[0].line).toBe(5);
+});
+
 // =============================================================================
 // Class Diagram
 // =============================================================================

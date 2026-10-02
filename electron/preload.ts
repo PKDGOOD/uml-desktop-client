@@ -15,6 +15,9 @@ export interface OpenDialogOptions {
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // File I/O
+  saveExport(name: string, format: 'svg' | 'png', data: string): Promise<boolean> {
+    return ipcRenderer.invoke('ipc:save-export', name, format, data);
+  },
   saveProject(filePath: string, data: string): Promise<void> {
     return ipcRenderer.invoke('ipc:save-project', filePath, data);
   },

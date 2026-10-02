@@ -3,11 +3,15 @@
 // =============================================================================
 
 import React, { useRef, useCallback, useState, useEffect } from 'react';
-import Editor, { type OnMount, type OnChange } from '@monaco-editor/react';
+import Editor, { loader, type OnMount, type OnChange } from '@monaco-editor/react';
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js';
+import 'monaco-editor/esm/vs/editor/edcore.main.js';
+import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker.js?worker';
 import type { DSLError } from '../../types';
 
-/** Threshold for "large paste" detection (element count in DSL text). */
-const LARGE_PASTE_ELEMENT_THRESHOLD = 100;
+// Bundle the editor and its worker locally instead of fetching code from a CDN.
+globalThis.MonacoEnvironment = { getWorker: () => new EditorWorker() };
+loader.config({ monaco });
 
 /** DSL keywords used for syntax highlighting and auto-completion. */
 const DSL_KEYWORDS = [
@@ -45,12 +49,13 @@ export const DSLEditor: React.FC<DSLEditorProps> = ({
 }) => {
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
-  const [pasteProgress, setPasteProgress] = useState<number | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   // Register custom language on mount
   const handleEditorMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
+    setMounted(true);
 
     // Register 'uml-dsl' language if not already registered
     if (!monaco.languages.getLanguages().some((l: any) => l.id === 'uml-dsl')) {
@@ -174,47 +179,32 @@ export const DSLEditor: React.FC<DSLEditorProps> = ({
     }));
 
     monaco.editor.setModelMarkers(model, 'uml-dsl', markers);
-  }, [errors]);
+  }, [errors, mounted]);
 
-  // Handle text changes with large paste detection
   const handleChange: OnChange = useCallback(
     (newValue) => {
       if (newValue == null) return;
-
-      // Detect large paste: count element-like declarations
-      const elementPattern = /(?:class|interface|enum|actor|state|lifeline|usecase|action|decision|fork|join|note)\s+\w+/g;
-      const matches = newValue.match(elementPattern);
-      const elementCount = matches?.length ?? 0;
-
-      if (elementCount >= LARGE_PASTE_ELEMENT_THRESHOLD) {
-        // Show progress indicator for large paste
-        setPasteProgress(0);
-        // Simulate progress (actual parsing happens in SyncEngine)
-        const interval = setInterval(() => {
-          setPasteProgress((prev) => {
-            if (prev === null || prev >= 100) {
-              clearInterval(interval);
-              setPasteProgress(null);
-              return null;
-            }
-            return prev + 20;
-          });
-        }, 100);
-      }
-
       onChange(newValue);
     },
     [onChange],
   );
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+    <div className="dsl-editor">
+      {errors.length > 0 && (
+        <div className="dsl-error" role="status">
+          <strong>Line {errors[0].line}: {errors[0].message}</strong>
+          <span>Canvas shows the last valid version. Save keeps your draft.</span>
+        </div>
+      )}
+      <div style={{ flex: 1, minHeight: 0 }}>
       <Editor
         language="uml-dsl"
         value={value}
         onChange={handleChange}
         onMount={handleEditorMount}
         options={{
+          ariaLabel: 'UML DSL editor',
           lineNumbers: 'on',
           minimap: { enabled: false },
           readOnly,
@@ -225,27 +215,7 @@ export const DSLEditor: React.FC<DSLEditorProps> = ({
           tabSize: 2,
         }}
       />
-      {pasteProgress !== null && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 3,
-            background: '#e0e0e0',
-          }}
-        >
-          <div
-            style={{
-              height: '100%',
-              width: `${pasteProgress}%`,
-              background: '#1976D2',
-              transition: 'width 100ms linear',
-            }}
-          />
-        </div>
-      )}
+      </div>
     </div>
   );
 };

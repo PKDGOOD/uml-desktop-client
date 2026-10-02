@@ -35,9 +35,9 @@ describe('createCanvasElement', () => {
     expect(element?.properties.name).toBe('NewClass3');
   });
 
-  it('does not create unsupported diagram elements yet', () => {
+  it('rejects tools from another diagram type', () => {
     expect(createCanvasElement('class', 'note', { x: 0, y: 0 }, [])).toBeNull();
-    expect(createCanvasElement('sequence', 'lifeline', { x: 0, y: 0 }, [])).toBeNull();
+    expect(createCanvasElement('sequence', 'class', { x: 0, y: 0 }, [])).toBeNull();
   });
 });
 
@@ -53,6 +53,6 @@ describe('createCanvasConnector', () => {
 
   it('rejects self links and unsupported connector flows', () => {
     expect(createCanvasConnector('class', 'dependency', 'a', 'a')).toBeNull();
-    expect(createCanvasConnector('sequence', 'sync-message', 'a', 'b')).toBeNull();
+    expect(createCanvasConnector('sequence', 'inheritance', 'a', 'b')).toBeNull();
   });
 });

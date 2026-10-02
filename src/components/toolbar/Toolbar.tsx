@@ -2,7 +2,8 @@
 // Toolbar - Diagram type selector + dynamic tool palette
 // =============================================================================
 
-import React, { useState, useCallback } from 'react';
+import React from 'react';
+import { CONNECTOR_TYPES } from '../../engine/elementFactory';
 import type { CanvasTool, ConnectorType, DiagramType, ElementType } from '../../types';
 
 /** Tools available per diagram type */
@@ -37,13 +38,6 @@ export const DIAGRAM_TOOLS: Record<DiagramType, { type: ElementType; label: stri
   ],
 };
 
-const CLASS_CONNECTOR_TOOLS: { type: ConnectorType; label: string }[] = [
-  { type: 'directed-association', label: 'Association' },
-  { type: 'dependency', label: 'Dependency' },
-  { type: 'inheritance', label: 'Inheritance' },
-  { type: 'composition', label: 'Composition' },
-];
-
 const DIAGRAM_TYPE_LABELS: Record<DiagramType, string> = {
   class: 'Class Diagram',
   sequence: 'Sequence Diagram',
@@ -56,7 +50,7 @@ export interface ToolbarProps {
   /** Currently selected diagram type */
   diagramType: DiagramType;
   /** Called when diagram type changes */
-  onDiagramTypeChange: (type: DiagramType) => void;
+  disabled?: boolean;
   /** Called when a tool is clicked to activate canvas creation mode */
   onToolSelect: (tool: CanvasTool) => void;
   /** Currently active tool (for highlighting) */
@@ -65,47 +59,15 @@ export interface ToolbarProps {
 
 export const Toolbar: React.FC<ToolbarProps> = ({
   diagramType,
-  onDiagramTypeChange,
+  disabled = false,
   onToolSelect,
   activeTool = null,
 }) => {
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-
-  const handleDiagramTypeSelect = useCallback(
-    (type: DiagramType) => {
-      onDiagramTypeChange(type);
-      setDropdownOpen(false);
-    },
-    [onDiagramTypeChange],
-  );
-
   const tools = DIAGRAM_TOOLS[diagramType] ?? [];
 
   return (
     <div className="toolbar">
-      {/* Diagram type selector dropdown */}
-      <div className="diagram-select">
-        <button
-          onClick={() => setDropdownOpen((o) => !o)}
-          className="tool-button diagram-select-button"
-        >
-          {DIAGRAM_TYPE_LABELS[diagramType]} v
-        </button>
-        {dropdownOpen && (
-          <div className="diagram-select-menu">
-            {(Object.keys(DIAGRAM_TYPE_LABELS) as DiagramType[]).map((type) => (
-              <div
-                key={type}
-                onClick={() => handleDiagramTypeSelect(type)}
-                className={`diagram-select-item${type === diagramType ? ' is-active' : ''}`}
-              >
-                {DIAGRAM_TYPE_LABELS[type]}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
+      <span className="diagram-type-label">{DIAGRAM_TYPE_LABELS[diagramType]}</span>
       {/* Separator */}
       <div className="toolbar-separator" />
 
@@ -113,6 +75,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       <div className="toolbar-group">
         {tools.map((tool) => (
           <button
+            disabled={disabled}
             key={tool.type}
             onClick={() => onToolSelect({ kind: 'element', type: tool.type })}
             title={tool.label}
@@ -125,12 +88,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         ))}
       </div>
 
-      {diagramType === 'class' && (
+      {!disabled && (
         <>
           <div className="toolbar-separator" />
           <div className="toolbar-group">
-            {CLASS_CONNECTOR_TOOLS.map((tool) => (
+            {CONNECTOR_TYPES[diagramType].map((type) => ({ type, label: type.replace(/-/g, ' ') })).map((tool) => (
               <button
+                disabled={disabled}
                 key={tool.type}
                 onClick={() => onToolSelect({ kind: 'connector', type: tool.type })}
                 title={tool.label}

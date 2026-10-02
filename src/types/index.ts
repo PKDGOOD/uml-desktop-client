@@ -164,6 +164,8 @@ export interface ProjectData {
   tree: ProjectTreeNode[];
   sharedElements: Record<string, DiagramElement>;
   diagrams: Record<string, DiagramData>;
+  /** Original editor text, including comments and unfinished drafts. Optional for older files. */
+  diagramTexts?: Record<string, string>;
 }
 
 // --- DSL Parser ---
@@ -254,6 +256,7 @@ export interface DiffLine {
 // --- Sync Engine ---
 
 export type CanvasChange =
+  | { type: 'batch'; changes: CanvasChange[] }
   | { type: 'element-add'; element: DiagramElement }
   | { type: 'element-move'; elementId: string; position: Position }
   | { type: 'element-resize'; elementId: string; size: Size }

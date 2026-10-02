@@ -4,10 +4,12 @@ import electron from 'vite-plugin-electron';
 import renderer from 'vite-plugin-electron-renderer';
 import path from 'path';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  // Packaged Electron pages load from file://, so assets must be relative.
+  base: './',
   plugins: [
     react(),
-    electron([
+    mode !== 'browser' && electron([
       {
         entry: 'electron/main.ts',
         vite: {
@@ -28,11 +30,11 @@ export default defineConfig({
         },
       },
     ]),
-    renderer(),
+    mode !== 'browser' && renderer(),
   ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
     },
   },
-});
+}));

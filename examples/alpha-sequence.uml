@@ -1,0 +1,7 @@
+@sequence-diagram "주문 취소 - sequence acceptance"
+lifeline "고객 Client" @pos(40, 40) @size(120, 500)
+lifeline OrderService @pos(300, 40) @size(120, 500)
+lifeline PaymentGateway @pos(600, 40) @size(120, 500)
+"고객 Client" -> OrderService : cancel(orderId, reason)
+OrderService ->> PaymentGateway : refund(orderId) - 결제 취소 요청
+PaymentGateway <-- OrderService : refundAccepted

@@ -3,11 +3,13 @@
 // =============================================================================
 
 import React from 'react';
+import { connectorGeometry } from '../../engine/connectorGeometry';
 import { Group, Line, Arrow, Text, Circle } from 'react-konva';
 import type { Connector, DiagramElement, Position, ConnectorType } from '../../types';
 
 export interface ConnectorRendererProps {
   connector: Connector;
+  sequenceIndex?: number;
   elements: DiagramElement[];
   isSelected: boolean;
   onSelect: (connectorId: string, shiftKey: boolean) => void;
@@ -74,7 +76,7 @@ function getArrowFill(type: ConnectorType): string | undefined {
 }
 
 function needsArrow(type: ConnectorType): boolean {
-  return type !== 'association';
+  return !['association', 'composition', 'aggregation'].includes(type);
 }
 
 function getArrowPointerLength(type: ConnectorType): number {
@@ -96,6 +98,7 @@ const WAYPOINT_RADIUS = 4;
 
 export const ConnectorRenderer: React.FC<ConnectorRendererProps> = ({
   connector,
+  sequenceIndex,
   elements,
   isSelected,
   onSelect,
@@ -106,7 +109,9 @@ export const ConnectorRenderer: React.FC<ConnectorRendererProps> = ({
 
   if (!sourceEl || !targetEl) return null;
 
-  const waypoints = connector.waypoints ?? [];
+  const geometry = connectorGeometry(connector, elements, sequenceIndex);
+  if (!geometry) return null;
+  const waypoints = geometry.waypoints;
   const color = isSelected ? SELECTED_COLOR : DEFAULT_COLOR;
   const lineStyle = getLineStyle(connector.type);
 
@@ -114,8 +119,8 @@ export const ConnectorRenderer: React.FC<ConnectorRendererProps> = ({
   const firstTarget = waypoints.length > 0 ? waypoints[0] : getElementCenter(targetEl);
   const lastSource = waypoints.length > 0 ? waypoints[waypoints.length - 1] : getElementCenter(sourceEl);
 
-  const sourcePoint = getEdgePoint(sourceEl, firstTarget);
-  const targetPoint = getEdgePoint(targetEl, lastSource);
+  const sourcePoint = geometry.source;
+  const targetPoint = geometry.target;
 
   const allPoints: number[] = [sourcePoint.x, sourcePoint.y];
   for (const wp of waypoints) {
@@ -163,6 +168,13 @@ export const ConnectorRenderer: React.FC<ConnectorRendererProps> = ({
           hitStrokeWidth={12}
         />
       )}
+
+      {['composition', 'aggregation'].includes(connector.type) && <Line
+        x={sourcePoint.x} y={sourcePoint.y}
+        points={[0, 0, 7, -5, 14, 0, 7, 5]} closed
+        rotation={Math.atan2(allPoints[3] - sourcePoint.y, allPoints[2] - sourcePoint.x) * 180 / Math.PI}
+        stroke={color} fill={connector.type === 'composition' ? color : '#fff'}
+      />}
 
       {/* Label */}
       {connector.label && (

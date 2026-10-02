@@ -27,7 +27,7 @@ export function serializeDSL(diagram: DiagramData): string {
   const lines: string[] = [];
 
   // Header
-  lines.push(`@${diagram.type}-diagram "${diagram.name}"`);
+  lines.push(`@${diagram.type}-diagram ${JSON.stringify(diagram.name)}`);
   lines.push('');
 
   // Build reverse lookup: element ID → element name
@@ -67,7 +67,7 @@ function formatName(name: string): string {
   if (/^[a-zA-Z_\u00C0-\u024F\uAC00-\uD7AF][a-zA-Z0-9_\u00C0-\u024F\uAC00-\uD7AF]*$/.test(name)) {
     return name;
   }
-  return `"${name}"`;
+  return JSON.stringify(name);
 }
 
 /** Format @pos and @size annotations */
@@ -291,7 +291,7 @@ function serializeUsecaseElements(
       const stereotype = conn.type === 'include' ? '<<include>>' : '<<extend>>';
       lines.push(`${src} ..> ${tgt} ${stereotype}`);
     } else {
-      lines.push(`${src} --> ${tgt}`);
+      lines.push(`${src} ${conn.type === 'association' ? '--' : '-->'} ${tgt}${conn.label ? ` : ${conn.label}` : ''}`);
     }
   }
 }

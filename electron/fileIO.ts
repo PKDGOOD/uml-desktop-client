@@ -1,6 +1,7 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron';
 import fs from 'fs/promises';
 import path from 'path';
+import { atomicWrite } from './atomicWrite';
 
 /**
  * File I/O Manager - Handles project and diagram file read/write operations
@@ -21,12 +22,25 @@ export interface OpenDialogOptions {
 }
 
 export function registerFileIOHandlers(): void {
+  ipcMain.handle('ipc:save-export', async (event, name: string, format: string, data: string) => {
+    if (!['svg', 'png'].includes(format) || typeof data !== 'string' || typeof name !== 'string') throw new Error('Invalid export');
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return false;
+    const result = await dialog.showSaveDialog(win, {
+      title: 'Export diagram', defaultPath: `${name.replace(/[\\/:*?"<>|]/g, '_')}.${format}`,
+      filters: [{ name: format.toUpperCase(), extensions: [format] }],
+    });
+    if (result.canceled || !result.filePath) return false;
+    if (format === 'png' && !data.startsWith('data:image/png;base64,')) throw new Error('Invalid PNG data');
+    await atomicWrite(result.filePath, format === 'png' ? Buffer.from(data.slice('data:image/png;base64,'.length), 'base64') : data);
+    return true;
+  });
   // Save project file (project.uml.json)
   ipcMain.handle('ipc:save-project', async (_event, filePath: string, data: string) => {
     try {
       const dir = path.dirname(filePath);
       await fs.mkdir(dir, { recursive: true });
-      await fs.writeFile(filePath, data, 'utf-8');
+      await atomicWrite(filePath, data);
     } catch (err) {
       throw new Error(`Failed to save project: ${(err as Error).message}`);
     }
@@ -47,7 +61,7 @@ export function registerFileIOHandlers(): void {
     try {
       const dir = path.dirname(filePath);
       await fs.mkdir(dir, { recursive: true });
-      await fs.writeFile(filePath, data, 'utf-8');
+      await atomicWrite(filePath, data);
     } catch (err) {
       throw new Error(`Failed to save diagram: ${(err as Error).message}`);
     }

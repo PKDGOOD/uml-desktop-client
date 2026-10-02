@@ -1,16 +1,27 @@
 {
   "name": "uml-desktop-client",
   "version": "0.1.0",
-  "description": "UML Desktop Client - Hybrid UML editor with DSL text and GUI Canvas",
+  "description": "Local UML editor with a text DSL and interactive canvas \u2014 early alpha",
   "private": true,
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && electron-builder",
-    "preview": "vite preview",
-    "electron:dev": "vite",
+    "dev:browser": "vite --mode browser --host 127.0.0.1",
+    "electron:dev": "npm run dev",
+    "typecheck": "tsc --noEmit",
     "test": "vitest --run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:readiness": "vitest --run src/engine/readinessRegression.test.ts src/engine/alphaFixtures.test.ts",
+    "qa:packaged": "node scripts/smoke-packaged.mjs",
+    "qa:baseline": "node scripts/measure-baseline.mjs",
+    "check": "npm run typecheck && npm run repo:check && npm test",
+    "build:app": "npm run typecheck && vite build",
+    "build": "npm run notices:check && npm run build:app && electron-builder",
+    "pack": "npm run notices:check && npm run build:app && electron-builder --dir",
+    "preview": "vite preview",
+    "repo:check": "node scripts/check-repo.mjs",
+    "notices": "node scripts/generate-notices.mjs",
+    "notices:check": "node scripts/generate-notices.mjs --check"
   },
   "keywords": [
     "uml",
@@ -42,5 +53,52 @@
     "vite-plugin-electron": "^0.29.1",
     "vite-plugin-electron-renderer": "^0.14.6",
     "vitest": "^4.1.3"
+  },
+  "build": {
+    "appId": "com.umlstudio.desktop",
+    "productName": "UML Studio",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "electronDist": "node_modules/electron/dist",
+    "npmRebuild": false,
+    "mac": {
+      "identity": "-",
+      "target": [
+        "zip"
+      ]
+    },
+    "extraResources": [
+      {
+        "from": "LICENSE",
+        "to": "LICENSE.uml-studio"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
+      },
+      {
+        "from": "node_modules/electron/dist/LICENSES.chromium.html",
+        "to": "LICENSES.chromium.html"
+      }
+    ]
+  },
+  "author": "UML Studio contributors",
+  "homepage": "https://github.com/PKDGOOD/uml-desktop-client#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PKDGOOD/uml-desktop-client.git"
+  },
+  "bugs": {
+    "url": "https://github.com/PKDGOOD/uml-desktop-client/issues"
+  },
+  "engines": {
+    "node": ">=24 <25"
   }
 }

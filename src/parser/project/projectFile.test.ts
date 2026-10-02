@@ -130,6 +130,26 @@ const sampleProject: ProjectData = {
 // --- Tests ---
 
 describe('ProjectFileParser', () => {
+  it.each(['null', '[]', '123', '"project"'])('rejects a non-object root without throwing: %s', (json) => {
+    expect(ProjectFileParser.parseAll(json).success).toBe(false);
+    expect(ProjectFileParser.parseMetadata(json).success).toBe(false);
+    expect(ProjectFileParser.parseDiagram(json, 'diagram-1').success).toBe(false);
+  });
+
+  it('rejects malformed drafts instead of silently losing them', () => {
+    const result = ProjectFileParser.parseAll(JSON.stringify({ ...sampleProject, diagramTexts: { 'diagram-1': null } }));
+    expect(result.success).toBe(false);
+  });
+
+  it.each([
+    { ...sampleDiagram, elements: [null] },
+    { ...sampleDiagram, viewport: { x: 0, y: 0, zoom: 0 } },
+    { ...sampleDiagram, elements: [{ ...sampleDiagram.elements[0], properties: { name: 'Broken', methods: [{}] } }] },
+  ])('rejects malformed diagram data before replacing the current project', (diagram) => {
+    const result = ProjectFileParser.parseAll(JSON.stringify({ ...sampleProject, diagrams: { 'diagram-1': diagram } }));
+    expect(result.success).toBe(false);
+  });
+
   describe('parseMetadata', () => {
     it('extracts metadata, tree, and sharedElements without diagrams', () => {
       const json = ProjectFileSerializer.serialize(sampleProject);
