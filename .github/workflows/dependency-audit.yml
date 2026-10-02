@@ -1,0 +1,25 @@
+name: Dependency audit
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 4 * * 1'
+  push:
+    branches: [main]
+    paths: [package.json, package-lock.json, .github/workflows/dependency-audit.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      # Includes dev dependencies: Electron is declared as dev but is the shipped runtime.
+      # Known findings are expected to fail this job until remediation; do not silently waive them.
+      - run: npm audit --audit-level=high
