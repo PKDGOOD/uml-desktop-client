@@ -33,3 +33,14 @@ it('places sequence messages on separate rows', () => {
   expect(second.source.y).toBeGreaterThan(first.source.y);
   expect(first.source.y).toBe(first.target.y);
 });
+
+it('includes generated sequence message rows in export bounds', () => {
+  const lifelines = ['a', 'b'].map((id, i) => ({ id, type: 'lifeline' as const, position: { x: i * 300, y: 0 }, size: { width: 100, height: 300 }, properties: { name: id } }));
+  const messages = Array.from({ length: 20 }, (_, i) => ({ id: `m${i}`, type: 'sync-message' as const, sourceId: 'a', targetId: 'b', properties: {} }));
+  const sequence: DiagramData = { ...diagram, type: 'sequence', elements: lifelines, connectors: messages };
+  const last = connectorGeometry(messages[19], lifelines, 19)!;
+  const svg = ExportEngine.exportSVG(sequence);
+  const height = Number(/height="(\d+(?:\.\d+)?)"/.exec(svg)![1]);
+  expect(last.source.y).toBeGreaterThan(300);
+  expect(height).toBeGreaterThanOrEqual(last.source.y + 20);
+});
