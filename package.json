@@ -36,13 +36,13 @@
     "monaco-editor": "^0.55.1",
     "peggy": "^5.1.0",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5",
+    "react-dom": "^19.3.0",
     "react-konva": "^19.2.3",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
+    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.0.1",
     "electron": "^41.2.0",
     "electron-builder": "^26.8.1",
