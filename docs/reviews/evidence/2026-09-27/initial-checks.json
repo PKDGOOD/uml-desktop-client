@@ -1,0 +1,54 @@
+{
+  "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "results": [
+    {
+      "command": [
+        "node",
+        "--version"
+      ],
+      "exitCode": 0,
+      "seconds": 0.08,
+      "log": "1---version.log"
+    },
+    {
+      "command": [
+        "npm",
+        "--version"
+      ],
+      "exitCode": 0,
+      "seconds": 0.15,
+      "log": "2---version.log"
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "check"
+      ],
+      "exitCode": 0,
+      "seconds": 3.21,
+      "log": "3-check.log"
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "notices:check"
+      ],
+      "exitCode": 0,
+      "seconds": 0.18,
+      "log": "4-notices-check.log"
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "pack"
+      ],
+      "exitCode": 0,
+      "seconds": 18.65,
+      "log": "5-pack.log"
+    }
+  ]
+}

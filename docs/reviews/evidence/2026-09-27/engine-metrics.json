@@ -1,0 +1,83 @@
+{
+  "kind": "Headless engine baseline: no native IO, UI latency, FPS or durability claim",
+  "node": "v24.21.0",
+  "platform": "darwin",
+  "release": "27.0.0",
+  "arch": "arm64",
+  "cpu": "Apple M1 Pro",
+  "logicalCpus": 10,
+  "memoryGiB": 32,
+  "diagrams": [
+    {
+      "name": "typical",
+      "elements": 200,
+      "connectors": 300,
+      "jsonBytes": 77710,
+      "dslBytes": 26544,
+      "svgBytes": 122896,
+      "parse": {
+        "samples": 20,
+        "medianMs": 2.51,
+        "p95Ms": 3.07,
+        "maxMs": 3.38
+      },
+      "serialize": {
+        "samples": 20,
+        "medianMs": 0.13,
+        "p95Ms": 0.22,
+        "maxMs": 0.42
+      },
+      "svg": {
+        "samples": 20,
+        "medianMs": 1.25,
+        "p95Ms": 1.42,
+        "maxMs": 1.54
+      }
+    },
+    {
+      "name": "stress",
+      "elements": 1000,
+      "connectors": 2000,
+      "jsonBytes": 455726,
+      "dslBytes": 159860,
+      "svgBytes": 712660,
+      "parse": {
+        "samples": 20,
+        "medianMs": 13.56,
+        "p95Ms": 15.69,
+        "maxMs": 15.76
+      },
+      "serialize": {
+        "samples": 20,
+        "medianMs": 0.72,
+        "p95Ms": 0.78,
+        "maxMs": 1.17
+      },
+      "svg": {
+        "samples": 20,
+        "medianMs": 16.32,
+        "p95Ms": 16.72,
+        "maxMs": 16.72
+      }
+    }
+  ],
+  "project": {
+    "diagrams": 20,
+    "elements": 4000,
+    "connectors": 6000,
+    "bytes": 3879676,
+    "parse": {
+      "samples": 20,
+      "medianMs": 7,
+      "p95Ms": 7.68,
+      "maxMs": 7.76
+    },
+    "serialize": {
+      "samples": 20,
+      "medianMs": 4.49,
+      "p95Ms": 5.12,
+      "maxMs": 5.47
+    }
+  },
+  "bundleSha256": "5be416a3f153c5829d6083f6c26dee9716e2f413b1b2e27a4a73603792c4788f"
+}
