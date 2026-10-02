@@ -1,0 +1,991 @@
+{
+  "createdAt": "20260926T204130Z",
+  "baseCommit": "1322f1c5507ff3206c13c7aafdf3b77c07dba816",
+  "fingerprint": "1e052e540efd76c52b090213285e535a0ddebeadc1c7b06ae5280b89aec5cd8a",
+  "fileCount": 125,
+  "trackedCount": 74,
+  "untrackedCount": 51,
+  "deletedCount": 7,
+  "restoreVerified": true,
+  "records": [
+    {
+      "path": "\"일시정지\"",
+      "kind": "deleted",
+      "tracked": true
+    },
+    {
+      "path": ".editorconfig",
+      "kind": "file",
+      "tracked": false,
+      "size": 188,
+      "mode": 420,
+      "sha256": "a6b98ea7cb6d61ed8d430dd0dffa46c87012b5cf859d4ce7207898954951fdcd"
+    },
+    {
+      "path": ".gitattributes",
+      "kind": "file",
+      "tracked": false,
+      "size": 140,
+      "mode": 420,
+      "sha256": "3162099d858737da31a80bf537a0f243bcb918314c96efe13ec7b303a0c2df8c"
+    },
+    {
+      "path": ".github/CODEOWNERS",
+      "kind": "file",
+      "tracked": false,
+      "size": 97,
+      "mode": 420,
+      "sha256": "2a7bb915b2b682f41f2c3cc7bd9359523b07d99349ea9cb43536883dc2f47218"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug_report.yml",
+      "kind": "file",
+      "tracked": false,
+      "size": 1176,
+      "mode": 420,
+      "sha256": "4d1ffe7d7f85ffcd79f8ac96f752e05601bf480ccf010ba7f58b04039cfb3448"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/config.yml",
+      "kind": "file",
+      "tracked": false,
+      "size": 219,
+      "mode": 420,
+      "sha256": "b6e7be5c53a448e451d62eaa05673914fb5e72b4e9f9b03d0e499659a9db478a"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/feature_request.yml",
+      "kind": "file",
+      "tracked": false,
+      "size": 610,
+      "mode": 420,
+      "sha256": "dc6bfcc7e368d60d163f19be75aefbcba24e6c6711c79b0d971752a8c587c6cb"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/question.yml",
+      "kind": "file",
+      "tracked": false,
+      "size": 523,
+      "mode": 420,
+      "sha256": "e91836395af0219bac1c74c91958b019207a85187ecd25b1319a5099e3cc3e75"
+    },
+    {
+      "path": ".github/dependabot.yml",
+      "kind": "file",
+      "tracked": false,
+      "size": 257,
+      "mode": 420,
+      "sha256": "06c866a85cd0a1c3d033f0d3774ae43993506bca4984d095de7e6ab53cac95c6"
+    },
+    {
+      "path": ".github/pull_request_template.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 736,
+      "mode": 420,
+      "sha256": "41da5a7b083a28df3f29e294c26d5ef621f272508acd37b4d9011972cc9a0366"
+    },
+    {
+      "path": ".github/release.yml",
+      "kind": "file",
+      "tracked": false,
+      "size": 74,
+      "mode": 420,
+      "sha256": "b56b020b0c7bf9662e181d682b4ee03e68a1a8ce46973c2753bfa1ca3f0d145f"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "kind": "file",
+      "tracked": false,
+      "size": 888,
+      "mode": 420,
+      "sha256": "c1dc02c4e29759dc2046d37647ca924c28170211c7789c8d0bcb0261b387ea8d"
+    },
+    {
+      "path": ".github/workflows/dependency-audit.yml",
+      "kind": "file",
+      "tracked": false,
+      "size": 843,
+      "mode": 420,
+      "sha256": "544c492d74473a0429db208036a9cf75c123aa5468defe27abd713d45ea56ef7"
+    },
+    {
+      "path": ".github/workflows/secret-scan.yml",
+      "kind": "file",
+      "tracked": false,
+      "size": 1024,
+      "mode": 420,
+      "sha256": "3b94600b8092ec412ace4e54118ca1ee6d2398a6c25ada531e5706caaf01ffc3"
+    },
+    {
+      "path": ".gitignore",
+      "kind": "file",
+      "tracked": true,
+      "size": 257,
+      "mode": 420,
+      "sha256": "8cc9e42fd318c4767fbb4f68c1d934246aaf001158e0c15bc67a125aca4b3634"
+    },
+    {
+      "path": ".kiro/specs/uml-desktop-client/.config.kiro",
+      "kind": "file",
+      "tracked": true,
+      "size": 111,
+      "mode": 420,
+      "sha256": "6812ec607503ad17b0ee7d51a693be64bef02deab5283c4bcdd7da9cba07fc14"
+    },
+    {
+      "path": ".kiro/specs/uml-desktop-client/design.md",
+      "kind": "file",
+      "tracked": true,
+      "size": 27680,
+      "mode": 420,
+      "sha256": "973523a327aaf72851dbf51fbcacc2ee63e100aea215a9d578e9b7df71c432db"
+    },
+    {
+      "path": ".kiro/specs/uml-desktop-client/requirements.md",
+      "kind": "file",
+      "tracked": true,
+      "size": 27956,
+      "mode": 420,
+      "sha256": "2eb8c8c3ab281cfd5d09d9d849831ce291f3591230eaf8419f27d0256bff1172"
+    },
+    {
+      "path": ".kiro/specs/uml-desktop-client/tasks.md",
+      "kind": "file",
+      "tracked": true,
+      "size": 20290,
+      "mode": 420,
+      "sha256": "1b57e746467b7597a17cafc6f0014e077a6c88f6d9f9cebd8945eae69d3ccd5a"
+    },
+    {
+      "path": ".nvmrc",
+      "kind": "file",
+      "tracked": false,
+      "size": 3,
+      "mode": 420,
+      "sha256": "68ca3fba3b7e864770cb61aeb306d4bd4354b68ab4dd38450860c5d823e42a53"
+    },
+    {
+      "path": ".vscode/settings.json",
+      "kind": "file",
+      "tracked": true,
+      "size": 3,
+      "mode": 420,
+      "sha256": "8eb95bcbc154530931e15fc418c8b1fe991095671409552099ea1aa596999ede"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 1073,
+      "mode": 420,
+      "sha256": "6c0b6b1a6245bbb1b71c6e9fb02563a3595c37ed0cbffa84ee84beb005c66644"
+    },
+    {
+      "path": "CODE_OF_CONDUCT.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 1802,
+      "mode": 420,
+      "sha256": "c018931eebbaf948a3d4939f0bfd1a16f37bed04e1df3b9e112faab04531171b"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 3453,
+      "mode": 420,
+      "sha256": "0f6f827520727b10da6395a06e8c0ffaf76853c06b5f7e8393560d983f7b8682"
+    },
+    {
+      "path": "GOVERNANCE.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 1757,
+      "mode": 420,
+      "sha256": "1590a51a32e23700c92af7819669eeedfbe77bd8ef55dd3836626a60f788f156"
+    },
+    {
+      "path": "LICENSE",
+      "kind": "file",
+      "tracked": false,
+      "size": 1080,
+      "mode": 420,
+      "sha256": "8aa1c3087ca1e99c06354908b366dc27ea1daa02db7fb71455ef90b56126852e"
+    },
+    {
+      "path": "README.md",
+      "kind": "file",
+      "tracked": true,
+      "size": 5209,
+      "mode": 420,
+      "sha256": "c6e1928db9b797da602f5adb090001f7b994e64fa5fa3c8e077c948d2bc03a7a"
+    },
+    {
+      "path": "SECURITY.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 1801,
+      "mode": 420,
+      "sha256": "7f52cd44a1e7ac1595b464344427af23ef9de0ded3eb5aad93d5d7be42a665f5"
+    },
+    {
+      "path": "SUPPORT.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 957,
+      "mode": 420,
+      "sha256": "44cd004e6ba2f88ff13da63552a979709850c38448cc5301026fb8f9c726adce"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 121407,
+      "mode": 420,
+      "sha256": "8f2e03aca82eef0997c010b0ca806d17ae1ea0e57b1b7b02121f0e056d08b16f"
+    },
+    {
+      "path": "docs/README.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 1710,
+      "mode": 420,
+      "sha256": "d86de92c140f7ddfd8219e7691dc310bd01b5cc2efb5bcdd22d8d65296d963f1"
+    },
+    {
+      "path": "docs/architecture.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 3410,
+      "mode": 420,
+      "sha256": "8d582ac82cf0768f968ba47bf527aac5752c356af1b0b4b4c30d8904bd6669b1"
+    },
+    {
+      "path": "docs/atomic-execution-plan.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 47668,
+      "mode": 420,
+      "sha256": "51f931839880ae830a74ecbe6f56c2f821d2c1e2c521b01e347b8851c341b7d7"
+    },
+    {
+      "path": "docs/known-limitations.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 2056,
+      "mode": 420,
+      "sha256": "4fafc94ba256dcb99bb96f6d09d8bf57af8dc60af5e1ea97344eb26bdef1fefc"
+    },
+    {
+      "path": "docs/ko/README.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 2715,
+      "mode": 420,
+      "sha256": "4357946c4b1efe6aec6e18cd2c95bcd75fee36e1aa0e92de44e01e1b5dbf253c"
+    },
+    {
+      "path": "docs/ko/atomic-execution-plan.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 45963,
+      "mode": 420,
+      "sha256": "100f5901262594ed6666affdab8170c132d892b48d3def0bae5a6f5660711284"
+    },
+    {
+      "path": "docs/ko/product-spec.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 19403,
+      "mode": 420,
+      "sha256": "bffc2c1587f524204a5b86600aa1926d9b002cc6997cca5ab082c34d518998d0"
+    },
+    {
+      "path": "docs/product-spec.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 37850,
+      "mode": 420,
+      "sha256": "5ddca09fb8fc7c324c92e525fe3a18b3e714c8ce66c29ac6546449635334ab4d"
+    },
+    {
+      "path": "docs/public-alpha-plan.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 21495,
+      "mode": 420,
+      "sha256": "9414658ccdaebf7cf7d0e4aed9a4cdeaaa3b45d7472edbf1c62ef6d3f2da71aa"
+    },
+    {
+      "path": "docs/publication.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 3254,
+      "mode": 420,
+      "sha256": "49ef0c490d9ded94358f541cf22e0b5568deca027ae1890350127321547abc82"
+    },
+    {
+      "path": "docs/releases.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 2244,
+      "mode": 420,
+      "sha256": "ae841360ac4cb46aa8125f57e6666e602db8a0299f97dbd7d3ac86aab59beb10"
+    },
+    {
+      "path": "docs/reviews/2026-09-26-commercial-readiness.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 9493,
+      "mode": 420,
+      "sha256": "b29d65831c6e23eb46eedc180450d9df4667f101a5558ecef8fe906500a65cb3"
+    },
+    {
+      "path": "docs/reviews/2026-09-26-open-source-readiness.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 3386,
+      "mode": 420,
+      "sha256": "1aec499464fae27eb6457fa80b858b6d9ed445b73cef9f3fee448b93fe03df90"
+    },
+    {
+      "path": "docs/roadmap.md",
+      "kind": "file",
+      "tracked": false,
+      "size": 3800,
+      "mode": 420,
+      "sha256": "0b4207e939019424b6559b7ba4fa354e73d084c9203ae9e0e4c4f01b3701a770"
+    },
+    {
+      "path": "electron/atomicWrite.ts",
+      "kind": "file",
+      "tracked": false,
+      "size": 564,
+      "mode": 420,
+      "sha256": "a938b9d960589a34bc2d9313a4fec196a9ff7b6af84a0610635cf168d0dbd9a4"
+    },
+    {
+      "path": "electron/fileIO.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 3940,
+      "mode": 420,
+      "sha256": "15ee7161ac95fd1a1074cd08aa670f606c4fa4f943461407c2a2c753fba19897"
+    },
+    {
+      "path": "electron/main.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 1533,
+      "mode": 420,
+      "sha256": "ac7ec06e1c9b851c8cba314f41fa00ed3ca2f208d84825a4fa9f276fc06f9b99"
+    },
+    {
+      "path": "electron/preload.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 1681,
+      "mode": 420,
+      "sha256": "258557d385bd33d605b68c666f42ebc04aba77d41f7ed04447190c87b0fffae5"
+    },
+    {
+      "path": "electron/recentProjects.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 2901,
+      "mode": 420,
+      "sha256": "0cc04f17d62af46c5dfee764a59be76ddd61fa26f2a403b46b872a3cda79d831"
+    },
+    {
+      "path": "examples/order-system.uml",
+      "kind": "file",
+      "tracked": false,
+      "size": 179,
+      "mode": 420,
+      "sha256": "8648b6ccdd660ef39530d0ed009db384a25a138b676f416823bcf797223f3a24"
+    },
+    {
+      "path": "index.html",
+      "kind": "file",
+      "tracked": true,
+      "size": 462,
+      "mode": 420,
+      "sha256": "c60602d2a2c639a09cc463b5ef1d61f3d80d7f84944798c013c3740827c6b529"
+    },
+    {
+      "path": "package-lock.json",
+      "kind": "file",
+      "tracked": true,
+      "size": 241772,
+      "mode": 420,
+      "sha256": "aec8e99525344138ae08c8eb3cd8eddf000d9663097c883ea52ffa8dc16892fa"
+    },
+    {
+      "path": "package.json",
+      "kind": "file",
+      "tracked": true,
+      "size": 2758,
+      "mode": 420,
+      "sha256": "4976f32b6335c09f47e0b44880efed936faed903d31e6ea9735a3e97d712bc17"
+    },
+    {
+      "path": "scripts/check-repo.mjs",
+      "kind": "file",
+      "tracked": false,
+      "size": 2482,
+      "mode": 420,
+      "sha256": "1d5c9cf487e203b8d2ae11f1e982bab2dfd4d8c03a29f6912b0f6869310caf4a"
+    },
+    {
+      "path": "scripts/generate-notices.mjs",
+      "kind": "file",
+      "tracked": false,
+      "size": 2534,
+      "mode": 420,
+      "sha256": "60b001a7a89120465f6efd0455bc946a9592ef0e7a1e6a305eeb2b17aaa49881"
+    },
+    {
+      "path": "src/App.tsx",
+      "kind": "file",
+      "tracked": true,
+      "size": 37313,
+      "mode": 420,
+      "sha256": "cf1c7b8ca0c842ade6dabaecf349fddf004eb69523fc1a05bb5c3862f467250f"
+    },
+    {
+      "path": "src/components/canvas/ConnectorRenderer.tsx",
+      "kind": "file",
+      "tracked": true,
+      "size": 6845,
+      "mode": 420,
+      "sha256": "0225b57f69f2b0d2be5a9f56d7ab1c85406edaa28b6ec91da6359de570667ca4"
+    },
+    {
+      "path": "src/components/canvas/ElementRenderer.tsx",
+      "kind": "file",
+      "tracked": true,
+      "size": 11779,
+      "mode": 420,
+      "sha256": "bdb1deb11aec4de0d9c3fe0bbcb1c31cfa675060f8c70b039443a9e8c10940e0"
+    },
+    {
+      "path": "src/components/canvas/SharedElementContextMenu.tsx",
+      "kind": "file",
+      "tracked": true,
+      "size": 4760,
+      "mode": 420,
+      "sha256": "057fb370a7db153071ad5d2f588e1cb8edeab6623823afd24e77329fd8bbb727"
+    },
+    {
+      "path": "src/components/canvas/UMLCanvas.tsx",
+      "kind": "file",
+      "tracked": true,
+      "size": 20610,
+      "mode": 420,
+      "sha256": "46eef319e9f0ac78bd4da3f2149f5e3c965dfe6d08c338090e0b6c500e3b6cee"
+    },
+    {
+      "path": "src/components/canvas/useCanvasControls.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 3445,
+      "mode": 420,
+      "sha256": "2d1c4b3cdf8fb48f1a4e475b11b5b1b7ef83da23fed2ac39357cb4e56fa4e504"
+    },
+    {
+      "path": "src/components/editor/DSLEditor.tsx",
+      "kind": "file",
+      "tracked": true,
+      "size": 7126,
+      "mode": 420,
+      "sha256": "e59e42a65bbe31a40ed8a5175ca24a97a80fe0ee95dd0e7b74bf077b8a26b0af"
+    },
+    {
+      "path": "src/components/layout/SplitView.tsx",
+      "kind": "file",
+      "tracked": true,
+      "size": 4345,
+      "mode": 420,
+      "sha256": "578602ab1b87be06991da699cc5e50230645bfdd99d8ca9d51bab0560db0d890"
+    },
+    {
+      "path": "src/components/project/CreateDialog.tsx",
+      "kind": "file",
+      "tracked": false,
+      "size": 2764,
+      "mode": 420,
+      "sha256": "0ac5ba40a20c39ebff6722561ebb52aec566108be6a370e7199bcab9892c243f"
+    },
+    {
+      "path": "src/components/project/HistoryDialog.tsx",
+      "kind": "file",
+      "tracked": false,
+      "size": 3462,
+      "mode": 420,
+      "sha256": "b284c6351329c5264079c26b110defe1e90d294a07763090f06281c98c2ed9e3"
+    },
+    {
+      "path": "src/components/project/ProjectTree.tsx",
+      "kind": "file",
+      "tracked": true,
+      "size": 13355,
+      "mode": 420,
+      "sha256": "37d4f0a5631520f33d78cf58b19fb1feb01caca3ed3a829ccf57df42292be9e6"
+    },
+    {
+      "path": "src/components/properties/PropertyPanel.tsx",
+      "kind": "file",
+      "tracked": true,
+      "size": 9407,
+      "mode": 420,
+      "sha256": "ceb82ae6dcf0c78af5a46890fa91b952ff1c99edf7a0b4fd76c5e3211ea1e3f0"
+    },
+    {
+      "path": "src/components/tabs/DiagramTabs.tsx",
+      "kind": "file",
+      "tracked": true,
+      "size": 1969,
+      "mode": 420,
+      "sha256": "155f542955b75dc075e6a17523c71a79cbdf87b8de7830c9d317380bdaa6a763"
+    },
+    {
+      "path": "src/components/toolbar/Toolbar.tsx",
+      "kind": "file",
+      "tracked": true,
+      "size": 3687,
+      "mode": 420,
+      "sha256": "c8fa2662706b3a775238743425f9df97248a6df743ca98e2bfcaf3d04d2aed93"
+    },
+    {
+      "path": "src/engine/browserProjectFile.ts",
+      "kind": "file",
+      "tracked": false,
+      "size": 1180,
+      "mode": 420,
+      "sha256": "953009612863b22f80550fd9d9a59d0645ba1eaa389021905c37fd23e27143a5"
+    },
+    {
+      "path": "src/engine/clipboardManager.test.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 7183,
+      "mode": 420,
+      "sha256": "359bd14631c432c945f7a7731a0078ae0f3504f1c546d3eed7ecea2944c4d965"
+    },
+    {
+      "path": "src/engine/clipboardManager.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 3011,
+      "mode": 420,
+      "sha256": "57b028024e72cb58e4ae952cbab9c4fee1eb252c1cc09b6050160730e69ddbfd"
+    },
+    {
+      "path": "src/engine/connectorGeometry.ts",
+      "kind": "file",
+      "tracked": false,
+      "size": 1399,
+      "mode": 420,
+      "sha256": "e271fe14d30c2310751ccdd0667430369df76153815e9ef968a11378e7632d04"
+    },
+    {
+      "path": "src/engine/elementFactory.test.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 1891,
+      "mode": 420,
+      "sha256": "f5bd1bb1c7627f9dd5f15050df1e2ecad59fbc4a312f1b4750c51493ee78aade"
+    },
+    {
+      "path": "src/engine/elementFactory.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 3790,
+      "mode": 420,
+      "sha256": "f39841741ed61b4d1a8447bc95a471f661dc0dfbba7f462b4c447f0a964b9fb5"
+    },
+    {
+      "path": "src/engine/exportEngine.test.ts",
+      "kind": "file",
+      "tracked": false,
+      "size": 1821,
+      "mode": 420,
+      "sha256": "1e7ce4225b0873696e9b023b0e6e271292ef0aa080a9a55bfd97f02105350b0c"
+    },
+    {
+      "path": "src/engine/exportEngine.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 14865,
+      "mode": 420,
+      "sha256": "b49f45a0a105647ad0589be0b75796c606ab5f75c57484d263056dd92f51c7aa"
+    },
+    {
+      "path": "src/engine/lazyLoader.test.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 5566,
+      "mode": 420,
+      "sha256": "e2d7e2b335088ec88b3b263b80795bf896234a31e315c51dcd30b2a24f42aee4"
+    },
+    {
+      "path": "src/engine/lazyLoader.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 2896,
+      "mode": 420,
+      "sha256": "0b366d357cccd5123cc58be245e98fe0c76bddbc4ef4bae0d260fedcd4c0bc4b"
+    },
+    {
+      "path": "src/engine/localVersionStorage.test.ts",
+      "kind": "file",
+      "tracked": false,
+      "size": 2072,
+      "mode": 420,
+      "sha256": "22445e1ed2992ddf9955a4a7a5948db7e11583fcc8b1b9fb575bd142dfc8e423"
+    },
+    {
+      "path": "src/engine/localVersionStorage.ts",
+      "kind": "file",
+      "tracked": false,
+      "size": 1223,
+      "mode": 420,
+      "sha256": "651c2cc78ddf144fb467a19d21557d15d374582fc0d98b9dbe9e42a495fca6f7"
+    },
+    {
+      "path": "src/engine/lruCache.test.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 4839,
+      "mode": 420,
+      "sha256": "bac5d6c897e97e4b07b12ef8d863d6e7ff0d32033d0d1b03a470cec013d23d05"
+    },
+    {
+      "path": "src/engine/lruCache.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 1996,
+      "mode": 420,
+      "sha256": "6252fc8707673f0f12eb7598b0264505b6bdc11816160bef47a08081f70184d9"
+    },
+    {
+      "path": "src/engine/projectFactory.ts",
+      "kind": "file",
+      "tracked": false,
+      "size": 474,
+      "mode": 420,
+      "sha256": "d4535eac00c50d97ab87997f5cdcae1431ff9e5309865fd77cc1fb2495c84c05"
+    },
+    {
+      "path": "src/engine/projectSession.test.ts",
+      "kind": "file",
+      "tracked": false,
+      "size": 5821,
+      "mode": 420,
+      "sha256": "b07fab77cc1f51f600f8903bf77e0844cac6e8dceecff239dc5a2143f1252c56"
+    },
+    {
+      "path": "src/engine/projectSession.ts",
+      "kind": "file",
+      "tracked": false,
+      "size": 6781,
+      "mode": 420,
+      "sha256": "43b4e238c49f78813e10145552fd91b24e23aff70834258332e43b94200d7c10"
+    },
+    {
+      "path": "src/engine/projectWorkflow.test.ts",
+      "kind": "file",
+      "tracked": false,
+      "size": 6799,
+      "mode": 420,
+      "sha256": "a78d8ccec7890f2a63d00060190c36d9ecd4cdc98a0f85a1b041fc1deef58d58"
+    },
+    {
+      "path": "src/engine/recentProjects.test.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 5570,
+      "mode": 420,
+      "sha256": "c4050e1f9bdcdf0138ed6e50e819b7bbaafc6c18d067df67ccb5bf8d32cd128b"
+    },
+    {
+      "path": "src/engine/sharedElementRegistry.test.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 7327,
+      "mode": 420,
+      "sha256": "dff01fa031924088ce41417e7e369c696d6c44f035927ace632b689952cee045"
+    },
+    {
+      "path": "src/engine/sharedElementRegistry.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 2261,
+      "mode": 420,
+      "sha256": "86536e15ecc6756e740eac6b19372513401854f43f8f8c151ba2ec26576d54c3"
+    },
+    {
+      "path": "src/engine/syncEngine.test.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 18884,
+      "mode": 420,
+      "sha256": "5b527ec070bc36b9461e1539ef42e8ddce445fa7fe8353e7df74fa0644681785"
+    },
+    {
+      "path": "src/engine/syncEngine.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 10488,
+      "mode": 420,
+      "sha256": "bfc0097f87c0a6711f99c19726fb2e9f2af7af98f2122eea44cbe5ca101aa88a"
+    },
+    {
+      "path": "src/engine/undoManager.test.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 6474,
+      "mode": 420,
+      "sha256": "c3425c55416bbc2838eaba3b2ee8549523badd0afcff56329671965a63dd5ed3"
+    },
+    {
+      "path": "src/engine/undoManager.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 1250,
+      "mode": 420,
+      "sha256": "626f6129174d3c3656ed496feca97fa58aca1e2bcb0ffaad5be671cdc26974a4"
+    },
+    {
+      "path": "src/engine/versionManager.test.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 10459,
+      "mode": 420,
+      "sha256": "27d75bf4fed70b7fe77b72c7f5bc1103c3696f6497fc8c4eebdc2d419d0d58d5"
+    },
+    {
+      "path": "src/engine/versionManager.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 10006,
+      "mode": 420,
+      "sha256": "c6a8ae814ad1c63e2434e67006df450691d41be38ff0ef4d6654179fa6ba790d"
+    },
+    {
+      "path": "src/main.tsx",
+      "kind": "file",
+      "tracked": true,
+      "size": 238,
+      "mode": 420,
+      "sha256": "240903a71d5933c9b6910e054295ec4551c18803cd024ad6ef6d52134d96202a"
+    },
+    {
+      "path": "src/parser/dsl/grammarSource.ts",
+      "kind": "deleted",
+      "tracked": true
+    },
+    {
+      "path": "src/parser/dsl/index.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 317,
+      "mode": 420,
+      "sha256": "655512382eebf83b14a0ae6ce6c042823f48872232218236eb2e004dac6fa803"
+    },
+    {
+      "path": "src/parser/dsl/parser.ts",
+      "kind": "deleted",
+      "tracked": true
+    },
+    {
+      "path": "src/parser/dsl/peggyParser.test.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 15762,
+      "mode": 420,
+      "sha256": "71a1096e034a831630f8b47eee58b636e248fef5292f74707eb1888402f91b42"
+    },
+    {
+      "path": "src/parser/dsl/peggyParser.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 2662,
+      "mode": 420,
+      "sha256": "e7f883e078a0beef889cfe926266b179695d0491378f216076b7eb9ac2a2a496"
+    },
+    {
+      "path": "src/parser/dsl/serializer.test.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 20885,
+      "mode": 420,
+      "sha256": "86b1320d553bbed2b8bde6a90470d0f44fe1794ee6a9450be2b84e1e3bf93399"
+    },
+    {
+      "path": "src/parser/dsl/serializer.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 16090,
+      "mode": 420,
+      "sha256": "f1be5134e4b2326080920eaf55e1b1a6a563fa583cc48d87a582b29f9d22fa3a"
+    },
+    {
+      "path": "src/parser/dsl/tokenizer.ts",
+      "kind": "deleted",
+      "tracked": true
+    },
+    {
+      "path": "src/parser/dsl/uml.pegjs",
+      "kind": "file",
+      "tracked": true,
+      "size": 15281,
+      "mode": 420,
+      "sha256": "a54b1d0d3348ef4e94b7a18fd777e4cf1d3d9e175d2c80430af6e8555ef2cfbb"
+    },
+    {
+      "path": "src/parser/dslParser.ts",
+      "kind": "deleted",
+      "tracked": true
+    },
+    {
+      "path": "src/parser/grammar.ts",
+      "kind": "deleted",
+      "tracked": true
+    },
+    {
+      "path": "src/parser/project/index.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 212,
+      "mode": 420,
+      "sha256": "e4727a45fdb90f0a6b8ea65bb465538a07259f9b63bf435b78b0fa6a87cb67eb"
+    },
+    {
+      "path": "src/parser/project/projectFile.test.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 11198,
+      "mode": 420,
+      "sha256": "4bfe7f0e8c9bf0d4904da11289de17afa29eb8c9f5b43c0dc1370c38595d54b8"
+    },
+    {
+      "path": "src/parser/project/projectFileParser.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 10693,
+      "mode": 420,
+      "sha256": "f7b79629b8f7758b551df9e1ae0663cda11cc91758a8082cba3a0f09be755e27"
+    },
+    {
+      "path": "src/parser/project/projectFileSerializer.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 525,
+      "mode": 420,
+      "sha256": "d45e837533022f73802e2f571fa807d0cc350bac70b577545d9f379fdb1ab979"
+    },
+    {
+      "path": "src/parser/uml.peggy",
+      "kind": "deleted",
+      "tracked": true
+    },
+    {
+      "path": "src/store/diagramStore.test.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 9968,
+      "mode": 420,
+      "sha256": "66738b6d70b033314887cb9336c8598340ac20e7945dab617d8882a22afadabd"
+    },
+    {
+      "path": "src/store/diagramStore.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 4152,
+      "mode": 420,
+      "sha256": "1c4e3f0c7d6185e4da56e0b44e9181f75a8106ad6cc37c751dc6d4148a39cf38"
+    },
+    {
+      "path": "src/store/projectStore.test.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 3879,
+      "mode": 420,
+      "sha256": "f8826a9620a71c406a9460a7d8640e8f1eb04e896d1ca5e9b587d379f4049a6d"
+    },
+    {
+      "path": "src/store/projectStore.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 2041,
+      "mode": 420,
+      "sha256": "555751b1c43ad91c528d4d87b6ff5f7ee36ea0d60641894b40e703f2001fcb50"
+    },
+    {
+      "path": "src/styles.css",
+      "kind": "file",
+      "tracked": true,
+      "size": 13568,
+      "mode": 420,
+      "sha256": "c3c08513265bf3c33e556acc753ca6edb8f3ea602b70fdf23be632bccea5af78"
+    },
+    {
+      "path": "src/types/index.test.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 6704,
+      "mode": 420,
+      "sha256": "940e5d36d1d00988fc4d133e3a70e3a94128f11a15f7f15c68061447a5dc2bd5"
+    },
+    {
+      "path": "src/types/index.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 6087,
+      "mode": 420,
+      "sha256": "52c61307dfbd54e41fb27b04ef456c814671986332fd5e18638471c0762f3279"
+    },
+    {
+      "path": "src/vite-env.d.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 38,
+      "mode": 420,
+      "sha256": "65996936fbb042915f7b74a200fcdde7e410f32a669b1ab9597cfaa4b0faddb5"
+    },
+    {
+      "path": "tsconfig.json",
+      "kind": "file",
+      "tracked": true,
+      "size": 747,
+      "mode": 420,
+      "sha256": "62e30089ea706951a0215df916dad5ab533eab5518b43af7c8a10757148759dd"
+    },
+    {
+      "path": "tsconfig.node.json",
+      "kind": "file",
+      "tracked": true,
+      "size": 333,
+      "mode": 420,
+      "sha256": "4014d79b2c78582088bb1003e0b5bfc6df0b7a50fd6d1a5de2b422cc3e7262d8"
+    },
+    {
+      "path": "vite.config.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 898,
+      "mode": 420,
+      "sha256": "5070e5d1509769fc12a9a1b1018db864f5ccf4a08aabed7dbe760e1c46cd531a"
+    },
+    {
+      "path": "vitest.config.ts",
+      "kind": "file",
+      "tracked": true,
+      "size": 389,
+      "mode": 420,
+      "sha256": "bf2038e2f54687d72ade025984a7c180a6e55cdd1fed655fa00932f78600557b"
+    }
+  ]
+}

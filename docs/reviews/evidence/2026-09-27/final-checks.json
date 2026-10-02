@@ -1,0 +1,17 @@
+[
+  {
+    "command": "npm run check",
+    "exitCode": 0,
+    "seconds": 2.91
+  },
+  {
+    "command": "npm run pack",
+    "exitCode": 0,
+    "seconds": 17.03
+  },
+  {
+    "command": "npm run qa:packaged",
+    "exitCode": 0,
+    "seconds": 5.91
+  }
+]
