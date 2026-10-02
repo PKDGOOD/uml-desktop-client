@@ -1,0 +1,19 @@
+{
+  "platform": "darwin 27.0.0 arm64",
+  "binary": "release/mac-arm64/UML Studio.app/Contents/MacOS/UML Studio",
+  "nativeDialogs": "Picker answers stubbed; real renderer, preload, IPC and file writes.",
+  "checks": [
+    "New project → new diagram → real Monaco text input → IPC save → exact draft on disk",
+    "New application process → real IPC open → resave semantic/draft equality → SVG file"
+  ],
+  "knownFailures": [
+    "F5: blocked browser download incorrectly cleared dirty state"
+  ],
+  "browserSave": {
+    "dirty": false,
+    "notice": "Project download started (.uml.json).×",
+    "requests": 1
+  },
+  "status": "baseline-with-known-failure",
+  "appArchiveSha256": "0ac65bffc0c621a803eef2052b75091a8f77a47f5b9351310a3436f64129333f"
+}
