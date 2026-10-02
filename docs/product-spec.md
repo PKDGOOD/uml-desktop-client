@@ -2,9 +2,9 @@
 
 Status: **draft 0.1, proposed product behavior**, 2026-09-26. This is a specification to implement and validate, not a description of completed functionality or approval to publish.
 
-[한국어 기획안 안내](ko/product-spec.md) · [Execution plan](public-alpha-plan.md) · [Atomic tasks](atomic-execution-plan.md) · [Current limitations](known-limitations.md)
+[Korean product specification](ko/product-spec.md) · [Execution plan](public-alpha-plan.md) · [Atomic tasks](atomic-execution-plan.md) · [Current limitations](known-limitations.md)
 
-This document defines **who the product serves, what they can accomplish, and how it should behave**. The execution plan defines implementation order, dependencies, estimates and release evidence. Requirement IDs below connect the two. The original [requirements](../.kiro/specs/uml-desktop-client/requirements.md) remain historical context; this draft proposes a narrower first public release. If adopted, it becomes the alpha scope baseline. A change to scope must update this document and its acceptance scenarios before dependent implementation changes.
+This document defines **who the product serves, what they can accomplish, and how it should behave**. The execution plan defines implementation order, dependencies, estimates and release evidence. Requirement IDs below connect the two. The original [requirements (Korean)](ko/archive/kiro-specs/requirements.md) remain historical context; this draft proposes a narrower first public release. If adopted, it becomes the alpha scope baseline. A change to scope must update this document and its acceptance scenarios before dependent implementation changes.
 
 ## 1. Product intent and users
 

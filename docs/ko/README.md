@@ -1,10 +1,12 @@
 # UML Studio
 
+> 이 문서는 한국어 번역본입니다. 기준 문서는 [영문 README](../../README.md)이며, 번역이 늦을 수 있으니 내용이 다르면 영문판을 따르세요.
+
 [English](../../README.md) · [기여 안내](../../CONTRIBUTING.md) · [제품 기획안](product-spec.md) · [원자 단위 실행 계획](atomic-execution-plan.md) · [작업 목록](../roadmap.md)
 
 텍스트 DSL과 캔버스를 함께 사용하는 로컬 UML 편집기입니다. Electron, React, TypeScript, Monaco, Konva로 개발합니다.
 
-**현재는 개발용 알파입니다.** DSL 왕복 변환에서 속성이나 포함 관계가 달라지는 결함이 남아 있습니다. 중요한 설계의 유일한 원본으로 사용하지 마세요. [알려진 제한](../known-limitations.md)과 [상세 검토(한국어)](../reviews/2026-09-26-commercial-readiness.md)를 확인하세요.
+**현재는 개발용 알파입니다.** DSL 왕복 변환에서 속성이나 포함 관계가 달라지는 결함이 남아 있습니다. 중요한 설계의 유일한 원본으로 사용하지 마세요. [알려진 제한](../known-limitations.md)과 [상세 검토](reviews/2026-09-26-commercial-readiness.md)를 확인하세요.
 
 ## 시작하기
 

@@ -2,7 +2,7 @@
 
 This page separates open-source project infrastructure from product readiness. The repository can accept contributions while the application remains an early alpha. Do not use it as the only copy of an important specification.
 
-The following issues were identified in the [2026-09-26 review (Korean)](reviews/2026-09-26-commercial-readiness.md). Current status is updated from the [2026-09-27 execution evidence](reviews/2026-09-27-execution-baseline.md):
+The following issues were identified in the [2026-09-26 review](reviews/2026-09-26-commercial-readiness.md). Current status is updated from the [2026-09-27 execution evidence](reviews/2026-09-27-execution-baseline.md):
 
 | ID | Problem | Consequence |
 | --- | --- | --- |

@@ -1,5 +1,7 @@
 # 구현 계획: UML 데스크탑 클라이언트
 
+> **Archived, Korean only.** This initial spec is superseded by the English [product specification](../../../product-spec.md) and is not maintained or translated. 초기 기록으로만 보존하며, 현재 기준은 영문 제품 기획안입니다.
+
 ## 개요
 
 Electron + React + TypeScript 기반 UML 데스크탑 클라이언트를 구현한다. DSL 파서/직렬화기 → 데이터 모델 → 핵심 엔진(Undo, Sync, Clipboard, LazyLoader, SharedElement) → UI 컴포넌트(Canvas, TextEditor, ProjectTree, Tabs, SplitView) → 내보내기/버전 관리 순서로 점진적으로 구축한다. 각 단계에서 속성 기반 테스트(fast-check)와 단위 테스트(Vitest)를 병행하여 정확성을 검증한다.
