@@ -91,8 +91,8 @@ macOS Apple Silicon has a repeatable packaged save/restart/open smoke with autom
 - [Governance](GOVERNANCE.md) and [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Support](SUPPORT.md): bug reports and questions
 - [Roadmap](docs/roadmap.md): prioritized work and acceptance criteria
-- [Product specification](docs/product-spec.md) ([한국어 기획안](docs/ko/product-spec.md)): proposed users, workflows and behavior, linked to the [execution plan](docs/public-alpha-plan.md)
-- [Atomic execution plan](docs/atomic-execution-plan.md) ([한국어](docs/ko/atomic-execution-plan.md)): task boundaries, dependencies and acceptance evidence
+- [Product specification](docs/product-spec.md) ([Korean](docs/ko/product-spec.md)): proposed users, workflows and behavior, linked to the [execution plan](docs/public-alpha-plan.md)
+- [Atomic execution plan](docs/atomic-execution-plan.md) ([Korean](docs/ko/atomic-execution-plan.md)): task boundaries, dependencies and acceptance evidence
 - [Execution status](docs/execution-status.md): actual completed work and verification evidence
 - [Changelog](CHANGELOG.md): unreleased changes
 

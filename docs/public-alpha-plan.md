@@ -2,9 +2,9 @@
 
 Status: implementation started, 2026-09-27. See the [execution ledger](execution-status.md) for actual completed work. This milestone plan does not mark the remaining work complete or authorize a public release by itself.
 
-The [product specification](product-spec.md) ([한국어 기획안](ko/product-spec.md)) defines users, scenarios, screens, supported features and interaction rules. Read it before implementing this plan. Its P-01–P-11 and D-01–D-05 requirements map to AC-01–AC-15 acceptance scenarios and the A01–A14 slices below. This document defines how to deliver that product; neither draft is a claim of completed implementation.
+The [product specification](product-spec.md) ([Korean](ko/product-spec.md)) defines users, scenarios, screens, supported features and interaction rules. Read it before implementing this plan. Its P-01–P-11 and D-01–D-05 requirements map to AC-01–AC-15 acceptance scenarios and the A01–A14 slices below. This document defines how to deliver that product; neither draft is a claim of completed implementation.
 
-Execute through the [145 atomic tasks](atomic-execution-plan.md) ([한국어 실행 계획](ko/atomic-execution-plan.md)). A01–A14 below are work packages, not individual PRs. The leaf plan is authoritative for task dependencies, boundaries and completion evidence.
+Execute through the [145 atomic tasks](atomic-execution-plan.md) ([Korean](ko/atomic-execution-plan.md)). A01–A14 below are work packages, not individual PRs. The leaf plan is authoritative for task dependencies, boundaries and completion evidence.
 
 ## Target outcome
 

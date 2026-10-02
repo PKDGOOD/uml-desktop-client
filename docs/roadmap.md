@@ -1,8 +1,8 @@
 # Roadmap
 
-For users, product workflows, screen behavior and acceptance scenarios, see the [product specification](product-spec.md) ([한국어](ko/product-spec.md)). For milestone dependencies, estimates, work packages and measurable release gates, see the [public alpha execution plan](public-alpha-plan.md). Both are proposals for future work; unchecked items below remain open.
+For users, product workflows, screen behavior and acceptance scenarios, see the [product specification](product-spec.md) ([Korean](ko/product-spec.md)). For milestone dependencies, estimates, work packages and measurable release gates, see the [public alpha execution plan](public-alpha-plan.md). Both are proposals for future work; unchecked items below remain open.
 
-Execute one leaf at a time from the [atomic backlog](atomic-execution-plan.md) ([한국어](ko/atomic-execution-plan.md)): 145 tasks with direct dependencies and completion evidence. The [execution ledger](execution-status.md) records the completed local baseline and next steps. A01–A14 are work packages, not individual PRs.
+Execute one leaf at a time from the [atomic backlog](atomic-execution-plan.md) ([Korean](ko/atomic-execution-plan.md)): 145 tasks with direct dependencies and completion evidence. The [execution ledger](execution-status.md) records the completed local baseline and next steps. A01–A14 are work packages, not individual PRs.
 
 The app is an early alpha. This is a prioritized work list, not a delivery schedule. The [readiness review](reviews/2026-09-26-commercial-readiness.md) contains original evidence; [known limitations](known-limitations.md) summarizes it in English.
 
