@@ -1,104 +1,103 @@
-# UML Desktop Client
+# UML Studio
 
-텍스트 DSL과 GUI Canvas를 실시간 양방향 동기화하는 하이브리드 UML 편집기.
+**A local UML editor with a text DSL and an interactive canvas.**
 
-## 주요 기능
+Design class, sequence, use case, activity, and state diagrams in one Electron workspace. Edit text with Monaco, arrange shapes with Konva, and keep project files on your machine.
 
-- 5가지 UML 다이어그램: 클래스, 시퀀스, 유스케이스, 액티비티, 상태
-- 텍스트 DSL ↔ Canvas 실시간 양방향 동기화
-- Monaco Editor 기반 텍스트 편집 (구문 강조, 자동 완성)
-- Konva.js 기반 Canvas (드래그, 줌, 패닝, 리사이즈)
-- 프로젝트 트리 구조 관리 (폴더, 탭, 검색)
-- 요소 참조 공유 (Shared Element)
-- 로컬 버전 관리 (스냅샷, 복원, diff)
-- PNG/SVG/PDF 내보내기
-- Undo/Redo (50단계)
-- 클립보드 (복사/잘라내기/붙여넣기)
-- 대규모 프로젝트 지연 로딩 (LRU 캐시)
-- 완전 오프라인 동작 (서버 불필요)
+[한국어](docs/ko/README.md) · [Getting started](#getting-started) · [Contributing](CONTRIBUTING.md) · [Roadmap](docs/roadmap.md) · [Security](SECURITY.md)
 
-## 기술 스택
+> **Early alpha — not production-ready.** Known defects can lose properties or change nesting when switching between text and canvas. Keep backups and use disposable copies when evaluating. See [known limitations](docs/known-limitations.md). Open-source availability is not a production-readiness claim.
 
-| 영역 | 기술 |
-|------|------|
-| 런타임 | Electron |
-| UI | React + TypeScript |
-| 빌드 | Vite |
-| Canvas | Konva.js (react-konva) |
-| 텍스트 편집기 | Monaco Editor |
-| DSL 파서 | peggy (PEG.js) |
-| 상태 관리 | Zustand |
-| 테스트 | Vitest + fast-check |
+## What you can try
 
-## 시작하기
+- Create projects, folders, and diagrams; navigate with tabs and search.
+- Work in editor, canvas, or split view with per-diagram undo/redo.
+- Copy and paste shapes within the app between diagrams of the same type.
+- Save and open `.uml.json` projects, including unfinished text drafts.
+- Create device-local snapshots and export diagrams as SVG or PNG.
+- Run the editor without an account or a backend. Editor assets ship locally.
+
+Automatic crash recovery, PDF export, collaboration, code generation, and contract testing are not available. This is a diagram editor, not yet a specification-driven development platform.
+
+## Getting started
+
+Prerequisites: **Node.js 24**, npm, and Git. `.nvmrc` selects the development Node major; the lockfile pins dependencies.
 
 ```bash
-# 의존성 설치
-npm install
-
-# 개발 서버 (브라우저에서 확인)
+git clone https://github.com/PKDGOOD/uml-desktop-client.git
+cd uml-desktop-client
+# With nvm installed:
+nvm use
+npm ci
 npm run dev
-
-# Electron 앱으로 실행 (별도 터미널)
-npx electron .
-
-# 테스트
-npm test
 ```
 
-## 프로젝트 구조
+`dev` starts Vite and Electron together. Do not start a second Electron process. To run only the browser UI:
 
-```
-src/
-├── types/           # 핵심 데이터 모델 타입
-├── parser/
-│   ├── dsl/         # DSL 파서 (peggy) + 직렬화기
-│   └── project/     # 프로젝트 파일 JSON 파서/직렬화기
-├── engine/          # 핵심 엔진
-│   ├── syncEngine   # 텍스트 ↔ Canvas 양방향 동기화
-│   ├── undoManager  # Undo/Redo (Command 패턴)
-│   ├── clipboardManager
-│   ├── sharedElementRegistry
-│   ├── lazyLoader + lruCache
-│   ├── versionManager
-│   └── exportEngine
-├── store/           # Zustand 스토어
-├── components/      # React UI 컴포넌트
-│   ├── canvas/      # Konva.js Canvas
-│   ├── editor/      # Monaco Editor
-│   ├── layout/      # SplitView
-│   ├── toolbar/     # 다이어그램 유형별 도구 모음
-│   ├── properties/  # 속성 패널
-│   ├── project/     # 프로젝트 트리
-│   └── tabs/        # 다이어그램 탭
-└── App.tsx          # 메인 앱 컴포넌트
-electron/
-├── main.ts          # Electron 메인 프로세스
-├── preload.ts       # IPC 브릿지
-├── fileIO.ts        # 파일 I/O 핸들러
-└── recentProjects.ts
+```bash
+npm run dev:browser
 ```
 
-## DSL 문법 예시
+Open the localhost address printed by Vite. The browser uses file upload/download; Electron uses native file dialogs. Browser downloads retain unsaved state because completion cannot be confirmed. Verify the downloaded file before closing the page.
 
-```
-@class-diagram "주문 시스템"
+### Your first diagram
+
+1. Choose **+ Diagram**, enter a name, and select a diagram type.
+2. Add a shape using the toolbar and canvas, or switch to **Editor** and paste [order-system.uml](examples/order-system.uml).
+3. Use **Save** to keep a `.uml.json` project. **Open** accepts project JSON, not standalone `.uml` snippets.
+4. Use **Export SVG** or **Export PNG** for an image. **History** keeps snapshots on this device only; they do not travel with the project file.
+
+```text
+@class-diagram "Order system"
 
 class Order {
   - id: string
-  - status: OrderStatus
   + addItem(item: OrderItem): void
-  + calculateTotal(): number
 }
 
 class OrderItem {
   - quantity: number
-  - unitPrice: number
 }
 
 Order "1" --> "*" OrderItem : contains
 ```
 
-## 라이선스
+## Development
 
-MIT
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Electron + Vite development |
+| `npm run dev:browser` | Browser development without launching Electron |
+| `npm run check` | Type checking, repository checks, and unit/regression tests |
+| `npm run test:watch` | Watch tests |
+| `npm run test:readiness` | Synthetic fixtures and explicitly expected failures for open defects |
+| `npm run qa:packaged` | Existing macOS package: save/restart/open and browser download regression |
+| `npm run qa:baseline` | Headless reference data sizes and engine timings |
+| `npm run build:app` | Type checking and renderer/main/preload bundles |
+| `npm run notices` | Regenerate third-party license notices from installed locked packages |
+| `npm run pack` | Build a local unpacked desktop app |
+| `npm run build` | Build a distribution for the host platform |
+
+Use `npm ci`, not an unreviewed dependency upgrade. Output goes to `dist/`, `dist-electron/`, and `release/`. `private: true` in package.json prevents accidental npm publication; it does not make the source repository private.
+
+### Platform status
+
+macOS Apple Silicon has a repeatable packaged save/restart/open smoke with automated picker answers; see [test scope and instructions](docs/testing.md). Windows and Linux are not validated desktop releases. CI is configured to check code and bundles across all three platforms; that does **not** validate native dialogs, installers, accessibility, or application recovery. macOS packaging uses ad-hoc signing, not Developer ID signing or notarization. No supported production binaries are advertised yet.
+
+## Project and community
+
+- [Documentation](docs/README.md): architecture, limitations, and release process
+- [Contributing](CONTRIBUTING.md): setup, tests, and review expectations
+- [Governance](GOVERNANCE.md) and [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Support](SUPPORT.md): bug reports and questions
+- [Roadmap](docs/roadmap.md): prioritized work and acceptance criteria
+- [Product specification](docs/product-spec.md) ([한국어 기획안](docs/ko/product-spec.md)): proposed users, workflows and behavior, linked to the [execution plan](docs/public-alpha-plan.md)
+- [Atomic execution plan](docs/atomic-execution-plan.md) ([한국어](docs/ko/atomic-execution-plan.md)): task boundaries, dependencies and acceptance evidence
+- [Execution status](docs/execution-status.md): actual completed work and verification evidence
+- [Changelog](CHANGELOG.md): unreleased changes
+
+Small fixes, documentation improvements, and reproducible bug reports are welcome. Discuss model/schema changes before implementing them; data preservation comes first.
+
+## License
+
+UML Studio is licensed under the [MIT License](LICENSE). Contributors retain copyright in their contributions. Dependencies have their own terms; see [Third-party notices](THIRD_PARTY_NOTICES.md). Desktop distributions must also retain Electron's bundled Chromium notices.

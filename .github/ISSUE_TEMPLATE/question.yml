@@ -1,0 +1,18 @@
+name: Usage question
+description: Ask about setup or an existing workflow.
+title: "[Question]: "
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: Explain what you tried and link related documentation.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment and version
+  - type: markdown
+    attributes:
+      value: "Support is best-effort. Use SECURITY.md for vulnerabilities and remove private data from logs."

@@ -1,0 +1,39 @@
+name: Bug report
+description: Report a reproducible problem using synthetic data.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: "For security vulnerabilities, use SECURITY.md instead. Do not attach private project files, credentials, or personal data."
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Include the commit SHA for a development build.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: macOS / Windows / Linux, architecture, Node version, Electron or browser
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps and minimal example
+      description: Include commands or a small synthetic DSL example.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized logs or screenshots
+      description: Remove names, local paths, tokens, and confidential designs.
