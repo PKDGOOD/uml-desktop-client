@@ -1,0 +1,44 @@
+[
+  {
+    "file": "alpha-class.uml", "type": "class",
+    "elements": { "Order": "class", "OrderItem": "class", "PaymentGateway": "interface", "BaseOrder": "abstract-class", "OrderStatus": "enum" },
+    "connections": [["composition", "Order", "OrderItem"], ["inheritance", "Order", "BaseOrder"], ["dependency", "Order", "PaymentGateway"], ["dependency", "Order", "OrderStatus"]],
+    "ownership": {},
+    "requiredProperties": {
+      "Order": { "attributes": [{ "name": "id", "type": "String", "visibility": "private" }], "methods": [{ "name": "cancel", "returnType": "void", "visibility": "public", "parameters": [{ "name": "reason", "type": "String" }] }] },
+      "OrderItem": { "attributes": [{ "name": "quantity", "type": "int", "visibility": "private" }] },
+      "PaymentGateway": { "methods": [{ "name": "refund", "returnType": "boolean", "visibility": "public", "parameters": [{ "name": "orderId", "type": "String" }] }] },
+      "BaseOrder": { "methods": [{ "name": "validate", "returnType": "boolean", "visibility": "protected", "parameters": [] }] },
+      "OrderStatus": { "attributes": [{ "name": "PENDING", "type": "", "visibility": "public" }, { "name": "CANCELED", "type": "", "visibility": "public" }] }
+    },
+    "requiredLabels": ["contains", "refund after cancellation"]
+  },
+  {
+    "file": "alpha-sequence.uml", "type": "sequence",
+    "elements": { "고객 Client": "lifeline", "OrderService": "lifeline", "PaymentGateway": "lifeline" },
+    "connections": [["sync-message", "고객 Client", "OrderService"], ["async-message", "OrderService", "PaymentGateway"], ["return-message", "PaymentGateway", "OrderService"]],
+    "ownership": {},
+    "requiredLabels": ["cancel(orderId, reason)", "refund(orderId) - 결제 취소 요청", "refundAccepted"]
+  },
+  {
+    "file": "alpha-usecase.uml", "type": "usecase",
+    "elements": { "고객": "actor", "OrderSystem": "system-boundary", "CancelOrder": "usecase", "RefundPayment": "usecase", "ContactSupport": "usecase" },
+    "connections": [["association", "고객", "CancelOrder"], ["include", "CancelOrder", "RefundPayment"], ["extend", "ContactSupport", "CancelOrder"]],
+    "ownership": { "CancelOrder": "OrderSystem", "RefundPayment": "OrderSystem", "ContactSupport": null, "고객": null },
+    "requiredLabels": []
+  },
+  {
+    "file": "alpha-activity.uml", "type": "activity",
+    "elements": { "Start": "initial-node", "ReceiveRequest": "action", "Cancelable": "decision", "ParallelWork": "fork", "Refund": "action", "Notify": "action", "CompleteWork": "join", "End": "final-node" },
+    "connections": [["transition", "Start", "ReceiveRequest"], ["transition", "ReceiveRequest", "Cancelable"], ["transition", "Cancelable", "ParallelWork"], ["transition", "ParallelWork", "Refund"], ["transition", "ParallelWork", "Notify"], ["transition", "Refund", "CompleteWork"], ["transition", "Notify", "CompleteWork"], ["transition", "CompleteWork", "End"], ["transition", "Cancelable", "End"]],
+    "ownership": {},
+    "requiredLabels": ["allowed - 취소 가능", "rejected"]
+  },
+  {
+    "file": "alpha-state.uml", "type": "state",
+    "elements": { "Start": "initial-state", "Active": "composite-state", "Inside": "state", "Outside": "state", "End": "final-state" },
+    "connections": [["transition", "Start", "Inside"], ["transition", "Inside", "Outside"], ["transition", "Outside", "End"]],
+    "ownership": { "Inside": "Active", "Outside": null, "End": null },
+    "requiredLabels": ["created", "cancel - 취소 요청", "closed"]
+  }
+]

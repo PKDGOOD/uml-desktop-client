@@ -99,7 +99,11 @@ function findUnexpectedTokenPosition(content: string, token: string): number {
 
 function tryParseJson(content: string): ProjectFileParseResult<unknown> {
   try {
-    return { success: true, data: JSON.parse(content) };
+    const data: unknown = JSON.parse(content);
+    if (data === null || typeof data !== 'object' || Array.isArray(data)) {
+      return { success: false, errors: [{ message: 'Project must be a JSON object' }] };
+    }
+    return { success: true, data };
   } catch (err) {
     const position = extractJsonErrorPosition(content, err);
     const message =
@@ -108,11 +112,58 @@ function tryParseJson(content: string): ProjectFileParseResult<unknown> {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function validPoint(value: unknown): boolean {
+  return isRecord(value) && Number.isFinite(value.x) && Number.isFinite(value.y);
+}
+
+function validMembers(properties: Record<string, unknown>): boolean {
+  const attributes = properties.attributes;
+  const methods = properties.methods;
+  return (attributes === undefined || (Array.isArray(attributes) && attributes.every((attribute) =>
+    isRecord(attribute) && typeof attribute.name === 'string' && typeof attribute.type === 'string')))
+    && (methods === undefined || (Array.isArray(methods) && methods.every((method) =>
+      isRecord(method) && typeof method.name === 'string' && typeof method.returnType === 'string'
+      && Array.isArray(method.parameters) && method.parameters.every((parameter) =>
+        isRecord(parameter) && typeof parameter.name === 'string' && typeof parameter.type === 'string'))));
+}
+
+function validateDiagram(value: unknown, id: string): boolean {
+  if (!isRecord(value) || value.id !== id || typeof value.name !== 'string'
+    || !['class', 'sequence', 'usecase', 'activity', 'state'].includes(String(value.type))
+    || !Array.isArray(value.elements) || !Array.isArray(value.connectors)
+    || !validPoint(value.viewport) || !isRecord(value.viewport)
+    || !Number.isFinite(value.viewport.zoom) || Number(value.viewport.zoom) <= 0) return false;
+  return value.elements.every((element) => isRecord(element)
+    && typeof element.id === 'string' && typeof element.type === 'string'
+    && validPoint(element.position) && isRecord(element.size)
+    && Number.isFinite(element.size.width) && Number(element.size.width) > 0
+    && Number.isFinite(element.size.height) && Number(element.size.height) > 0
+    && isRecord(element.properties) && typeof element.properties.name === 'string'
+    && validMembers(element.properties))
+    && value.connectors.every((connector) => isRecord(connector)
+      && typeof connector.id === 'string' && typeof connector.type === 'string'
+      && typeof connector.sourceId === 'string' && typeof connector.targetId === 'string'
+      && isRecord(connector.properties)
+      && (connector.waypoints === undefined || (Array.isArray(connector.waypoints) && connector.waypoints.every(validPoint)))
+      && (connector.label === undefined || typeof connector.label === 'string'));
+}
+
+function validTree(nodes: unknown): boolean {
+  return Array.isArray(nodes) && nodes.every((node) => isRecord(node)
+    && typeof node.id === 'string' && typeof node.name === 'string'
+    && (node.type === 'folder' || node.type === 'diagram')
+    && (node.children === undefined || validTree(node.children)));
+}
+
 function validateMetadata(
   obj: Record<string, unknown>,
 ): ProjectFileParseError[] {
   const errors: ProjectFileParseError[] = [];
-  if (!obj.metadata || typeof obj.metadata !== 'object') {
+  if (!isRecord(obj.metadata)) {
     errors.push({ message: 'Missing required field: metadata', path: 'metadata' });
   } else {
     const meta = obj.metadata as Record<string, unknown>;
@@ -124,13 +175,13 @@ function validateMetadata(
       errors.push({ message: 'Missing required field: metadata.createdAt', path: 'metadata.createdAt' });
     if (typeof meta.updatedAt !== 'string')
       errors.push({ message: 'Missing required field: metadata.updatedAt', path: 'metadata.updatedAt' });
-    if (!meta.diagramIndex || typeof meta.diagramIndex !== 'object')
+    if (!isRecord(meta.diagramIndex))
       errors.push({ message: 'Missing required field: metadata.diagramIndex', path: 'metadata.diagramIndex' });
   }
-  if (!Array.isArray(obj.tree)) {
+  if (!validTree(obj.tree)) {
     errors.push({ message: 'Missing required field: tree', path: 'tree' });
   }
-  if (!obj.sharedElements || typeof obj.sharedElements !== 'object') {
+  if (!isRecord(obj.sharedElements)) {
     errors.push({ message: 'Missing required field: sharedElements', path: 'sharedElements' });
   }
   return errors;
@@ -178,7 +229,7 @@ export const ProjectFileParser = {
     if (!jsonResult.success) return jsonResult;
 
     const obj = jsonResult.data as Record<string, unknown>;
-    if (!obj.diagrams || typeof obj.diagrams !== 'object') {
+    if (!isRecord(obj.diagrams)) {
       return {
         success: false,
         errors: [{ message: 'Missing required field: diagrams', path: 'diagrams' }],
@@ -211,11 +262,27 @@ export const ProjectFileParser = {
     const obj = jsonResult.data as Record<string, unknown>;
     const validationErrors = validateMetadata(obj);
 
-    if (!obj.diagrams || typeof obj.diagrams !== 'object') {
+    if (!isRecord(obj.diagrams)) {
       validationErrors.push({
         message: 'Missing required field: diagrams',
         path: 'diagrams',
       });
+    }
+
+    if (isRecord(obj.diagrams)) {
+      for (const [id, diagram] of Object.entries(obj.diagrams)) {
+        if (!validateDiagram(diagram, id)) {
+          validationErrors.push({ message: `Invalid diagram: ${id}`, path: `diagrams.${id}` });
+        }
+      }
+    }
+
+    if (obj.diagramTexts !== undefined && (
+      obj.diagramTexts === null || typeof obj.diagramTexts !== 'object'
+      || Array.isArray(obj.diagramTexts)
+      || Object.values(obj.diagramTexts).some((text) => typeof text !== 'string')
+    )) {
+      validationErrors.push({ message: 'diagramTexts must contain text drafts', path: 'diagramTexts' });
     }
 
     if (validationErrors.length > 0) {
@@ -229,6 +296,7 @@ export const ProjectFileParser = {
         tree: obj.tree as ProjectTreeNode[],
         sharedElements: obj.sharedElements as Record<string, DiagramElement>,
         diagrams: obj.diagrams as Record<string, DiagramData>,
+        ...(obj.diagramTexts !== undefined ? { diagramTexts: obj.diagramTexts as Record<string, string> } : {}),
       },
     };
   },

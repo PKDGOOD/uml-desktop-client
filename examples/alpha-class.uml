@@ -1,0 +1,23 @@
+@class-diagram "주문 서비스 - class acceptance"
+// Synthetic design; no company data.
+class Order @pos(40, 40) @size(260, 180) {
+  - id: String
+  + cancel(reason: String): void
+}
+class OrderItem @pos(380, 40) @size(220, 140) {
+  - quantity: int
+}
+interface PaymentGateway @pos(40, 300) @size(240, 120) {
+  + refund(orderId: String): boolean
+}
+abstract class BaseOrder @pos(380, 300) @size(220, 120) {
+  # validate(): boolean
+}
+enum OrderStatus @pos(700, 40) @size(180, 140) {
+  PENDING
+  CANCELED
+}
+Order "1" --* "1..*" OrderItem : contains
+Order --|> BaseOrder
+Order ..> PaymentGateway : refund after cancellation
+Order ..> OrderStatus

@@ -1,0 +1,18 @@
+@activity-diagram "취소 처리 - activity acceptance"
+initial-node Start @pos(50, 40)
+action ReceiveRequest @pos(50, 120)
+decision Cancelable @pos(80, 240)
+fork ParallelWork @pos(260, 300)
+action Refund @pos(240, 400)
+action Notify @pos(490, 400)
+join CompleteWork @pos(300, 550)
+final-node End @pos(380, 640)
+Start --> ReceiveRequest
+ReceiveRequest --> Cancelable
+Cancelable --> ParallelWork : allowed - 취소 가능
+ParallelWork --> Refund
+ParallelWork --> Notify
+Refund --> CompleteWork
+Notify --> CompleteWork
+CompleteWork --> End
+Cancelable --> End : rejected

@@ -6,7 +6,7 @@ import peggy from 'peggy';
 import type { DiagramData, DSLParseResult, DSLError } from '../../types';
 
 // Import the grammar as a raw string
-import { umlGrammar } from './grammarSource';
+import umlGrammar from './uml.pegjs?raw';
 
 let cachedParser: peggy.Parser | null = null;
 
@@ -46,7 +46,7 @@ export function parseDSL(text: string): DSLParseResult {
 
   try {
     const parser = getParser();
-    const diagram: DiagramData = parser.parse(trimmed);
+    const diagram: DiagramData = parser.parse(text);
     return { success: true, diagram };
   } catch (err: unknown) {
     if (isPeggySyntaxError(err)) {

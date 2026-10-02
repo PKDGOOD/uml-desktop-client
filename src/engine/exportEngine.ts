@@ -1,3 +1,4 @@
+import { connectorGeometry } from './connectorGeometry';
 // =============================================================================
 // Export Engine - PNG, SVG, PDF export from DiagramData
 // =============================================================================
@@ -43,6 +44,10 @@ function computeBounds(diagram: DiagramData): {
     maxX = Math.max(maxX, el.position.x + el.size.width);
     maxY = Math.max(maxY, el.position.y + el.size.height);
   }
+  for (const connector of diagram.connectors) for (const point of connector.waypoints ?? []) {
+    minX = Math.min(minX, point.x); minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x); maxY = Math.max(maxY, point.y);
+  }
   return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
 }
 
@@ -66,6 +71,10 @@ function renderElementSVG(el: DiagramElement, offsetX: number, offsetY: number):
   const name = escapeXml(el.properties.name);
 
   switch (el.type) {
+    case 'lifeline':
+      return `<rect x="${x}" y="${y}" width="${width}" height="40" fill="#f1f8e9" stroke="#333" />
+        <text x="${x + width / 2}" y="${y + 24}" text-anchor="middle" font-size="12">${name}</text>
+        <line x1="${x + width / 2}" y1="${y + 40}" x2="${x + width / 2}" y2="${y + height}" stroke="#333" stroke-dasharray="7,5" />`;
     case 'class':
     case 'abstract-class':
     case 'interface':
@@ -97,7 +106,7 @@ function renderElementSVG(el: DiagramElement, offsetX: number, offsetY: number):
       }
       for (const m of methods) {
         const vis = m.visibility === 'public' ? '+' : m.visibility === 'private' ? '-' : '#';
-        lines.push(`<text x="${x + 4}" y="${attrY}" font-size="10">${escapeXml(`${vis} ${m.name}(): ${m.returnType}`)}</text>`);
+        lines.push(`<text x="${x + 4}" y="${attrY}" font-size="10">${escapeXml(`${vis} ${m.name}(${m.parameters.map((p) => `${p.name}: ${p.type}`).join(', ')}): ${m.returnType}`)}</text>`);
         attrY += 14;
       }
       return lines.join('\n');
@@ -168,19 +177,18 @@ function renderElementSVG(el: DiagramElement, offsetX: number, offsetY: number):
   }
 }
 
-function renderConnectorSVG(conn: Connector, elements: DiagramElement[], offsetX: number, offsetY: number): string {
+function renderConnectorSVG(conn: Connector, elements: DiagramElement[], offsetX: number, offsetY: number, sequenceIndex?: number): string {
   const source = elements.find((e) => e.id === conn.sourceId);
   const target = elements.find((e) => e.id === conn.targetId);
   if (!source || !target) return '';
 
-  const sx = source.position.x + source.size.width / 2 - offsetX;
-  const sy = source.position.y + source.size.height / 2 - offsetY;
-  const tx = target.position.x + target.size.width / 2 - offsetX;
-  const ty = target.position.y + target.size.height / 2 - offsetY;
+  const geometry = connectorGeometry(conn, elements, sequenceIndex)!;
+  const sx = geometry.source.x - offsetX, sy = geometry.source.y - offsetY;
+  const tx = geometry.target.x - offsetX, ty = geometry.target.y - offsetY;
 
   const points: string[] = [`${sx},${sy}`];
-  if (conn.waypoints) {
-    for (const wp of conn.waypoints) {
+  if (geometry.waypoints) {
+    for (const wp of geometry.waypoints) {
       points.push(`${wp.x - offsetX},${wp.y - offsetY}`);
     }
   }
@@ -190,8 +198,11 @@ function renderConnectorSVG(conn: Connector, elements: DiagramElement[], offsetX
     ['dependency', 'usage', 'realization', 'return-message', 'include', 'extend'].includes(conn.type);
   const dashAttr = isDashed ? ' stroke-dasharray="6,3"' : '';
 
+  const marker = conn.type === 'association' ? ''
+    : ['composition', 'aggregation'].includes(conn.type) ? ` marker-start="url(#${conn.type})"`
+    : ` marker-end="url(#${['inheritance', 'realization'].includes(conn.type) ? 'triangle' : 'arrowhead'})"`;
   const lines: string[] = [];
-  lines.push(`<polyline points="${points.join(' ')}" fill="none" stroke="#333" stroke-width="1"${dashAttr} marker-end="url(#arrowhead)" />`);
+  lines.push(`<polyline points="${points.join(' ')}" fill="none" stroke="#333" stroke-width="1"${dashAttr}${marker} />`);
 
   // Label
   if (conn.label) {
@@ -222,12 +233,17 @@ function buildSVGString(diagram: DiagramData, options: Required<ExportOptions>):
   const parts: string[] = [];
   parts.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}">`);
   parts.push(`<defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#333" /></marker></defs>`);
+  parts.push(`<defs>
+    <marker id="triangle" markerWidth="12" markerHeight="12" refX="11" refY="6" orient="auto"><path d="M 1 1 L 11 6 L 1 11 Z" fill="white" stroke="#333" /></marker>
+    <marker id="composition" markerWidth="16" markerHeight="12" refX="1" refY="6" orient="auto"><path d="M 1 6 L 8 1 L 15 6 L 8 11 Z" fill="#333" stroke="#333" /></marker>
+    <marker id="aggregation" markerWidth="16" markerHeight="12" refX="1" refY="6" orient="auto"><path d="M 1 6 L 8 1 L 15 6 L 8 11 Z" fill="white" stroke="#333" /></marker>
+  </defs>`);
   parts.push(`<rect width="100%" height="100%" fill="${escapeXml(backgroundColor)}" />`);
 
   // Render connectors first (behind elements)
-  for (const conn of diagram.connectors) {
-    parts.push(renderConnectorSVG(conn, diagram.elements, offsetX, offsetY));
-  }
+  diagram.connectors.forEach((conn, index) => {
+    parts.push(renderConnectorSVG(conn, diagram.elements, offsetX, offsetY, diagram.type === 'sequence' ? index : undefined));
+  });
 
   // Render elements
   for (const el of diagram.elements) {
@@ -309,26 +325,4 @@ export const ExportEngine = {
     }
   },
 
-  /**
-   * Export diagram as PDF data URL.
-   * Uses SVG embedded in a simple PDF structure.
-   * For a production app, use jsPDF; here we generate a minimal PDF with SVG.
-   */
-  async exportPDF(diagram: DiagramData, options?: ExportOptions): Promise<string> {
-    if (!diagram) {
-      throw new Error('Export failed: No diagram data provided');
-    }
-    if (diagram.elements.length === 0) {
-      throw new Error('Export failed: Diagram has no elements to export');
-    }
-    try {
-      // Generate PNG first, then embed in a simple PDF-like data URL
-      const pngDataUrl = await ExportEngine.exportPNG(diagram, options);
-      // Return the PNG data URL as a fallback PDF representation
-      // In production, jsPDF would be used here
-      return pngDataUrl;
-    } catch (err) {
-      throw new Error(`PDF export failed: ${(err as Error).message}`);
-    }
-  },
 };
