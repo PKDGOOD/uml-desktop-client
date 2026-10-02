@@ -44,10 +44,14 @@ function computeBounds(diagram: DiagramData): {
     maxX = Math.max(maxX, el.position.x + el.size.width);
     maxY = Math.max(maxY, el.position.y + el.size.height);
   }
-  for (const connector of diagram.connectors) for (const point of connector.waypoints ?? []) {
-    minX = Math.min(minX, point.x); minY = Math.min(minY, point.y);
-    maxX = Math.max(maxX, point.x); maxY = Math.max(maxY, point.y);
-  }
+  diagram.connectors.forEach((connector, index) => {
+    const geometry = connectorGeometry(connector, diagram.elements, diagram.type === 'sequence' ? index : undefined);
+    if (!geometry) return;
+    for (const point of [geometry.source, ...geometry.waypoints, geometry.target]) {
+      minX = Math.min(minX, point.x); minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x); maxY = Math.max(maxY, point.y);
+    }
+  });
   return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
 }
 
