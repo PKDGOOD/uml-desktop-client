@@ -50,7 +50,7 @@
     "fast-check": "^4.6.0",
     "typescript": "^6.0.2",
     "vite": "^8.0.8",
-    "vite-plugin-electron": "^0.29.1",
+    "vite-plugin-electron": "^1.1.2",
     "vite-plugin-electron-renderer": "^0.14.6",
     "vitest": "^4.1.3"
   },
