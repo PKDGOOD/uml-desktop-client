@@ -1,10 +1,18 @@
 # Contributing to UML Studio
 
-Thank you for helping improve the editor. Read the [Code of Conduct](CODE_OF_CONDUCT.md) and [known limitations](docs/known-limitations.md) before getting started. English is the shared language for project documentation and review; Korean reports are also welcome. Clear reproductions matter more than polished language.
+Thank you for helping improve the editor. Read the [Code of Conduct](CODE_OF_CONDUCT.md) and [known limitations](docs/known-limitations.md) before getting started. Clear reproductions matter more than polished language; see the [language policy](#language-policy).
 
 ## Choose a contribution
 
 Check [open issues](https://github.com/PKDGOOD/uml-desktop-client/issues) and the [roadmap](docs/roadmap.md). Small bug fixes, accessibility improvements, examples, and documentation are welcome. Discuss new features, file-format changes, dependency replacements, or broad refactors in an issue first. Do not post security exploit details publicly; use [SECURITY.md](SECURITY.md).
+
+## Language policy
+
+English is the canonical language of this project:
+
+- Code, comments, test names, commit messages, issues, pull requests and canonical documentation are written in English.
+- Korean translations live under [docs/ko/](docs/ko/README.md) and mirror the English paths. They may lag behind; when they disagree, the English version wins. Update or flag the matching translation when you change a translated document.
+- Korean is welcome in issue reports when it is easier for you, and as intentional test data (for example, Unicode project and diagram names).
 
 ## Set up
 
