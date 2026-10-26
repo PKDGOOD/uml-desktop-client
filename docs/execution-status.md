@@ -21,7 +21,7 @@ Updated: **2026-09-27**. This is the live ledger for the [145-task backlog](atom
 | A01.11 | Done | macOS packaged create/paste/save/new-process/open/resave/SVG harness verifies actual disk content. Native picker answers are stubbed. |
 | A07.03 | Done | Browser download requests retain unsaved revision and show an explicit verification notice; ordinary packaged regression checks the blocked-download case. |
 | A01.12 | Ready | Review and split the preserved mixed working tree into baseline commits; no commit/push was made by this batch. |
-| A02.01 | Ready | Next implementation: decide the versioned file envelope and reject/migrate policy using F4 cases. |
+| A02.01 | Review | [ADR 0001](decisions/0001-project-file-envelope.md) proposes the schema-2 envelope: integer `schemaVersion` separate from informational writer version, `project.id`, `textStatus` invalid-draft marker, derived diagram index, ID/reference rules and an ordered reject/migrate table with valid, legacy, future and malformed examples. Awaiting maintainer acceptance. |
 | A01.13 | Planned | Needs A01.12 and actual remote CI evidence. |
 
 Every task not named above remains **Planned**. **12 of 145 local tasks are Done**, including reproduction tasks, not 12 shipped features. G0 (local baseline) is satisfied; M0 is still incomplete until baseline commits and remote CI are verified. G1–G4 remain unmet. Current validation: **21 test files, 289 passing tests and 7 explicitly expected failures**; typecheck, repository checks, notices, bundle/package and the fixed packaged smoke passed.
@@ -32,7 +32,7 @@ A07.03 now depends on A01.09 only. Its former A02.08 dependency was unnecessary:
 
 ## Next sequence
 
-1. A02.01: file envelope/version/compatibility ADR with valid, legacy, future and malformed examples.
+1. A02.01: maintainer review of [ADR 0001](decisions/0001-project-file-envelope.md); A02.02 and A02.03 can start once it is accepted.
 2. A02.02–A02.03: identity/containment/message-order decisions, then model fields and migration leaves in dependency order.
 3. A03/A04: convert the seven expected failures to ordinary passing regressions as their linked fixes land.
 4. A01.12–A01.13 can proceed independently with maintainer review and private CI; they do not require publishing the repository.
