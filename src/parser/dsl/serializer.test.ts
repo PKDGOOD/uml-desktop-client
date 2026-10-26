@@ -485,12 +485,13 @@ describe('serializeDSL - roundtrip', () => {
     expect(serializeDSL(result.diagram)).toBe(dsl);
   });
 
-  it('omits unset stereotype and visibility from class declarations', () => {
+  it('omits unset or unknown stereotype and visibility from class declarations', () => {
     const dsl = serializeDSL(makeDiagram({
       type: 'class',
       name: 'Plain',
-      elements: [makeElement({ type: 'class', properties: { name: 'Order', stereotype: '  ' } })],
+      elements: [makeElement({ type: 'class', properties: { name: 'Order', stereotype: '  ', visibility: 'internal' as never } })],
     }));
+    expect(parseDSL(dsl).success).toBe(true);
     expect(dsl).toContain('class Order @pos(100, 200)');
     expect(dsl).not.toContain('<<');
   });

@@ -115,7 +115,8 @@ function serializeClassElements(
   for (const el of elements) {
     const name = formatName(el.properties.name);
     const ann = formatAnnotations(el);
-    const vis = el.properties.visibility ? `${visibilityMarker[el.properties.visibility]} ` : '';
+    const visMarker = el.properties.visibility ? visibilityMarker[el.properties.visibility] : undefined;
+    const vis = visMarker ? `${visMarker} ` : '';
     const stereo = formatStereotype(el.properties.stereotype);
 
     switch (el.type) {
