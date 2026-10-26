@@ -1,6 +1,6 @@
 # ADR 0001: Versioned project file envelope and compatibility policy
 
-- Status: **Proposed** (A02.01; awaiting maintainer review)
+- Status: **Accepted** (A02.01; maintainer accepted 2026-10-27, including unknown-key rejection and the first-save legacy ID)
 - Date: 2026-10-27
 - Backlog: [A02.01](../atomic-execution-plan.md) · Contracts: [P-05, P-06, AC-05, AC-14](../product-spec.md)
 - Inputs: A01.03 capability matrix and A01.08 invalid-file reproductions (F4a–F4d) in the [baseline report](../reviews/2026-09-27-execution-baseline.md)

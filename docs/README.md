@@ -11,7 +11,7 @@
 - [Public alpha execution plan: milestones, work packages and release gates](public-alpha-plan.md)
 - [Atomic execution backlog: 145 tasks with dependencies and completion evidence](atomic-execution-plan.md) ([Korean](ko/atomic-execution-plan.md))
 - [Execution status and current evidence](execution-status.md)
-- [Architecture decision records](decisions/0001-project-file-envelope.md): project file envelope and compatibility (proposed)
+- [Architecture decision records](decisions/0001-project-file-envelope.md): project file envelope and compatibility
 - [Baseline, known-failure and packaged test procedures](testing.md)
 - [Contribution guide](../CONTRIBUTING.md)
 - [Security](../SECURITY.md), [support](../SUPPORT.md), and [governance](../GOVERNANCE.md)
