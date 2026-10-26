@@ -72,7 +72,7 @@ beforeAll(() => {
 
 describe('OPEN readiness defects: expected failures are NOT supported behavior', () => {
   // Remove .fails in the linked fix task; unexpected success deliberately turns red.
-  it.fails('F1 / A01.05 → A04.04: preserve GUI properties after text whitespace edits', () => {
+  it('F1 / A01.05 → A04.04: preserve GUI properties after text whitespace edits', () => {
     expect(propertiesAfterText).toMatchObject({ stereotype: 'entity', visibility: 'private' });
   });
   it.fails('F2 / A01.06 → A04.07: keep Outside at top level after serialization', () => {

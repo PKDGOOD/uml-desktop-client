@@ -22,6 +22,19 @@ it('reports error lines relative to the original text including leading blank li
 // =============================================================================
 
 describe('parseDSL - class diagram', () => {
+  it('parses optional element visibility and stereotype on class declarations', () => {
+    const result = parseDSL('@class-diagram "Meta"\n- class Order <<entity>> @pos(10, 20) {\n}\ninterface Repo << repository >> {\n}\nclass Plain {\n}\n');
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const [order, repo, plain] = result.diagram.elements;
+    expect(order.properties).toMatchObject({ name: 'Order', stereotype: 'entity', visibility: 'private' });
+    expect(order.position).toEqual({ x: 10, y: 20 });
+    expect(repo.properties).toMatchObject({ stereotype: 'repository' });
+    expect(repo.properties.visibility).toBeUndefined();
+    expect(plain.properties).not.toHaveProperty('stereotype');
+    expect(plain.properties).not.toHaveProperty('visibility');
+  });
+
   it('parses a class with attributes and methods', () => {
     const dsl = `@class-diagram "주문 시스템"
 

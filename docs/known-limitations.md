@@ -6,7 +6,7 @@ The following issues were identified in the [2026-09-26 review](reviews/2026-09-
 
 | ID | Problem | Consequence |
 | --- | --- | --- |
-| F1 | Stereotype/element visibility are not preserved by DSL round trips | Editing text can discard properties set in the UI |
+| F1 — fixed | Stereotype/element visibility are now written to the DSL (`- class Order <<entity>> { ... }`) and survive text round trips | Text edits no longer discard these UI properties; stereotypes containing `<`, `>` or line breaks are still not representable |
 | F2 | Nested ownership is inferred from flat element order | A top-level state can move inside a composite state |
 | F3 | Property editing can generate invalid DSL without reporting errors | A project may appear valid until it is reopened |
 | F4 | Duplicate IDs, unresolved endpoints, tree/index consistency, and future versions are not fully validated | Invalid projects may be accepted and connectors hidden |
@@ -14,7 +14,7 @@ The following issues were identified in the [2026-09-26 review](reviews/2026-09-
 | F6 | IPC, approved paths, CSP, and navigation need hardening | Renderer compromise is not sufficiently contained |
 | F7 | Dependency audit has unresolved findings | Runtime and build-chain exposure need individual triage and updates |
 
-F1–F4 have seven explicit expected-failure engine tests and remain open. F5 was reproduced and corrected through the actual renderer save handler. F6 remains based on code inspection, not an exploit test. Audit totals change over time; run the audit workflow instead of treating the historical count as current.
+F1 is now an ordinary regression test. F2–F4 have six explicit expected-failure engine tests and remain open. F5 was reproduced and corrected through the actual renderer save handler. F6 remains based on code inspection, not an exploit test. Audit totals change over time; run the audit workflow instead of treating the historical count as current.
 
 Additional gaps include automatic crash recovery, file conflict detection, snapshot retention/quotas, enforced input limits, measured GUI capacity, and externally trusted signing/notarization. A macOS class-diagram packaged save/restart/reopen smoke now passes with picker answers stubbed; native-dialog usability and the full five-type acceptance flow remain unverified. A passing CI build is not evidence that these risks are resolved.
 

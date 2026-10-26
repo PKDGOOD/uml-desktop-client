@@ -70,6 +70,13 @@ function formatName(name: string): string {
   return JSON.stringify(name);
 }
 
+/** Format a stereotype as ` <<name>>`; empty or unrepresentable values are omitted */
+function formatStereotype(stereotype: string | undefined): string {
+  const value = stereotype?.trim();
+  if (!value || /[<>\r\n]/.test(value)) return '';
+  return ` <<${value}>>`;
+}
+
 /** Format @pos and @size annotations */
 function formatAnnotations(el: DiagramElement): string {
   const parts: string[] = [];
@@ -108,25 +115,27 @@ function serializeClassElements(
   for (const el of elements) {
     const name = formatName(el.properties.name);
     const ann = formatAnnotations(el);
+    const vis = el.properties.visibility ? `${visibilityMarker[el.properties.visibility]} ` : '';
+    const stereo = formatStereotype(el.properties.stereotype);
 
     switch (el.type) {
       case 'class':
-        lines.push(`class ${name}${ann} {`);
+        lines.push(`${vis}class ${name}${stereo}${ann} {`);
         serializeClassBody(el, lines);
         lines.push('}');
         break;
       case 'abstract-class':
-        lines.push(`abstract class ${name}${ann} {`);
+        lines.push(`${vis}abstract class ${name}${stereo}${ann} {`);
         serializeClassBody(el, lines);
         lines.push('}');
         break;
       case 'interface':
-        lines.push(`interface ${name}${ann} {`);
+        lines.push(`${vis}interface ${name}${stereo}${ann} {`);
         serializeClassBody(el, lines);
         lines.push('}');
         break;
       case 'enum':
-        lines.push(`enum ${name}${ann} {`);
+        lines.push(`${vis}enum ${name}${stereo}${ann} {`);
         if (el.properties.attributes) {
           for (const attr of el.properties.attributes) {
             lines.push(`  ${attr.name}`);
