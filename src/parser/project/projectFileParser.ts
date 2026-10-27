@@ -97,7 +97,7 @@ function findUnexpectedTokenPosition(content: string, token: string): number {
   return -1;
 }
 
-function tryParseJson(content: string): ProjectFileParseResult<unknown> {
+export function tryParseJson(content: string): ProjectFileParseResult<unknown> {
   try {
     const data: unknown = JSON.parse(content);
     if (data === null || typeof data !== 'object' || Array.isArray(data)) {
@@ -112,7 +112,7 @@ function tryParseJson(content: string): ProjectFileParseResult<unknown> {
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
@@ -131,7 +131,7 @@ function validMembers(properties: Record<string, unknown>): boolean {
         isRecord(parameter) && typeof parameter.name === 'string' && typeof parameter.type === 'string'))));
 }
 
-function validateDiagram(value: unknown, id: string): boolean {
+export function validateDiagram(value: unknown, id: string): boolean {
   if (!isRecord(value) || value.id !== id || typeof value.name !== 'string'
     || !['class', 'sequence', 'usecase', 'activity', 'state'].includes(String(value.type))
     || !Array.isArray(value.elements) || !Array.isArray(value.connectors)
@@ -152,7 +152,7 @@ function validateDiagram(value: unknown, id: string): boolean {
       && (connector.label === undefined || typeof connector.label === 'string'));
 }
 
-function validTree(nodes: unknown): boolean {
+export function validTree(nodes: unknown): boolean {
   return Array.isArray(nodes) && nodes.every((node) => isRecord(node)
     && typeof node.id === 'string' && typeof node.name === 'string'
     && (node.type === 'folder' || node.type === 'diagram')

@@ -24,9 +24,10 @@ Updated: **2026-10-27**. This is the live ledger for the [145-task backlog](atom
 | A02.01 | Done | [ADR 0001](decisions/0001-project-file-envelope.md) proposes the schema-2 envelope: integer `schemaVersion` separate from informational writer version, `project.id`, `textStatus` invalid-draft marker, derived diagram index, ID/reference rules and an ordered reject/migrate table with valid, legacy, future and malformed examples. Accepted by the maintainer, including unknown-key rejection and the first-save legacy ID. |
 | A02.02 | Review | [ADR 0002](decisions/0002-dsl-identity-and-source-edits.md) proposes name-keyed element identity, inspector-only identity-preserving rename, quoting/escaping, source spans, two-pass connector matching and diagnostics for ambiguous input. Awaiting maintainer acceptance. |
 | A02.03 | Done | `DiagramElement.parentId` (absent = top level) and sequence `Connector.messageOrder` (1..n) in `src/types/index.ts`. Detached fixtures in `src/types/structureFixtures.ts` deliberately mislead array-order readers (F2 shape, a use case after a boundary, shuffled messages); tests match the A01.04 ownership/label oracle and survive a project file round trip. Parser, serializer, canvas and validation do not read the fields yet (A04.07, A04.08, A03.05). |
+| A02.04 | Done | `src/parser/project/projectFileCodec.ts` encodes/decodes the ADR 0001 envelope into a `ProjectDocument` (new types in `src/types/index.ts`). Tests round-trip IDs, `invalid` drafts with their text, last valid models, `parentId`/`messageOrder`, viewport, waypoints, tree `expanded` and shared elements; the ADR example opens; future/non-integer versions, other formats, missing `project.id`/`writer`, bad `textStatus` and legacy files are refused. Not wired into Save/Open (A02.08). Unknown-key rejection, tree/diagram consistency and reference rules remain A03.01/A03.08; legacy migration remains A02.06. |
 | A01.13 | Planned | Needs A01.12 and actual remote CI evidence. |
 
-Every task not named above remains **Planned**. **13 of 145 local tasks are Done**, including reproduction tasks, not 12 shipped features. G0 (local baseline) is satisfied; M0 is still incomplete until baseline commits and remote CI are verified. G1–G4 remain unmet. Current validation: **22 test files, 297 passing tests and 7 explicitly expected failures**; `npm run check` and `npm run build:app` passed after A02.03. Notices, package and the packaged smoke were last run at the A01 baseline.
+Every task not named above remains **Planned**. **14 of 145 local tasks are Done**, including reproduction tasks, not 14 shipped features. G0 (local baseline) is satisfied; M0 is still incomplete until baseline commits and remote CI are verified. G1–G4 remain unmet. Current validation: **23 test files, 312 passing tests and 7 explicitly expected failures**; `npm run check` and `npm run build:app` passed after A02.04. Notices, package and the packaged smoke were last run at the A01 baseline.
 
 ## Dependency correction
 
@@ -35,7 +36,7 @@ A07.03 now depends on A01.09 only. Its former A02.08 dependency was unnecessary:
 ## Next sequence
 
 1. Maintainer review of ADR 0002 (A02.02).
-2. A02.04 (schema-2 codec), unblocked by ADR 0001 and A02.03; then A02.05–A02.08 in dependency order.
+2. A02.05 (session boundary) and A02.06 (legacy migration), both unblocked by A02.04; then A02.07–A02.08.
 3. A03/A04: convert the seven expected failures to ordinary passing regressions as their linked fixes land.
 4. A01.12–A01.13 can proceed independently with maintainer review and private CI; they do not require publishing the repository.
 

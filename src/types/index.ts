@@ -181,6 +181,37 @@ export interface ProjectData {
   diagramTexts?: Record<string, string>;
 }
 
+// --- Project File, schema 2 (ADR 0001) ---
+
+/** `in-sync`: `text` parsed to `model`. `invalid`: `text` is a draft and `model` is the last valid one. */
+export type TextStatus = 'in-sync' | 'invalid';
+
+export interface DiagramDocument {
+  model: DiagramData;
+  text: string;
+  textStatus: TextStatus;
+}
+
+export interface ProjectIdentity {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** In-memory content of a schema-2 file; `format`, `schemaVersion` and `writer` belong to the file only. */
+export interface ProjectDocument {
+  project: ProjectIdentity;
+  tree: ProjectTreeNode[];
+  diagrams: Record<string, DiagramDocument>;
+  sharedElements: Record<string, DiagramElement>;
+}
+
+export interface ProjectFileWriter {
+  app: string;
+  version: string;
+}
+
 // --- DSL Parser ---
 
 export type DSLParseResult =
