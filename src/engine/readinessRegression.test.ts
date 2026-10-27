@@ -78,7 +78,7 @@ describe('OPEN readiness defects: expected failures are NOT supported behavior',
   it.fails('F2 / A01.06 → A04.07: keep Outside at top level after serialization', () => {
     expect(serializedContainment.split('\n').some((line) => /^state Outside(?:\s|$)/.test(line))).toBe(true);
   });
-  it.fails('F3 / A01.07 → A03.07: reject an invalid member command before commit', () => {
+  it('F3 / A01.07 → A03.07: reject an invalid member command before commit', () => {
     expect(invalidCommandAccepted).toBe(false);
   });
   for (const name of ['duplicate element ID', 'missing connector endpoint', 'tree/index mismatch', 'future file version']) {
