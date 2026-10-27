@@ -235,18 +235,21 @@ export class SyncEngine {
       };
 
       const newDiagram = applyChange(this.currentDiagram, change);
+      const newText = serializeDSL(newDiagram);
+      // Reject commands whose result the DSL cannot represent, before touching state or history.
+      if (!parseDSL(newText).success) return false;
 
       if (this.undoManager) {
         const diagramForUndo = deepClone(newDiagram);
         const oldDiagramCopy = deepClone(oldDiagram);
         const command: Command = {
           description: `Canvas: ${change.type}`,
-          execute: () => this.restore(diagramForUndo, serializeDSL(diagramForUndo)),
+          execute: () => this.restore(diagramForUndo, newText),
           undo: () => this.restore(oldDiagramCopy, oldText),
         };
         this.undoManager.execute(command);
       } else {
-        this.restore(newDiagram, serializeDSL(newDiagram));
+        this.restore(newDiagram, newText);
       }
       return true;
     } finally {

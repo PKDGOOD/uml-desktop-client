@@ -486,7 +486,10 @@ const App: React.FC = () => {
   const handleCanvasChange = useCallback((change: CanvasChange) => {
     const id = useProjectStore.getState().activeDiagramId;
     if (id && !workspaceRef.current?.editCanvas(id, change)) {
-      setFileNotice({ text: 'Fix the DSL errors before editing the canvas. Your draft can still be saved.', error: true });
+      const draftHasErrors = (workspaceRef.current?.getSession(id)?.sync.getErrors().length ?? 0) > 0;
+      setFileNotice({ text: draftHasErrors
+        ? 'Fix the DSL errors before editing the canvas. Your draft can still be saved.'
+        : 'This change cannot be written as valid DSL (check names for spaces or special characters), so it was not applied.', error: true });
       refreshWorkspace();
     }
   }, [refreshWorkspace]);

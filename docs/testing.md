@@ -22,7 +22,7 @@ npm run test:readiness
 npm run qa:baseline
 ```
 
-`test:readiness` runs five positive fixture tests and six named `it.fails` regressions for open F2–F4 defects, plus the F1 regression that now passes. Vitest reports expected failures separately. They are included in the regular suite so an unexpected pass requires converting the relevant test to an ordinary regression. Do not add blanket skips/retries. Reproduction completion is not defect resolution.
+`test:readiness` runs five positive fixture tests and five named `it.fails` regressions for open F2 and F4 defects, plus the F1 and F3 regressions that now pass. Vitest reports expected failures separately. They are included in the regular suite so an unexpected pass requires converting the relevant test to an ordinary regression. Do not add blanket skips/retries. Reproduction completion is not defect resolution.
 
 `qa:baseline` measures the actual headless parser/serializer/SVG engine with synthetic 200/300 and 1,000/2,000 element/connector diagrams, plus a 20-diagram project. It records runtime/machine, byte counts, warm p95 and engine bundle hash in ignored `.artifacts.local/engine-baseline-*/metrics.json`. This is not a browser FPS, GUI response-time or native file benchmark.
 
