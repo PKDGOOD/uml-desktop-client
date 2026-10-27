@@ -12,7 +12,7 @@ Updated: **2026-09-27**. This is the live ledger for the [145-task backlog](atom
 | A01.02 | Done | Node 24.21.0: original 284 tests, notices and macOS package passed; initial fingerprint and exact command results retained. |
 | A01.03 | Done | Five-type capability matrix separates engine evidence, packaged evidence, failures and unverified operations; alpha support assumptions and pending release resources listed. |
 | A01.04 | Done | Five synthetic DSL fixtures plus independent names/types/endpoints/order/ownership expectations; five parser/project round-trip tests. |
-| A01.05 | Done | F1 property loss reproduced as an explicit expected failure. Fix remains A04.04. |
+| A01.05 | Done | F1 property loss reproduced as an explicit expected failure; the regression now passes after class DSL gained element visibility and stereotype syntax. In-place patching for A04.04 remains open. |
 | A01.06 | Done | F2 external-state containment regression reproduced as an explicit expected failure. Fix remains A04.07. |
 | A01.07 | Done | F3 invalid member command reproduced as an explicit expected failure. Fix remains A03.07. |
 | A01.08 | Done | Four independent F4 invalid-project acceptances reproduced as expected failures. Fix remains A03.08. |

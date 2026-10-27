@@ -455,6 +455,47 @@ describe('serializeDSL - roundtrip', () => {
     expect(conn.label).toBe('has');
   });
 
+  it('class diagram roundtrip preserves element stereotype and visibility', () => {
+    const elements: DiagramElement[] = (['class', 'abstract-class', 'interface', 'enum'] as const).map((type, index) =>
+      makeElement({
+        id: `el_${index}`,
+        type,
+        position: { x: 50 + index * 250, y: 50 },
+        properties: {
+          name: `Item${index}`,
+          stereotype: 'entity',
+          visibility: (['public', 'private', 'protected', 'package'] as const)[index],
+          attributes: type === 'enum' ? [{ name: 'A', type: '', visibility: 'public' }] : [],
+          methods: [],
+        },
+      }),
+    );
+    const dsl = serializeDSL(makeDiagram({ type: 'class', name: 'Meta', elements }));
+    expect(dsl).toContain('- abstract class Item1 <<entity>> @pos(300, 50)');
+
+    const result = parseDSL(dsl);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.diagram.elements.map((e) => [e.type, e.properties.stereotype, e.properties.visibility])).toEqual([
+      ['class', 'entity', 'public'],
+      ['abstract-class', 'entity', 'private'],
+      ['interface', 'entity', 'protected'],
+      ['enum', 'entity', 'package'],
+    ]);
+    expect(serializeDSL(result.diagram)).toBe(dsl);
+  });
+
+  it('omits unset or unknown stereotype and visibility from class declarations', () => {
+    const dsl = serializeDSL(makeDiagram({
+      type: 'class',
+      name: 'Plain',
+      elements: [makeElement({ type: 'class', properties: { name: 'Order', stereotype: '  ', visibility: 'internal' as never } })],
+    }));
+    expect(parseDSL(dsl).success).toBe(true);
+    expect(dsl).toContain('class Order @pos(100, 200)');
+    expect(dsl).not.toContain('<<');
+  });
+
   it('sequence diagram roundtrip', () => {
     const original = makeDiagram({
       type: 'sequence',

@@ -36,6 +36,13 @@
     }
   }
 
+  function classifierProperties(name, visibility, stereotype, rest) {
+    const properties = { name };
+    if (stereotype) properties.stereotype = stereotype;
+    if (visibility) properties.visibility = visibility;
+    return Object.assign(properties, rest);
+  }
+
   function defaultPos(index) {
     return { x: 50 + (index % 4) * 250, y: 50 + Math.floor(index / 4) * 200 };
   }
@@ -158,7 +165,7 @@ Annotations
 // ============ Class Diagram Elements ============
 
 ClassDef
-  = "class" S name:IdentifierOrQuoted ann:Annotations _ "{" _ NL members:MemberLine* _ "}" {
+  = vis:ElementVisibility? "class" S name:IdentifierOrQuoted stereo:StereotypeAnnotation? ann:Annotations _ "{" _ NL members:MemberLine* _ "}" {
       const attrs = [];
       const methods = [];
       for (const m of members) {
@@ -171,12 +178,12 @@ ClassDef
         type: 'class',
         position: ann.position,
         size: ann.size,
-        properties: { name, attributes: attrs, methods },
+        properties: classifierProperties(name, vis, stereo, { attributes: attrs, methods }),
       };
     }
 
 AbstractClassDef
-  = "abstract" S "class" S name:IdentifierOrQuoted ann:Annotations _ "{" _ NL members:MemberLine* _ "}" {
+  = vis:ElementVisibility? "abstract" S "class" S name:IdentifierOrQuoted stereo:StereotypeAnnotation? ann:Annotations _ "{" _ NL members:MemberLine* _ "}" {
       const attrs = [];
       const methods = [];
       for (const m of members) {
@@ -189,12 +196,12 @@ AbstractClassDef
         type: 'abstract-class',
         position: ann.position,
         size: ann.size,
-        properties: { name, attributes: attrs, methods },
+        properties: classifierProperties(name, vis, stereo, { attributes: attrs, methods }),
       };
     }
 
 InterfaceDef
-  = "interface" S name:IdentifierOrQuoted ann:Annotations _ "{" _ NL members:MemberLine* _ "}" {
+  = vis:ElementVisibility? "interface" S name:IdentifierOrQuoted stereo:StereotypeAnnotation? ann:Annotations _ "{" _ NL members:MemberLine* _ "}" {
       const attrs = [];
       const methods = [];
       for (const m of members) {
@@ -207,21 +214,29 @@ InterfaceDef
         type: 'interface',
         position: ann.position,
         size: ann.size,
-        properties: { name, attributes: attrs, methods },
+        properties: classifierProperties(name, vis, stereo, { attributes: attrs, methods }),
       };
     }
 
 EnumDef
-  = "enum" S name:IdentifierOrQuoted ann:Annotations _ "{" _ NL values:EnumLine* _ "}" {
+  = vis:ElementVisibility? "enum" S name:IdentifierOrQuoted stereo:StereotypeAnnotation? ann:Annotations _ "{" _ NL values:EnumLine* _ "}" {
       const filtered = values.filter(Boolean);
       return {
         _nodeType: 'element',
         type: 'enum',
         position: ann.position,
         size: ann.size,
-        properties: { name, attributes: filtered.map(v => ({ name: v, type: '', visibility: 'public' })), methods: [] },
+        properties: classifierProperties(name, vis, stereo, { attributes: filtered.map(v => ({ name: v, type: '', visibility: 'public' })), methods: [] }),
       };
     }
+
+// Optional element visibility before the keyword, e.g. `- class Order { ... }`
+ElementVisibility
+  = vis:VisibilityMarker S { return vis; }
+
+// Optional stereotype after the name, e.g. `class Order <<entity>> { ... }`
+StereotypeAnnotation
+  = _ "<<" chars:$[^>\r\n]+ ">>" { return chars.trim(); }
 
 MemberLine
   = _ m:(MethodMember / AttributeMember) _ NL { return m; }
