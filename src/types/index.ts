@@ -83,6 +83,13 @@ export interface DiagramElement {
   properties: ElementProperties;
   /** Reference ID when this element is shared */
   sharedRefId?: string;
+  /**
+   * ID of the containing element in the same diagram; absent means top level.
+   * Ownership is never inferred from array order or geometry. Alpha allows a
+   * `composite-state` to own states, pseudostates and composite states, and a
+   * `system-boundary` to own use cases. Cycles are invalid (checked in A03.05).
+   */
+  parentId?: string;
 }
 
 // --- Connector Types ---
@@ -118,6 +125,12 @@ export interface Connector {
   label?: string;
   sourceMultiplicity?: string;
   targetMultiplicity?: string;
+  /**
+   * Position of a sequence message (`sync-`, `async-`, `return-message`).
+   * Messages of one diagram are numbered 1..n without gaps or duplicates and
+   * are shown in that order, independent of array order. Absent on others.
+   */
+  messageOrder?: number;
   properties: ConnectorProperties;
 }
 
