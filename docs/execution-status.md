@@ -27,7 +27,7 @@ Updated: **2026-10-27**. This is the live ledger for the [145-task backlog](atom
 | A02.04 | Done | `src/parser/project/projectFileCodec.ts` encodes/decodes the ADR 0001 envelope into a `ProjectDocument` (new types in `src/types/index.ts`). Tests round-trip IDs, `invalid` drafts with their text, last valid models, `parentId`/`messageOrder`, viewport, waypoints, tree `expanded` and shared elements; the ADR example opens; future/non-integer versions, other formats, missing `project.id`/`writer`, bad `textStatus` and legacy files are refused. Not wired into Save/Open (A02.08). Unknown-key rejection, tree/diagram consistency and reference rules remain A03.01/A03.08; legacy migration remains A02.06. |
 | A01.13 | Planned | Needs A01.12 and actual remote CI evidence. |
 
-Every task not named above remains **Planned**. **14 of 145 local tasks are Done**, including reproduction tasks, not 14 shipped features. G0 (local baseline) is satisfied; M0 is still incomplete until baseline commits and remote CI are verified. G1–G4 remain unmet. Current validation: **23 test files, 312 passing tests and 7 explicitly expected failures**; `npm run check` and `npm run build:app` passed after A02.04. Notices, package and the packaged smoke were last run at the A01 baseline.
+Every task not named above remains **Planned**. **14 of 145 local tasks are Done**, including reproduction tasks, not 14 shipped features. G0 (local baseline) is satisfied; M0 is still incomplete until baseline commits and remote CI are verified. G1–G4 remain unmet. Current validation: **23 test files, 316 passing tests and 6 explicitly expected failures**; `npm run check` and `npm run build:app` passed after A02.04. Notices, package and the packaged smoke were last run at the A01 baseline.
 
 ## Dependency correction
 
@@ -37,7 +37,7 @@ A07.03 now depends on A01.09 only. Its former A02.08 dependency was unnecessary:
 
 1. Maintainer review of ADR 0002 (A02.02).
 2. A02.05 (session boundary) and A02.06 (legacy migration), both unblocked by A02.04; then A02.07–A02.08.
-3. A03/A04: convert the seven expected failures to ordinary passing regressions as their linked fixes land.
+3. A03/A04: convert the six expected failures to ordinary passing regressions as their linked fixes land.
 4. A01.12–A01.13 can proceed independently with maintainer review and private CI; they do not require publishing the repository.
 
 F1–F4, F6–F7, recovery, conflicts and release validation remain open. The application is still an early alpha, and specification-driven development through generated contract tests is a separate product milestone.
