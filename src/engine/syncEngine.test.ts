@@ -153,6 +153,23 @@ describe('SyncEngine draft safety', () => {
     expect(onTextUpdate).toHaveBeenLastCalledWith(VALID_CLASS_DSL);
     expect(engine.getText()).toBe(VALID_CLASS_DSL);
   });
+
+  it('rejects a canvas command the DSL cannot represent without changing state or history', () => {
+    const history = new UndoManager();
+    const { engine, onDiagramUpdate, onTextUpdate } = createEngine({ undoManager: history });
+    engine.setDiagram(makeDiagram({ elements: [makeElement('el-1', 'Order')] }));
+    const before = { diagram: engine.getDiagram(), text: engine.getText() };
+
+    const accepted = engine.onCanvasChange({ type: 'element-update', elementId: 'el-1',
+      properties: { attributes: [{ name: 'bad name', type: 'String', visibility: 'private' }] } });
+
+    expect(accepted).toBe(false);
+    expect(engine.getDiagram()).toEqual(before.diagram);
+    expect(engine.getText()).toBe(before.text);
+    expect(history.canUndo()).toBe(false);
+    expect(onDiagramUpdate).not.toHaveBeenCalled();
+    expect(onTextUpdate).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
