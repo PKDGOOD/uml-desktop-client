@@ -1,6 +1,6 @@
 # ADR 0002: Stable DSL identity and source-edit mapping
 
-- Status: **Proposed** (A02.02; awaiting maintainer review)
+- Status: **Accepted** (A02.02; maintainer accepted 2026-10-27)
 - Date: 2026-10-27
 - Backlog: [A02.02](../atomic-execution-plan.md) · Contracts: [P-04, P-05, AC-02, AC-03](../product-spec.md)
 - Depends on: [ADR 0001](0001-project-file-envelope.md); reproductions F1 (A01.05) and F2 (A01.06) in the [baseline report](../reviews/2026-09-27-execution-baseline.md)

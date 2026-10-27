@@ -22,7 +22,7 @@ Updated: **2026-10-27**. This is the live ledger for the [145-task backlog](atom
 | A07.03 | Done | Browser download requests retain unsaved revision and show an explicit verification notice; ordinary packaged regression checks the blocked-download case. |
 | A01.12 | Ready | Review and split the preserved mixed working tree into baseline commits; no commit/push was made by this batch. |
 | A02.01 | Done | [ADR 0001](decisions/0001-project-file-envelope.md) proposes the schema-2 envelope: integer `schemaVersion` separate from informational writer version, `project.id`, `textStatus` invalid-draft marker, derived diagram index, ID/reference rules and an ordered reject/migrate table with valid, legacy, future and malformed examples. Accepted by the maintainer, including unknown-key rejection and the first-save legacy ID. |
-| A02.02 | Review | [ADR 0002](decisions/0002-dsl-identity-and-source-edits.md) proposes name-keyed element identity, inspector-only identity-preserving rename, quoting/escaping, source spans, two-pass connector matching and diagnostics for ambiguous input. Awaiting maintainer acceptance. |
+| A02.02 | Done | [ADR 0002](decisions/0002-dsl-identity-and-source-edits.md) (accepted) defines name-keyed element identity, inspector-only identity-preserving rename, quoting/escaping, source spans, two-pass connector matching and diagnostics for ambiguous input. |
 | A02.03 | Done | `DiagramElement.parentId` (absent = top level) and sequence `Connector.messageOrder` (1..n) in `src/types/index.ts`. Detached fixtures in `src/types/structureFixtures.ts` deliberately mislead array-order readers (F2 shape, a use case after a boundary, shuffled messages); tests match the A01.04 ownership/label oracle and survive a project file round trip. Parser, serializer, canvas and validation do not read the fields yet (A04.07, A04.08, A03.05). |
 | A02.04 | Done | `src/parser/project/projectFileCodec.ts` encodes/decodes the ADR 0001 envelope into a `ProjectDocument` (new types in `src/types/index.ts`). Tests round-trip IDs, `invalid` drafts with their text, last valid models, `parentId`/`messageOrder`, viewport, waypoints, tree `expanded` and shared elements; the ADR example opens; future/non-integer versions, other formats, missing `project.id`/`writer`, bad `textStatus` and legacy files are refused. Not wired into Save/Open (A02.08). Unknown-key rejection, tree/diagram consistency and reference rules remain A03.01/A03.08; legacy migration remains A02.06. |
 | A01.13 | Planned | Needs A01.12 and actual remote CI evidence. |
@@ -35,9 +35,8 @@ A07.03 now depends on A01.09 only. Its former A02.08 dependency was unnecessary:
 
 ## Next sequence
 
-1. Maintainer review of ADR 0002 (A02.02).
-2. A02.05 (session boundary) and A02.06 (legacy migration), both unblocked by A02.04; then A02.07–A02.08.
-3. A03/A04: convert the six expected failures to ordinary passing regressions as their linked fixes land.
-4. A01.12–A01.13 can proceed independently with maintainer review and private CI; they do not require publishing the repository.
+1. A02.05 (session boundary) and A02.06 (legacy migration), both unblocked by A02.04; then A02.07–A02.08.
+2. A03/A04: convert the six expected failures to ordinary passing regressions as their linked fixes land.
+3. A01.12–A01.13 can proceed independently with maintainer review and private CI; they do not require publishing the repository.
 
 F1–F4, F6–F7, recovery, conflicts and release validation remain open. The application is still an early alpha, and specification-driven development through generated contract tests is a separate product milestone.
