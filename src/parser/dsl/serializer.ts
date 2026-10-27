@@ -307,34 +307,22 @@ function serializeUsecaseElements(
 }
 
 function serializeUsecaseBoundaries(elements: DiagramElement[], lines: string[]): void {
-  // The parser flattens: boundary, then its child usecases appear right after it.
-  // We reconstruct by walking the elements array.
-  let i = 0;
+  const parents = resolveParents(elements, 'system-boundary', new Set(['usecase']));
   const standaloneUsecases: DiagramElement[] = [];
 
-  while (i < elements.length) {
-    const el = elements[i];
-    if (el.type === 'actor') {
-      // Already serialized above
-      i++;
-      continue;
-    }
+  for (const el of elements) {
     if (el.type === 'system-boundary') {
       lines.push('');
       lines.push(`system-boundary ${formatName(el.properties.name)}${formatAnnotations(el)} {`);
-      i++;
-      // Collect child usecases
-      while (i < elements.length && elements[i].type === 'usecase') {
-        lines.push(`  usecase ${formatName(elements[i].properties.name)}${formatAnnotations(elements[i])}`);
-        i++;
+      for (const child of elements) {
+        if (parents.get(child.id) === el.id) {
+          lines.push(`  usecase ${formatName(child.properties.name)}${formatAnnotations(child)}`);
+        }
       }
       lines.push('}');
-      continue;
-    }
-    if (el.type === 'usecase') {
+    } else if (el.type === 'usecase' && !parents.has(el.id)) {
       standaloneUsecases.push(el);
     }
-    i++;
   }
 
   for (const uc of standaloneUsecases) {
@@ -392,110 +380,76 @@ function serializeStateElements(
   idToName: Map<string, string>,
   lines: string[],
 ): void {
-  // Separate composite states and their children
-  // The parser flattens composite-state children into the elements array.
-  // We reconstruct by walking the elements array.
-  let i = 0;
-  while (i < elements.length) {
-    const el = elements[i];
+  const stateLine = (el: DiagramElement, indent: string): string | null => {
     const name = formatName(el.properties.name);
     const ann = formatAnnotations(el);
-
     switch (el.type) {
-      case 'initial-state':
-        lines.push(`initial-state ${name}${ann}`);
-        break;
-      case 'final-state':
-        lines.push(`final-state ${name}${ann}`);
-        break;
-      case 'state':
-        lines.push(`state ${name}${ann}`);
-        break;
-      case 'composite-state': {
-        lines.push(`composite-state ${name}${ann} {`);
-        i++;
-        // Collect children: states, initial-state, final-state until we hit
-        // something that's not a child type or we run out
-        const childTypes = new Set(['state', 'initial-state', 'final-state']);
-        const childConnectors: Connector[] = [];
-        const childIds = new Set<string>();
-
-        // Gather child element IDs
-        const startIdx = i;
-        while (i < elements.length && childTypes.has(elements[i].type)) {
-          childIds.add(elements[i].id);
-          i++;
-        }
-
-        // Serialize child elements
-        for (let j = startIdx; j < i; j++) {
-          const child = elements[j];
-          const cName = formatName(child.properties.name);
-          const cAnn = formatAnnotations(child);
-          switch (child.type) {
-            case 'initial-state':
-              lines.push(`  initial-state ${cName}${cAnn}`);
-              break;
-            case 'final-state':
-              lines.push(`  final-state ${cName}${cAnn}`);
-              break;
-            case 'state':
-              lines.push(`  state ${cName}${cAnn}`);
-              break;
-          }
-        }
-
-        // Find connectors between child elements
-        for (const conn of connectors) {
-          if (childIds.has(conn.sourceId) && childIds.has(conn.targetId)) {
-            childConnectors.push(conn);
-          }
-        }
-
-        // Serialize child transitions
-        for (const conn of childConnectors) {
-          const src = formatName(idToName.get(conn.sourceId) ?? conn.sourceId);
-          const tgt = formatName(idToName.get(conn.targetId) ?? conn.targetId);
-          let line = `  ${src} --> ${tgt}`;
-          if (conn.label) {
-            line += ` : ${conn.label}`;
-          }
-          lines.push(line);
-        }
-
-        lines.push('}');
-        continue; // skip the i++ at the end
-      }
+      case 'initial-state': return `${indent}initial-state ${name}${ann}`;
+      case 'final-state': return `${indent}final-state ${name}${ann}`;
+      case 'state': return `${indent}state ${name}${ann}`;
+      default: return null;
     }
-    i++;
+  };
+  const parents = resolveParents(elements, 'composite-state', new Set(['state', 'initial-state', 'final-state']));
+
+  for (const el of elements) {
+    if (parents.has(el.id)) continue;
+    if (el.type !== 'composite-state') {
+      const line = stateLine(el, '');
+      if (line) lines.push(line);
+      continue;
+    }
+
+    lines.push(`composite-state ${formatName(el.properties.name)}${formatAnnotations(el)} {`);
+    for (const child of elements) {
+      if (parents.get(child.id) !== el.id) continue;
+      const line = stateLine(child, '  ');
+      if (line) lines.push(line);
+    }
+    // Transitions between two children of this composite state
+    for (const conn of connectors) {
+      if (parents.get(conn.sourceId) !== el.id || parents.get(conn.targetId) !== el.id) continue;
+      const src = formatName(idToName.get(conn.sourceId) ?? conn.sourceId);
+      const tgt = formatName(idToName.get(conn.targetId) ?? conn.targetId);
+      lines.push(`  ${src} --> ${tgt}${conn.label ? ` : ${conn.label}` : ''}`);
+    }
+    lines.push('}');
   }
   lines.push('');
 
   // Top-level transitions (exclude those already serialized inside composite states)
-  const compositeChildIds = getCompositeChildIds(elements);
-  const topLevelConnectors = connectors.filter(
-    c => !(compositeChildIds.has(c.sourceId) && compositeChildIds.has(c.targetId)),
-  );
+  const topLevelConnectors = connectors.filter((c) => {
+    const parent = parents.get(c.sourceId);
+    return !parent || parent !== parents.get(c.targetId);
+  });
   serializeTransitions(topLevelConnectors, idToName, lines);
 }
 
-/** Get IDs of elements that are children of composite states */
-function getCompositeChildIds(elements: DiagramElement[]): Set<string> {
-  const childIds = new Set<string>();
-  const childTypes = new Set(['state', 'initial-state', 'final-state']);
-  let i = 0;
-  while (i < elements.length) {
-    if (elements[i].type === 'composite-state') {
-      i++;
-      while (i < elements.length && childTypes.has(elements[i].type)) {
-        childIds.add(elements[i].id);
-        i++;
-      }
-    } else {
-      i++;
+/**
+ * Map child element IDs to their container. Uses explicit `parentId` when the diagram has any;
+ * diagrams saved before `parentId` existed fall back to the old flattened order
+ * (children directly follow their container).
+ */
+function resolveParents(
+  elements: DiagramElement[],
+  containerType: DiagramElement['type'],
+  childTypes: Set<string>,
+): Map<string, string> {
+  const parents = new Map<string, string>();
+  const containers = new Set(elements.filter((el) => el.type === containerType).map((el) => el.id));
+  if (elements.some((el) => el.parentId !== undefined)) {
+    for (const el of elements) {
+      if (el.parentId && containers.has(el.parentId) && childTypes.has(el.type)) parents.set(el.id, el.parentId);
     }
+    return parents;
   }
-  return childIds;
+  let current: string | undefined;
+  for (const el of elements) {
+    if (el.type === containerType) current = el.id;
+    else if (current && childTypes.has(el.type)) parents.set(el.id, current);
+    else current = undefined;
+  }
+  return parents;
 }
 
 // =============================================================================

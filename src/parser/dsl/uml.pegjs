@@ -57,7 +57,7 @@ Diagram
       let elementIndex = 0;
       const nameToId = {};
 
-      function addElement(item) {
+      function addElement(item, parentId) {
         if (!item) return;
         const pos = item.position || defaultPos(elementIndex);
         const size = item.size || defaultSize(item.type);
@@ -69,12 +69,14 @@ Diagram
           position: pos,
           size: size,
           properties: item.properties,
+          ...(parentId ? { parentId } : {}),
         });
         elementIndex++;
-        // Add children as separate elements (system-boundary, composite-state)
+        // Children (system-boundary, composite-state) are flattened but keep an explicit parent.
         if (item.children) {
           for (const child of item.children) {
-            addElement(child);
+            if (child._nodeType === 'connector') connectors.push(child);
+            else addElement(child, id);
           }
         }
       }

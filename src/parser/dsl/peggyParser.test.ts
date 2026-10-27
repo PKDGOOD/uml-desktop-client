@@ -390,6 +390,18 @@ J1 --> D
 // =============================================================================
 
 describe('parseDSL - state diagram', () => {
+  it('records composite-state ownership and keeps inner transitions as connectors', () => {
+    const result = parseDSL('@state-diagram "S"\ncomposite-state Active {\n  state A\n  state B\n  A --> B : go\n}\nstate Outside\n');
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const [active, a, b, outside] = result.diagram.elements;
+    expect(result.diagram.elements.map((e) => e.type)).toEqual(['composite-state', 'state', 'state', 'state']);
+    expect([a.parentId, b.parentId]).toEqual([active.id, active.id]);
+    expect(active.parentId).toBeUndefined();
+    expect(outside.parentId).toBeUndefined();
+    expect(result.diagram.connectors).toMatchObject([{ type: 'transition', sourceId: a.id, targetId: b.id, label: 'go' }]);
+  });
+
   it('parses states and transitions', () => {
     const dsl = `@state-diagram "Order States"
 
