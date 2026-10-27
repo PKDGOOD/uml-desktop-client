@@ -83,6 +83,13 @@ export interface DiagramElement {
   properties: ElementProperties;
   /** Reference ID when this element is shared */
   sharedRefId?: string;
+  /**
+   * ID of the containing element in the same diagram; absent means top level.
+   * Ownership is never inferred from array order or geometry. Alpha allows a
+   * `composite-state` to own states, pseudostates and composite states, and a
+   * `system-boundary` to own use cases. Cycles are invalid (checked in A03.05).
+   */
+  parentId?: string;
 }
 
 // --- Connector Types ---
@@ -118,6 +125,12 @@ export interface Connector {
   label?: string;
   sourceMultiplicity?: string;
   targetMultiplicity?: string;
+  /**
+   * Position of a sequence message (`sync-`, `async-`, `return-message`).
+   * Messages of one diagram are numbered 1..n without gaps or duplicates and
+   * are shown in that order, independent of array order. Absent on others.
+   */
+  messageOrder?: number;
   properties: ConnectorProperties;
 }
 
@@ -166,6 +179,37 @@ export interface ProjectData {
   diagrams: Record<string, DiagramData>;
   /** Original editor text, including comments and unfinished drafts. Optional for older files. */
   diagramTexts?: Record<string, string>;
+}
+
+// --- Project File, schema 2 (ADR 0001) ---
+
+/** `in-sync`: `text` parsed to `model`. `invalid`: `text` is a draft and `model` is the last valid one. */
+export type TextStatus = 'in-sync' | 'invalid';
+
+export interface DiagramDocument {
+  model: DiagramData;
+  text: string;
+  textStatus: TextStatus;
+}
+
+export interface ProjectIdentity {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** In-memory content of a schema-2 file; `format`, `schemaVersion` and `writer` belong to the file only. */
+export interface ProjectDocument {
+  project: ProjectIdentity;
+  tree: ProjectTreeNode[];
+  diagrams: Record<string, DiagramDocument>;
+  sharedElements: Record<string, DiagramElement>;
+}
+
+export interface ProjectFileWriter {
+  app: string;
+  version: string;
 }
 
 // --- DSL Parser ---
