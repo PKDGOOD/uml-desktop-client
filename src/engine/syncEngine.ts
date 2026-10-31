@@ -310,6 +310,10 @@ function preserveIds(oldDiagram: DiagramData, newDiagram: DiagramData): void {
     }
   }
 
+  for (const el of newDiagram.elements) {
+    if (el.parentId) el.parentId = idMap.get(el.parentId) ?? el.parentId;
+  }
+
   // Remap endpoints before matching connectors, including parallel sequence messages.
   const remaining = [...oldDiagram.connectors];
   for (const connector of newDiagram.connectors) {
