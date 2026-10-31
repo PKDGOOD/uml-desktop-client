@@ -1,7 +1,8 @@
 // =============================================================================
 // Schema-2 project file codec (ADR 0001, A02.04)
-// Reads and writes the versioned envelope. Legacy migration (A02.06) and the
-// full validation boundary (A03.01, A03.08) are separate tasks.
+// Reads and writes the versioned envelope. Legacy files go through
+// legacyMigration.ts (A02.06); the full validation boundary (A03.01, A03.08)
+// is a separate task.
 // =============================================================================
 
 import type { DiagramDocument, ProjectDocument, ProjectFileWriter } from '@/types';
