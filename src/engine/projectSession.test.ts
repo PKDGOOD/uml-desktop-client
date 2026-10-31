@@ -11,8 +11,14 @@ function project(): ProjectData {
       position: { x: 10, y: 20 }, size: { width: 200, height: 100 } }],
   });
   return {
-    metadata: { name: 'Test', version: '1.0', createdAt: '', updatedAt: '', diagramIndex: {} },
-    tree: [{ id: 'one', type: 'diagram', name: 'one', diagramType: 'class' }],
+    metadata: { name: 'Test', version: '1.0', createdAt: '', updatedAt: '', diagramIndex: {
+      one: { id: 'one', name: 'one', type: 'class', parentFolderId: '' },
+      two: { id: 'two', name: 'two', type: 'class', parentFolderId: '' },
+    } },
+    tree: [
+      { id: 'one', type: 'diagram', name: 'one', diagramType: 'class' },
+      { id: 'two', type: 'diagram', name: 'two', diagramType: 'class' },
+    ],
     diagrams: { one: diagram('one'), two: diagram('two') }, sharedElements: {},
   };
 }

@@ -15,7 +15,7 @@ Updated: **2026-10-27**. This is the live ledger for the [145-task backlog](atom
 | A01.05 | Done | F1 property loss reproduced as an explicit expected failure; the regression now passes after class DSL gained element visibility and stereotype syntax. In-place patching for A04.04 remains open. |
 | A01.06 | Done | F2 external-state containment regression reproduced as an explicit expected failure; the regression now passes because the parser records `parentId` and the serializer nests by it. Remaining A04.07 work: ownership validation and reorder tests. |
 | A01.07 | Done | F3 invalid member command reproduced as an explicit expected failure; the regression now passes because canvas commands are rejected when their serialized result does not parse. Shared validators (A03.06) and field-level errors remain for A03.07/A05.01. |
-| A01.08 | Done | Four independent F4 invalid-project acceptances reproduced as expected failures. Fix remains A03.08. |
+| A01.08 | Done | Four independent F4 invalid-project acceptances reproduced as expected failures; all four regressions now pass because `parseAll` enforces the ADR 0001 reference rules for schema-1 files. Unknown-key rejection (A03.01) and input limits remain. |
 | A01.09 | Done | Packaged renderer without preload + blocked download reproduces F5; before/after reports retained. |
 | A01.10 | Done | Reference machine, measured engine/data sizes and initial numerical input budgets recorded. Enforcement and full UI capacity validation remain later tasks. |
 | A01.11 | Done | macOS packaged create/paste/save/new-process/open/resave/SVG harness verifies actual disk content. Native picker answers are stubbed. |
@@ -27,7 +27,7 @@ Updated: **2026-10-27**. This is the live ledger for the [145-task backlog](atom
 | A02.04 | Done | `src/parser/project/projectFileCodec.ts` encodes/decodes the ADR 0001 envelope into a `ProjectDocument` (new types in `src/types/index.ts`). Tests round-trip IDs, `invalid` drafts with their text, last valid models, `parentId`/`messageOrder`, viewport, waypoints, tree `expanded` and shared elements; the ADR example opens; future/non-integer versions, other formats, missing `project.id`/`writer`, bad `textStatus` and legacy files are refused. Not wired into Save/Open (A02.08). Unknown-key rejection, tree/diagram consistency and reference rules remain A03.01/A03.08; legacy migration remains A02.06. |
 | A01.13 | Planned | Needs A01.12 and actual remote CI evidence. |
 
-Every task not named above remains **Planned**. **16 of 145 local tasks are Done**, including reproduction tasks, not 14 shipped features. G0 (local baseline) is satisfied; M0 is still incomplete until baseline commits and remote CI are verified. G1–G4 remain unmet. Current validation: **23 test files, 325 passing tests and 4 explicitly expected failures**; `npm run check` passed after the F2 fix. Notices, package and the packaged smoke were last run at the A01 baseline.
+Every task not named above remains **Planned**. **16 of 145 local tasks are Done**, including reproduction tasks, not 14 shipped features. G0 (local baseline) is satisfied; M0 is still incomplete until baseline commits and remote CI are verified. G1–G4 remain unmet. Current validation: **23 test files, 342 passing tests and no expected failures**; `npm run check` passed after the F4 fix. Notices, package and the packaged smoke were last run at the A01 baseline.
 
 ## Dependency correction
 
@@ -36,7 +36,7 @@ A07.03 now depends on A01.09 only. Its former A02.08 dependency was unnecessary:
 ## Next sequence
 
 1. A02.05 (session boundary) and A02.06 (legacy migration), both unblocked by A02.04; then A02.07–A02.08.
-2. A03/A04: convert the four remaining expected failures (F4) to ordinary passing regressions as their linked fixes land.
+2. A03/A04: F1–F4 regressions now pass; remaining A03/A04 work is validation breadth, in-place text patching and GUI wiring.
 3. A01.12–A01.13 can proceed independently with maintainer review and private CI; they do not require publishing the repository.
 
-F1–F4, F6–F7, recovery, conflicts and release validation remain open. The application is still an early alpha, and specification-driven development through generated contract tests is a separate product milestone.
+F1–F4 have regression fixes; F6–F7, recovery, conflicts and release validation remain open. The application is still an early alpha, and specification-driven development through generated contract tests is a separate product milestone.
