@@ -301,6 +301,60 @@ describe('ProjectFileParser', () => {
   });
 });
 
+describe('ProjectFileParser reference rules', () => {
+  function rejects(mutate: (project: ProjectData) => void): string[] {
+    const copy = structuredClone(sampleProject);
+    mutate(copy);
+    const result = ProjectFileParser.parseAll(JSON.stringify(copy));
+    return result.success ? [] : result.errors.map((error) => error.path ?? '');
+  }
+
+  it('accepts the consistent sample project', () => {
+    expect(rejects(() => {})).toEqual([]);
+  });
+
+  it.each(['1', '1.0', '1.4.2'])('accepts schema-1 version %s', (version) => {
+    expect(rejects((p) => { p.metadata.version = version; })).toEqual([]);
+  });
+
+  it.each(['2.0.0', '999.0.0', '0.9.0', 'v1', ''])('rejects unknown version %s', (version) => {
+    expect(rejects((p) => { p.metadata.version = version; })).toEqual(['metadata.version']);
+  });
+
+  it('rejects an element and a connector sharing an ID', () => {
+    expect(rejects((p) => {
+      const d = p.diagrams['diagram-1'];
+      d.connectors.push({ id: d.elements[0].id, type: 'association',
+        sourceId: d.elements[0].id, targetId: d.elements[0].id, properties: {} });
+    })).toEqual([`diagrams.diagram-1.connectors[${sampleDiagram.connectors.length}].id`]);
+  });
+
+  it('rejects an unknown or self parent', () => {
+    expect(rejects((p) => { p.diagrams['diagram-1'].elements[0].parentId = 'nowhere'; }))
+      .toEqual(['diagrams.diagram-1.elements[0].parentId']);
+    expect(rejects((p) => {
+      const el = p.diagrams['diagram-1'].elements[0];
+      el.parentId = el.id;
+    })).toEqual(['diagrams.diagram-1.elements[0].parentId']);
+  });
+
+  it('rejects diagrams missing from the tree, tree entries without data and type disagreements', () => {
+    expect(rejects((p) => { p.tree[0].children!.pop(); }))
+      .toEqual(['diagrams.diagram-2', 'metadata.diagramIndex.diagram-2']);
+    expect(rejects((p) => { delete p.diagrams['diagram-2']; }))
+      .toEqual(['diagrams.diagram-2']);
+    expect(rejects((p) => { p.tree[0].children![0].diagramType = 'state'; }))
+      .toEqual(['diagrams.diagram-1.type']);
+    expect(rejects((p) => { p.metadata.diagramIndex['diagram-1'].type = 'state'; }))
+      .toEqual(['metadata.diagramIndex.diagram-1.type']);
+  });
+
+  it('rejects duplicate tree node IDs', () => {
+    expect(rejects((p) => { p.tree.push({ id: 'root', name: 'Again', type: 'folder', children: [] }); }))
+      .toEqual(['tree[1].id']);
+  });
+});
+
 describe('ProjectFileSerializer', () => {
   it('produces valid JSON that can be parsed back', () => {
     const json = ProjectFileSerializer.serialize(sampleProject);
