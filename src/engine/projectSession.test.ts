@@ -125,3 +125,62 @@ describe('ProjectSession editing and saving', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 });
+
+describe('ProjectSession diagram rename', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const renamedTree = (name: string) => project().tree.map((node) => (node.id === 'one' ? { ...node, name } : node));
+
+  function expectRenamed(session: ProjectSession, name: string) {
+    expect(session.project.diagrams.one.name).toBe(name);
+    expect(session.project.metadata.diagramIndex.one.name).toBe(name);
+    expect(session.project.tree[0].name).toBe(name);
+    expect(session.text('one').startsWith(`@class-diagram ${JSON.stringify(name)}`)).toBe(true);
+  }
+
+  it('renames an unopened diagram everywhere', () => {
+    const session = new ProjectSession(project(), vi.fn());
+    session.setTree(renamedTree('Orders'));
+    expectRenamed(session, 'Orders');
+    expect(session.getSession('one')!.sync.getErrors()).toEqual([]);
+    expect(session.project.diagrams.two.name).toBe('two');
+  });
+
+  it('renames an open diagram and keeps its comments and elements', () => {
+    const session = new ProjectSession(project(), vi.fn());
+    session.editText('one', draft);
+    session.setTree(renamedTree('Billing "v2"'));
+    expectRenamed(session, 'Billing "v2"');
+    expect(session.text('one')).toContain('// Keep this comment');
+    expect(session.project.diagrams.one.elements[0].properties.attributes?.[0].name).toBe('total');
+  });
+
+  it('rewrites a header that follows leading comments', () => {
+    const session = new ProjectSession(project(), vi.fn());
+    session.editText('one', '// header note\n' + draft);
+    session.setTree(renamedTree('Orders'));
+    expect(session.text('one').startsWith('// header note\n@class-diagram "Orders"')).toBe(true);
+    expect(session.project.diagrams.one.name).toBe('Orders');
+  });
+
+  it('renames the model even while the draft is invalid', () => {
+    const session = new ProjectSession(project(), vi.fn());
+    session.editText('one', '@class-diagram "one"\nclass {{{');
+    session.setTree(renamedTree('Orders'));
+    expect(session.text('one')).toBe('@class-diagram "Orders"\nclass {{{');
+    expect(session.project.diagrams.one.name).toBe('Orders');
+    expect(session.project.metadata.diagramIndex.one.name).toBe('Orders');
+    expect(session.project.tree[0].name).toBe('Orders');
+  });
+
+  it('survives save and reopen with matching names', () => {
+    const session = new ProjectSession(project(), vi.fn());
+    session.setTree(renamedTree('Orders'));
+    const parsed = ProjectFileParser.parseAll(ProjectFileSerializer.serialize(session.snapshot().project));
+    if (!parsed.success) throw new Error('Expected valid project file');
+    const reopened = new ProjectSession(parsed.data, vi.fn());
+    expect(reopened.getSession('one')!.sync.getErrors()).toEqual([]);
+    expectRenamed(reopened, 'Orders');
+  });
+});
