@@ -8,6 +8,17 @@ interface DiagramSession {
   history: UndoManager;
 }
 
+/** The `@<type>-diagram "Name"` header, possibly preceded by blank lines and comments. */
+const DIAGRAM_HEADER = /^((?:\s*\/\/[^\n]*\n)*\s*)(@[a-z]+-diagram)[ \t]+"(?:\\.|[^"\\])*"/;
+
+function collectNames(nodes: ProjectTreeNode[], result = new Map<string, string>()): Map<string, string> {
+  for (const node of nodes) {
+    if (node.type === 'diagram') result.set(node.id, node.name);
+    if (node.children) collectNames(node.children, result);
+  }
+  return result;
+}
+
 /** Owns drafts and history independently of which tab is currently visible. */
 export class ProjectSession {
   project: ProjectData;
@@ -110,7 +121,27 @@ export class ProjectSession {
       if (diagrams[id]) diagramIndex[id] = { id, name: diagrams[id].name, type: diagrams[id].type, parentFolderId };
     }
     this.project = { ...this.project, tree, diagrams, diagramTexts, metadata: { ...this.project.metadata, diagramIndex } };
+    // A diagram renamed in the tree is renamed everywhere: model, DSL header and index.
+    for (const [id, name] of collectNames(tree)) {
+      if (this.project.diagrams[id] && this.project.diagrams[id].name !== name) this.renameDiagram(id, name);
+    }
     this.touch();
+  }
+
+  private renameDiagram(id: string, name: string): void {
+    const text = this.text(id);
+    const renamed = text.replace(DIAGRAM_HEADER, (_match, prefix: string, keyword: string) => `${prefix}${keyword} ${JSON.stringify(name)}`);
+    const session = this.sessions.get(id);
+    if (renamed !== text) {
+      this.storeText(id, renamed);
+      if (session) {
+        session.sync.onTextChange(renamed);
+        // A valid draft updates the model, tree and index through onDiagramUpdate.
+        if (session.sync.flushPendingText()) return;
+      }
+    }
+    // Invalid draft, no header to rewrite, or no open session: rename the stored model directly.
+    this.updateDiagram(id, { ...this.project.diagrams[id], name });
   }
 
   addDiagram(name: string, type: DiagramType, parentFolderId = ''): string {
