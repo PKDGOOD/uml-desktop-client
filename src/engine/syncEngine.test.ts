@@ -140,6 +140,13 @@ describe('A03.06 diagram rules after DSL parsing', () => {
 
     expect(engine.onCanvasChange({ type: 'connector-add', connector: { ...makeConnector('ok', 'a', 'i'), type: 'realization' } })).toBe(true);
   });
+
+  it('lets the inspector remove a stereotype', () => {
+    const { engine } = createEngine();
+    engine.setDiagram(makeDiagram({ elements: [{ ...makeElement('a', 'A'), properties: { name: 'A', stereotype: 'entity' } }] }));
+    expect(engine.onCanvasChange({ type: 'element-update', elementId: 'a', properties: { stereotype: undefined } })).toBe(true);
+    expect(engine.getText()).not.toContain('<<');
+  });
 });
 
 describe('SyncEngine draft safety', () => {

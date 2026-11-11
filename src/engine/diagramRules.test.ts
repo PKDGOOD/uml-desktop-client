@@ -97,10 +97,19 @@ describe('A03.03 names, members and multiplicity', () => {
 
   it('rejects enum values that are not identifiers and enum methods', () => {
     const model = diagram('class', [el('e', 'enum', {
-      attributes: [{ name: 'RED', type: '', visibility: 'public' }, { name: 'light blue', type: '', visibility: 'public' }],
+      attributes: [
+        { name: 'RED', type: '', visibility: 'public' },
+        { name: 'light blue', type: '', visibility: 'public' },
+        { name: 'GREEN', type: 'string', visibility: 'private' },
+      ],
       methods: [{ name: 'f', returnType: 'void', parameters: [], visibility: 'public' }],
     })]);
-    expect(paths(validateDiagramProperties(model))).toEqual(['elements[0].properties.attributes[1].name', 'elements[0].properties.methods']);
+    expect(paths(validateDiagramProperties(model))).toEqual([
+      'elements[0].properties.attributes[1].name',
+      'elements[0].properties.attributes[2].type',
+      'elements[0].properties.attributes[2].visibility',
+      'elements[0].properties.methods',
+    ]);
   });
 
   it('rejects stereotypes and members on elements that cannot show them', () => {
@@ -227,6 +236,13 @@ describe('A03.06 parseCheckedDSL', () => {
       { line: 7, column: 1, message: 'A extend from actor "고객" to usecase "Pay" is not allowed: it connects two use cases' },
     ] });
     expect(parseCheckedDSL(text.split('\n').slice(0, 6).join('\n')).success).toBe(true);
+  });
+
+  it('points each connector error at its own line when two relations join the same elements', () => {
+    const text = '@class-diagram "Test"\n\nclass A {\n}\n\ninterface I {\n}\n\nA ..> I\nA --|> I\nI ..> A\n';
+    expect(parseCheckedDSL(text)).toMatchObject({ success: false, errors: [{ line: 10, message: expect.stringMatching(/class extends a class/) }] });
+    const selfLink = '@class-diagram "Test"\n\nclass A {\n}\n\nclass B {\n}\n\nA --> B\nA --> A\n';
+    expect(parseCheckedDSL(selfLink)).toMatchObject({ success: false, errors: [{ line: 10 }] });
   });
 
   it('points a duplicate name at the line that declares it again', () => {

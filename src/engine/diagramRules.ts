@@ -117,6 +117,13 @@ export function validateDiagramProperties(diagram: DiagramData): DiagramRuleErro
         if (!isIdentifier(value.name)) {
           errors.push({ message: `Enum value ${JSON.stringify(value.name)} in ${describe(element)} must be an identifier`, path: `${path}.attributes[${j}].name` });
         }
+        // The DSL writes only the value name; it reads back an empty type and public visibility.
+        if (value.type !== '') {
+          errors.push({ message: `Enum value ${JSON.stringify(value.name)} in ${describe(element)} cannot have a type`, path: `${path}.attributes[${j}].type` });
+        }
+        if (value.visibility !== 'public') {
+          errors.push({ message: `Enum value ${JSON.stringify(value.name)} in ${describe(element)} cannot have a visibility`, path: `${path}.attributes[${j}].visibility` });
+        }
       });
       if (methods !== undefined && methods.length > 0) {
         errors.push({ message: `Enum ${JSON.stringify(name)} cannot have methods`, path: `${path}.methods` });
@@ -295,6 +302,9 @@ export function validateDiagramRules(diagram: DiagramData): DiagramRuleError[] {
 // A03.06: the same rules after DSL parsing
 // -----------------------------------------------------------------------------
 
+/** Any relation or message arrow of the grammar. */
+const ARROW = /--|\.\.|->|<-/;
+
 function nameTokens(name: string): string[] {
   return IDENTIFIER.test(name) ? [name] : [JSON.stringify(name)];
 }
@@ -316,20 +326,35 @@ function locate(diagram: DiagramData, error: DiagramRuleError, lines: string[]):
     }
   }
   if (wanted.length === 0) return 1;
-  const isWord = (line: string, token: string) => {
-    const at = line.indexOf(token);
-    if (at < 0) return false;
-    const before = line[at - 1];
-    const after = line[at + token.length];
-    const part = /[a-zA-Z0-9_\u00C0-\u024F\uAC00-\uD7AF]/;
-    return !(before && part.test(before)) && !(after && part.test(after));
+  const part = /[a-zA-Z0-9_\u00C0-\u024F\uAC00-\uD7AF]/;
+  const wordCount = (line: string, token: string) => {
+    let count = 0;
+    for (let at = line.indexOf(token); at >= 0; at = line.indexOf(token, at + token.length)) {
+      const before = line[at - 1];
+      const after = line[at + token.length];
+      if (!(before && part.test(before)) && !(after && part.test(after))) count++;
+    }
+    return count;
   };
+  const isWord = (line: string, token: string) => wordCount(line, token) > 0;
+  const index = Number(match[2]);
+  if (match[1] === 'connectors') {
+    // Connector lines are in model order, so the n-th connector between the same two
+    // elements sits on the n-th relation line that names both of them.
+    const hits = lines.flatMap((line, i) => (
+      ARROW.test(line) && wanted.every((tokens) => tokens.some((token) => isWord(line, token)))
+        // A self-link names its element twice.
+        && (wanted.length < 2 || wanted[0][0] !== wanted[1][0] || wordCount(line, wanted[0][0]) >= 2) ? [i + 1] : []
+    ));
+    const pair = (connector: Connector) => [names.get(connector.sourceId), names.get(connector.targetId)].sort().join('\u0000');
+    const key = pair(diagram.connectors[index]);
+    const earlier = diagram.connectors.slice(0, index).filter((connector) => pair(connector) === key).length;
+    return hits[earlier] ?? hits[hits.length - 1] ?? 1;
+  }
   const hits = lines.flatMap((line, i) => (
     wanted.every((tokens) => tokens.some((token) => isWord(line, token))) ? [i + 1] : []
   ));
-  if (match[1] === 'connectors') return hits[hits.length - 1] ?? 1; // After both ends are declared.
   // The n-th element with this name is declared on the n-th line that names it.
-  const index = Number(match[2]);
   const name = diagram.elements[index].properties.name;
   const earlier = diagram.elements.slice(0, index).filter((element) => element.properties.name === name).length;
   return hits[earlier] ?? hits[0] ?? 1;
