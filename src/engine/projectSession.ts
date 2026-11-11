@@ -1,7 +1,7 @@
 import type {
   CanvasChange, DSLError, DiagramData, DiagramDocument, DiagramType, ProjectData, ProjectDocument, ProjectTreeNode,
 } from '../types';
-import { parseDSL } from '../parser/dsl/peggyParser';
+import { parseCheckedDSL } from './diagramRules';
 import { SyncEngine } from './syncEngine';
 import { UndoManager } from './undoManager';
 import { serializeDSL } from '../parser/dsl/serializer';
@@ -50,7 +50,7 @@ export class ProjectSession {
     this.projectId = options.projectId ?? crypto.randomUUID();
   }
 
-  /** Parse errors of a diagram's current text; empty when the text is valid. */
+  /** Syntax and rule errors of a diagram's current text; empty when the text is valid. */
   diagnostics(id: string): DSLError[] {
     const open = this.sessions.get(id);
     if (open) {
@@ -60,7 +60,7 @@ export class ProjectSession {
     const model = this.project.diagrams[id];
     if (!model) return [];
     // An unopened diagram without stored text is saved as generated text, which must parse too.
-    const parsed = parseDSL(this.text(id));
+    const parsed = parseCheckedDSL(this.text(id));
     return parsed.success ? [] : parsed.errors;
   }
 

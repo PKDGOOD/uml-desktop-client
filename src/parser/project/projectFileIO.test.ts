@@ -134,6 +134,34 @@ describe('A02.08 project file Save/Open', () => {
       if (!result.success) expect(result.errors).toContainEqual(expect.objectContaining({ path: path(content) }));
     });
 
+    it('refuses a self-link in a schema-2 file with the model path (A03.04)', () => {
+      const content = file();
+      const id = firstId(content);
+      const connector = content.diagrams[id].model.connectors[0];
+      connector.targetId = connector.sourceId;
+      const result = readProjectFile(JSON.stringify(content), { createId });
+      expect(result).toMatchObject({ success: false });
+      if (!result.success) {
+        expect(result.errors).toContainEqual(expect.objectContaining({
+          path: `diagrams.${id}.model.connectors[0].targetId`, message: expect.stringMatching(/self-links/),
+        }));
+      }
+    });
+
+    it('refuses an invalid multiplicity in a legacy file (A03.03)', () => {
+      const legacy = legacyProject();
+      const [id, diagram] = Object.entries(legacy.diagrams).find(([, entry]) => entry.type === 'class')!;
+      const index = diagram.connectors.findIndex((connector) => connector.sourceMultiplicity !== undefined);
+      diagram.connectors[index].sourceMultiplicity = '3..1';
+      const result = readProjectFile(ProjectFileSerializer.serialize(legacy), { createId });
+      expect(result).toMatchObject({ success: false });
+      if (!result.success) {
+        expect(result.errors).toContainEqual(expect.objectContaining({
+          path: `diagrams.${id}.connectors[${index}].sourceMultiplicity`, message: expect.stringMatching(/lower bound 3/),
+        }));
+      }
+    });
+
     it('still opens a legacy file whose tree rename left the old model name', () => {
       const legacy = legacyProject();
       legacy.tree[0].children![0].name = 'Renamed';

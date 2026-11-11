@@ -9,6 +9,7 @@ import type { DiagramData, DiagramDocument, DiagramElement, ProjectData, Project
 import { parseDSL } from '../dsl/peggyParser';
 import { serializeDSL } from '../dsl/serializer';
 import { renameDiagramHeader } from '../dsl/diagramHeader';
+import { parseCheckedDSL } from '@/engine/diagramRules';
 import {
   ProjectFileParser,
   type ProjectFileParseError,
@@ -117,8 +118,8 @@ function migrateDiagram(source: DiagramData, sourceText: string | undefined, nam
   const model = source.name === name ? source : { ...source, name };
   if (sourceText === undefined) return { model, text: serializeDSL(model), textStatus: 'in-sync' };
   const text = source.name === name ? sourceText : renameDiagramHeader(sourceText, name);
-  // A parsable draft is in-sync here; comparing its meaning with the model is A03.09.
-  return { model, text, textStatus: parseDSL(text).success ? 'in-sync' : 'invalid' };
+  // A draft that parses and meets the diagram rules is in-sync here; comparing its meaning with the model is A03.09.
+  return { model, text, textStatus: parseCheckedDSL(text).success ? 'in-sync' : 'invalid' };
 }
 
 // -----------------------------------------------------------------------------

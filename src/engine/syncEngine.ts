@@ -16,6 +16,7 @@ import type {
 import { parseDSL } from '../parser/dsl';
 import { serializeDSL } from '../parser/dsl/serializer';
 import { UndoManager } from './undoManager';
+import { parseCheckedDSL, validateDiagramRules } from './diagramRules';
 
 export interface SyncEngineOptions {
   onDiagramUpdate: (diagram: DiagramData) => void;
@@ -57,7 +58,7 @@ export class SyncEngine {
     this.currentDiagram = deepClone(diagram);
     this.lastValidDiagram = deepClone(diagram);
     this.currentText = text;
-    const result = parseDSL(text);
+    const result = parseCheckedDSL(text);
     this.currentErrors = result.success ? [] : result.errors;
   }
 
@@ -129,7 +130,8 @@ export class SyncEngine {
     this.syncing = true;
 
     try {
-      const result = parseDSL(newText);
+      // Syntax and rule errors both keep the raw text and the last valid model (A03.06).
+      const result = parseCheckedDSL(newText);
       const oldText = this.currentText;
       this.currentText = newText;
 
@@ -150,7 +152,7 @@ export class SyncEngine {
             undo: () => {
               if (oldDiagram) {
                 // An invalid draft has no corresponding canvas state to restore.
-                const previous = parseDSL(oldText);
+                const previous = parseCheckedDSL(oldText);
                 this.restore(oldDiagram, previous.success ? oldText : serializeDSL(oldDiagram));
               }
             },
@@ -165,7 +167,7 @@ export class SyncEngine {
         // Clear errors on success
         this.reportErrors([]);
       } else {
-        // Parse error: keep last valid state, report errors
+        // Syntax or rule error: keep last valid state, report errors
         this.reportErrors(result.errors);
       }
     } finally {
@@ -238,6 +240,9 @@ export class SyncEngine {
       const newText = serializeDSL(newDiagram);
       // Reject commands whose result the DSL cannot represent, before touching state or history.
       if (!parseDSL(newText).success) return false;
+      // Reject commands that break a diagram rule the model did not already break.
+      const before = new Set(validateDiagramRules(oldDiagram).map((error) => error.message));
+      if (validateDiagramRules(newDiagram).some((error) => !before.has(error.message))) return false;
 
       if (this.undoManager) {
         const diagramForUndo = deepClone(newDiagram);

@@ -20,6 +20,7 @@ Changes are documented here before a tagged release. The package version `0.1.0`
 - Use one DSL grammar source and separate browser and Electron development commands.
 - Keep browser projects unsaved after a download request; show an explicit file-verification notice instead of confirming persistence (F5).
 - Save projects in the schema-2 file format (ADR 0001): a durable project ID and, per diagram, the DSL text, last valid model and whether the text parses. Older files open as unsaved and are upgraded on save; old files whose nesting cannot be recovered are refused with an explanation.
+- Check names, members, multiplicity, labels and connector ends against the five diagram kinds when opening a file, after each text edit and before each canvas change. A draft that breaks a rule stays as typed and is reported on its line; the diagram keeps its last valid model.
 
 ### Known issues
 

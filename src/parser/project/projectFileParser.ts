@@ -5,6 +5,7 @@ import type {
   DiagramData,
   DiagramElement,
 } from '@/types';
+import { validateDiagramRules } from '@/engine/diagramRules';
 
 export interface ProjectFileParseError {
   message: string;
@@ -325,6 +326,11 @@ export function validateProjectReferences(project: ProjectData, options: Referen
         }
       }
     });
+    if (options.strict) {
+      for (const error of validateDiagramRules(diagram)) {
+        errors.push({ message: error.message, path: `diagrams.${id}.${error.path}` });
+      }
+    }
   }
   return errors;
 }
