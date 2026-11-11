@@ -9,6 +9,7 @@ import { CURRENT_SCHEMA_VERSION, PROJECT_FILE_FORMAT, decodeProjectFile, encodeP
 import { checkFileSize, checkProjectLimits, checkTextSizes, checkTreeDepth, checkUnknownKeys } from './projectFileLimits';
 import { migrateLegacyProjectFile } from './legacyMigration';
 import { tryParseJson, validateProjectReferences, type ProjectFileParseResult } from './projectFileParser';
+import { ProjectFileSerializer } from './projectFileSerializer';
 
 /** The in-memory version marker of a project opened from or saved as schema 2. */
 const IN_MEMORY_VERSION = '1.0.0';
@@ -82,6 +83,26 @@ export function readProjectFile(content: string, options: ReadProjectFileOptions
         .map(([id]) => id),
     },
   };
+}
+
+/**
+ * Check an in-memory project (a restored snapshot, an example, a new project)
+ * with every rule a file must pass on Open (A03.08), before it replaces the
+ * session. It goes through the same reader, so limits, unknown keys, legacy
+ * name repair and the strict reference and diagram rules all apply. Returns the
+ * project as Open would load it; nothing is dropped silently.
+ */
+export function checkProjectData(project: ProjectData): ProjectFileParseResult<Pick<OpenedProjectFile, 'project' | 'invalidDrafts'>> {
+  let content: string;
+  try {
+    content = ProjectFileSerializer.serialize(project);
+  } catch (error) {
+    return { success: false, errors: [{ message: `The project cannot be written as a file: ${(error as Error).message}` }] };
+  }
+  // The ID is irrelevant here: the caller keeps the session's own project ID.
+  const result = readProjectFile(content, { createId: () => 'unchecked' });
+  if (!result.success) return result;
+  return { success: true, data: { project: result.data.project, invalidDrafts: result.data.invalidDrafts } };
 }
 
 export function writeProjectFile(document: ProjectDocument, writer: ProjectFileWriter): string {
