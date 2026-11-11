@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import expectations from '../../examples/alpha-expectations.json';
-import type { ProjectData } from '../types';
+import type { ProjectData, ProjectTreeNode } from '../types';
 import { parseDSL } from '../parser/dsl';
 import { checkProjectData } from '../parser/project/projectFileIO';
 import { createExampleProject } from './projectFactory';
@@ -93,6 +93,32 @@ describe('A03.09 stored text/model conflicts', () => {
         ? conflicts[0].textModel.elements[0].position : { x: 777, y: 555 });
       if (choice === 'text') expect(resolved.diagramTexts![id]).toBe(project.diagramTexts![id]);
       expect(checkProjectData(resolved).success).toBe(true);
+    });
+
+    it('changes the diagram type in the tree and index when the chosen text declares another type', () => {
+      const project = corpus();
+      const id = classId(project);
+      project.diagramTexts![id] = readFileSync(new URL('../../examples/alpha-activity.uml', import.meta.url), 'utf8');
+      expect(parseDSL(project.diagramTexts![id]).success).toBe(true);
+      const conflicts = findTextModelConflicts(project);
+      expect(conflicts.map((c) => c.diagramId)).toEqual([id]);
+
+      const resolved = resolveTextModelConflicts(project, conflicts, { [id]: 'text' });
+      expect(resolved.diagrams[id].type).toBe('activity');
+      expect(resolved.metadata.diagramIndex[id].type).toBe('activity');
+      const find = (nodes: ProjectTreeNode[]): ProjectTreeNode | undefined => {
+        for (const node of nodes) {
+          const hit = node.id === id ? node : find(node.children ?? []);
+          if (hit) return hit;
+        }
+        return undefined;
+      };
+      expect(find(resolved.tree)?.diagramType).toBe('activity');
+      expect(checkProjectData(resolved).success).toBe(true);
+
+      const kept = resolveTextModelConflicts(project, conflicts, { [id]: 'model' });
+      expect(kept.diagrams[id].type).toBe('class');
+      expect(checkProjectData(kept).success).toBe(true);
     });
 
     it('requires a choice for every conflict', () => {

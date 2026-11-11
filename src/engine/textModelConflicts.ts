@@ -7,7 +7,7 @@
 // unsaved so the file on disk keeps both until they save.
 // =============================================================================
 
-import type { DiagramData, ProjectData } from '../types';
+import type { DiagramData, ProjectData, ProjectTreeNode } from '../types';
 import { serializeDSL } from '../parser/dsl/serializer';
 import { renameDiagramHeader } from '../parser/dsl/diagramHeader';
 import { parseCheckedDSL } from './diagramRules';
@@ -58,6 +58,21 @@ export function findTextModelConflicts(project: ProjectData): TextModelConflict[
 }
 
 /**
+ * The text may declare another diagram type than the model (a different
+ * header). Choosing it changes the diagram's type, so the tree and the index
+ * follow, as they do when the type changes in the editor.
+ */
+function setDiagramType(project: ProjectData, id: string, type: DiagramData['type']): void {
+  const visit = (nodes: ProjectTreeNode[]): ProjectTreeNode[] => nodes.map((node) => {
+    if (node.type === 'diagram' && node.id === id) return { ...node, diagramType: type };
+    return node.children ? { ...node, children: visit(node.children) } : node;
+  });
+  project.tree = visit(project.tree);
+  const meta = project.metadata.diagramIndex[id];
+  if (meta) project.metadata = { ...project.metadata, diagramIndex: { ...project.metadata.diagramIndex, [id]: { ...meta, type } } };
+}
+
+/**
  * Apply one choice per conflict to a copy of the project. Choosing the text
  * replaces the model with what the text means; choosing the model replaces the
  * text with the DSL the model writes. Every conflict needs a choice.
@@ -73,6 +88,7 @@ export function resolveTextModelConflicts(
     const choice = choices[conflict.diagramId];
     if (choice === 'text') {
       resolved.diagrams[conflict.diagramId] = structuredClone(conflict.textModel);
+      setDiagramType(resolved, conflict.diagramId, conflict.textModel.type);
       resolved.diagramTexts[conflict.diagramId] = renameDiagramHeader(conflict.text, conflict.diagramName);
     } else if (choice === 'model') {
       resolved.diagramTexts[conflict.diagramId] = serializeDSL(resolved.diagrams[conflict.diagramId]);
