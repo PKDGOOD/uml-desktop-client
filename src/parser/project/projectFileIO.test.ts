@@ -5,7 +5,7 @@ import expectations from '../../../examples/alpha-expectations.json';
 import { ProjectSession } from '../../engine/projectSession';
 import { parseDSL } from '../dsl/peggyParser';
 import { ProjectFileSerializer } from './projectFileSerializer';
-import { readProjectFile, writeProjectFile } from './projectFileIO';
+import { checkProjectData, readProjectFile, writeProjectFile } from './projectFileIO';
 
 const writer = { app: 'UML Studio', version: '0.1.0' };
 const createId = () => 'fresh-id';
@@ -168,5 +168,81 @@ describe('A02.08 project file Save/Open', () => {
       const opened = open(ProjectFileSerializer.serialize(legacy));
       expect(opened.project.diagrams[legacy.tree[0].children![0].id].name).toBe('Renamed');
     });
+  });
+});
+
+describe('A03.08 checkProjectData before replacing a session', () => {
+  it('accepts new, example and corpus projects as Open would load them', async () => {
+    const { createProject, createExampleProject } = await import('../../engine/projectFactory');
+    for (const project of [createProject('New'), createExampleProject('Examples'), legacyProject()]) {
+      const result = checkProjectData(project);
+      if (!result.success) throw new Error(JSON.stringify(result.errors));
+      expect(result.data.project.diagrams).toEqual(project.diagrams);
+      expect(result.data.project.tree).toEqual(project.tree);
+    }
+  });
+
+  it.each<[string, (project: ProjectData) => void, RegExp]>([
+    ['a self-link', (project) => {
+      const diagram = Object.values(project.diagrams).find((entry) => entry.connectors.length > 0)!;
+      diagram.connectors[0].targetId = diagram.connectors[0].sourceId;
+    }, /self-links/],
+    ['an unsupported element field', (project) => {
+      (Object.values(project.diagrams)[0].elements[0] as unknown as Record<string, unknown>).locked = true;
+    }, /locked/],
+    ['a diagram missing from the tree', (project) => { project.tree[0].children!.pop(); }, /not in the tree/],
+    ['too many diagrams', (project) => {
+      const [id, diagram] = Object.entries(project.diagrams)[0];
+      for (let i = 0; i < 20; i++) {
+        const copy = `${id}-copy-${i}`;
+        project.diagrams[copy] = { ...structuredClone(diagram), id: copy };
+        project.tree[0].children!.push({ id: copy, type: 'diagram', name: diagram.name, diagramType: diagram.type });
+        project.metadata.diagramIndex[copy] = { ...project.metadata.diagramIndex[id], id: copy };
+      }
+    }, /20/],
+  ])('refuses %s without changing the candidate', (_name, mutate, message) => {
+    const project = legacyProject();
+    mutate(project);
+    const before = structuredClone(project);
+    const result = checkProjectData(project);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.errors.map((error) => error.message).join('\n')).toMatch(message);
+    expect(project).toEqual(before);
+  });
+
+  it('keeps a project with an unknown root field from being dropped silently', () => {
+    const project = legacyProject() as ProjectData & { comments?: string[] };
+    project.comments = ['from a newer build'];
+    const result = checkProjectData(project);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.errors.map((error) => error.message).join('\n')).toMatch(/comments/);
+  });
+
+  it('does not apply the file byte ceiling to an open project', () => {
+    const project = legacyProject();
+    const [id, diagram] = Object.entries(project.diagrams)[0];
+    const copies = 20 - Object.keys(project.diagrams).length;
+    for (let i = 0; i < copies; i++) {
+      const copy = `${id}-big-${i}`;
+      project.diagrams[copy] = { ...structuredClone(diagram), id: copy };
+      project.tree[0].children!.push({ id: copy, type: 'diagram', name: diagram.name, diagramType: diagram.type });
+      project.metadata.diagramIndex[copy] = { ...project.metadata.diagramIndex[id], id: copy };
+    }
+    for (const key of Object.keys(project.diagrams)) project.diagramTexts![key] = 'x'.repeat(1_000_000);
+    expect(new TextEncoder().encode(JSON.stringify(project)).length).toBeGreaterThan(16 * 1024 * 1024);
+    const result = checkProjectData(project);
+    if (!result.success) throw new Error(JSON.stringify(result.errors.slice(0, 3)));
+    expect(result.data.invalidDrafts.length).toBeGreaterThan(0);
+  });
+
+  it('repairs a restored snapshot whose model name drifted from the tree, as Open does', () => {
+    const project = legacyProject();
+    const id = project.tree[0].children![0].id;
+    project.tree[0].children![0].name = 'Renamed';
+    project.metadata.diagramIndex[id].name = 'Renamed';
+    const result = checkProjectData(project);
+    if (!result.success) throw new Error(JSON.stringify(result.errors));
+    expect(result.data.project.diagrams[id].name).toBe('Renamed');
+    expect(result.data.project.diagramTexts?.[id]).toContain('"Renamed"');
   });
 });
