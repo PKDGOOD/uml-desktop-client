@@ -300,9 +300,33 @@ export function validateDiagramConnections(diagram: DiagramData): DiagramRuleErr
   return errors;
 }
 
-/** All A03.03 and A03.04 rules for one diagram. */
+/** A container may sit at most this many levels below the top (A01.10); the file format refuses deeper chains. */
+export const MAX_CONTAINMENT_DEPTH = 8;
+
+/** Containers nested deeper than the limit. Cycles are the file reader's concern; a revisit just stops the walk. */
+export function validateContainmentDepth(diagram: DiagramData): DiagramRuleError[] {
+  const errors: DiagramRuleError[] = [];
+  const byId = new Map(diagram.elements.map((element) => [element.id, element]));
+  diagram.elements.forEach((element, i) => {
+    const seen = new Set<string>([element.id]);
+    let current = element;
+    while (current.parentId !== undefined) {
+      const parent = byId.get(current.parentId);
+      if (!parent || seen.has(parent.id)) break;
+      seen.add(parent.id);
+      if (seen.size - 1 > MAX_CONTAINMENT_DEPTH) {
+        errors.push({ message: `Element ${element.id} is nested more than ${MAX_CONTAINMENT_DEPTH} levels deep`, path: `elements[${i}].parentId` });
+        break;
+      }
+      current = parent;
+    }
+  });
+  return errors;
+}
+
+/** All A03.03 and A03.04 rules for one diagram, plus the containment depth limit. */
 export function validateDiagramRules(diagram: DiagramData): DiagramRuleError[] {
-  return [...validateDiagramConnections(diagram), ...validateDiagramProperties(diagram)];
+  return [...validateDiagramConnections(diagram), ...validateDiagramProperties(diagram), ...validateContainmentDepth(diagram)];
 }
 
 // -----------------------------------------------------------------------------

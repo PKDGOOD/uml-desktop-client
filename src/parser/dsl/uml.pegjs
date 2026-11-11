@@ -470,7 +470,7 @@ CompositeStateDef
     }
 
 CompositeStateItem
-  = _ item:(StateDef / InitialStateDef / FinalStateDef / TransitionDef) _ NL { return item; }
+  = _ item:(CompositeStateDef / StateDef / InitialStateDef / FinalStateDef / TransitionDef) _ NL { return item; }
   / _ NL { return null; }
 
 InitialStateDef

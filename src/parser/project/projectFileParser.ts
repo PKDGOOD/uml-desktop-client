@@ -5,7 +5,7 @@ import type {
   DiagramData,
   DiagramElement,
 } from '@/types';
-import { validateDiagramRules } from '@/engine/diagramRules';
+import { validateContainmentDepth, validateDiagramRules } from '@/engine/diagramRules';
 
 export interface ProjectFileParseError {
   message: string;
@@ -193,8 +193,6 @@ function validateMetadata(
  * state owns states, pseudostates and composite states; a system boundary owns
  * use cases. Composite chains are acyclic and at most 8 levels deep (A01.10).
  */
-const MAX_CONTAINMENT_DEPTH = 8;
-
 const CONTAINMENT: Partial<Record<string, readonly string[]>> = {
   'composite-state': ['state', 'initial-state', 'final-state', 'composite-state'],
   'system-boundary': ['usecase'],
@@ -299,7 +297,7 @@ export function validateProjectReferences(project: ProjectData, options: Referen
       }
     });
     diagram.elements.forEach((element, i) => {
-      // Follow the parent chain; a revisit is a cycle, a long chain is too deep.
+      // Follow the parent chain; a revisit is a cycle. The depth limit is a diagram rule (MAX_CONTAINMENT_DEPTH).
       const seen = new Set<string>([element.id]);
       let current = element;
       while (current.parentId !== undefined) {
@@ -310,10 +308,6 @@ export function validateProjectReferences(project: ProjectData, options: Referen
           break;
         }
         seen.add(parent.id);
-        if (seen.size - 1 > MAX_CONTAINMENT_DEPTH) {
-          errors.push({ message: `Element ${element.id} is nested more than ${MAX_CONTAINMENT_DEPTH} levels deep`, path: `diagrams.${id}.elements[${i}].parentId` });
-          break;
-        }
         current = parent;
       }
     });
@@ -326,10 +320,9 @@ export function validateProjectReferences(project: ProjectData, options: Referen
         }
       }
     });
-    if (options.strict) {
-      for (const error of validateDiagramRules(diagram)) {
-        errors.push({ message: error.message, path: `diagrams.${id}.${error.path}` });
-      }
+    const ruleErrors = options.strict ? validateDiagramRules(diagram) : validateContainmentDepth(diagram);
+    for (const error of ruleErrors) {
+      errors.push({ message: error.message, path: `diagrams.${id}.${error.path}` });
     }
   }
   return errors;
