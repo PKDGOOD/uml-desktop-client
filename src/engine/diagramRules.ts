@@ -68,15 +68,25 @@ function describe(element: DiagramElement): string {
 // A03.03: names, members and multiplicity
 // -----------------------------------------------------------------------------
 
+/** ADR 0002 §4: names cannot hold U+0000–U+001F (line breaks, tabs and other controls). */
+const CONTROL = /[\u0000-\u001F]/;
+
 export function validateDiagramProperties(diagram: DiagramData): DiagramRuleError[] {
   const errors: DiagramRuleError[] = [];
   const names = new Map<string, number>();
+  if (typeof diagram.name !== 'string' || diagram.name.trim() === '') {
+    errors.push({ message: 'The diagram needs a name', path: 'name' });
+  } else if (CONTROL.test(diagram.name)) {
+    errors.push({ message: `Diagram name ${JSON.stringify(diagram.name)} cannot contain line breaks, tabs or other control characters`, path: 'name' });
+  }
 
   diagram.elements.forEach((element, i) => {
     const path = `elements[${i}].properties`;
     const { name, stereotype, visibility, attributes, methods } = element.properties;
     if (typeof name !== 'string' || name.trim() === '') {
       errors.push({ message: `Element ${element.id} needs a name`, path: `${path}.name` });
+    } else if (CONTROL.test(name)) {
+      errors.push({ message: `Name ${JSON.stringify(name)} cannot contain line breaks, tabs or other control characters`, path: `${path}.name` });
     } else if (names.has(name)) {
       errors.push({
         message: `Two elements in this diagram are named ${JSON.stringify(name)}; connections could not tell them apart`,
@@ -309,6 +319,42 @@ function nameTokens(name: string): string[] {
   return IDENTIFIER.test(name) ? [name] : [JSON.stringify(name)];
 }
 
+const NAME_PART = /[a-zA-Z0-9_\u00C0-\u024F\uAC00-\uD7AF]/;
+
+/** How often `token` appears in `line` as a whole name, not inside a longer one. */
+function wordCount(line: string, token: string): number {
+  let count = 0;
+  for (let at = line.indexOf(token); at >= 0; at = line.indexOf(token, at + token.length)) {
+    const before = line[at - 1];
+    const after = line[at + token.length];
+    if (!(before && NAME_PART.test(before)) && !(after && NAME_PART.test(after))) count++;
+  }
+  return count;
+}
+
+function isWord(line: string, token: string): boolean {
+  return wordCount(line, token) > 0;
+}
+
+/** A relation line without its `: label`, so names inside a label do not count as ends. */
+function relationPart(line: string): string {
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (quoted && char === '\\') i++;
+    else if (char === '"') quoted = !quoted;
+    else if (char === ':' && !quoted) return line.slice(0, i);
+  }
+  return line;
+}
+
+/** A relation line whose ends name every wanted element; a self-link names its element twice. */
+function isRelationLine(line: string, wanted: string[][]): boolean {
+  const ends = relationPart(line);
+  if (!ARROW.test(ends) || !wanted.every((tokens) => tokens.some((token) => isWord(ends, token)))) return false;
+  return wanted.length < 2 || wanted[0][0] !== wanted[1][0] || wordCount(ends, wanted[0][0]) >= 2;
+}
+
 /** Best-effort source line of a rule error: the line that names the element or both connector ends. */
 function locate(diagram: DiagramData, error: DiagramRuleError, lines: string[]): number {
   const match = /^(elements|connectors)\[(\d+)\]/.exec(error.path);
@@ -326,25 +372,12 @@ function locate(diagram: DiagramData, error: DiagramRuleError, lines: string[]):
     }
   }
   if (wanted.length === 0) return 1;
-  const part = /[a-zA-Z0-9_\u00C0-\u024F\uAC00-\uD7AF]/;
-  const wordCount = (line: string, token: string) => {
-    let count = 0;
-    for (let at = line.indexOf(token); at >= 0; at = line.indexOf(token, at + token.length)) {
-      const before = line[at - 1];
-      const after = line[at + token.length];
-      if (!(before && part.test(before)) && !(after && part.test(after))) count++;
-    }
-    return count;
-  };
-  const isWord = (line: string, token: string) => wordCount(line, token) > 0;
   const index = Number(match[2]);
   if (match[1] === 'connectors') {
     // Connector lines are in model order, so the n-th connector between the same two
     // elements sits on the n-th relation line that names both of them.
     const hits = lines.flatMap((line, i) => (
-      ARROW.test(line) && wanted.every((tokens) => tokens.some((token) => isWord(line, token)))
-        // A self-link names its element twice.
-        && (wanted.length < 2 || wanted[0][0] !== wanted[1][0] || wordCount(line, wanted[0][0]) >= 2) ? [i + 1] : []
+      isRelationLine(line, wanted) ? [i + 1] : []
     ));
     const pair = (connector: Connector) => [names.get(connector.sourceId), names.get(connector.targetId)].sort().join('\u0000');
     const key = pair(diagram.connectors[index]);
@@ -370,6 +403,32 @@ export function ruleDiagnostics(diagram: DiagramData, text: string): DSLError[] 
 export function parseCheckedDSL(text: string): DSLParseResult {
   const result = parseDSL(text);
   if (!result.success) return result;
-  const errors = ruleDiagnostics(result.diagram, text);
+  const errors = [...unresolvedEnds(result.diagram, text), ...ruleDiagnostics(result.diagram, text)];
   return errors.length > 0 ? { success: false, errors } : result;
+}
+
+/**
+ * ADR 0002 §7: a connector naming an undeclared element is a diagnostic on its
+ * line; the name is never kept as an endpoint ID.
+ */
+function unresolvedEnds(diagram: DiagramData, text: string): DSLError[] {
+  const ids = new Set(diagram.elements.map((element) => element.id));
+  const lines = text.split(/\r\n|\n|\r/);
+  const used = new Map<string, number>();
+  const errors: DSLError[] = [];
+  for (const connector of diagram.connectors) {
+    for (const name of new Set([connector.sourceId, connector.targetId])) {
+      if (ids.has(name)) continue;
+      const tokens = nameTokens(name);
+      const hits = lines.flatMap((line, i) => (isRelationLine(line, [tokens]) ? [i + 1] : []));
+      const seen = used.get(name) ?? 0;
+      used.set(name, seen + 1);
+      errors.push({
+        line: hits[seen] ?? hits[hits.length - 1] ?? 1,
+        column: 1,
+        message: `Unknown element ${JSON.stringify(name)}; declare it, or use Rename in the inspector to keep connections`,
+      });
+    }
+  }
+  return errors;
 }
