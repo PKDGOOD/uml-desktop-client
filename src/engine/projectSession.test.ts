@@ -363,9 +363,7 @@ describe('A03.07 diagram rules before GUI commands', () => {
       for (const change of refused) {
         expect(session.tryEditCanvas('one', change)).toEqual({ ok: false, reason: 'draft', errors: [] });
       }
-      session.undo('one');
       expect(session.snapshot().revision).toBe(revision);
-      expect(session.snapshot().project.diagramTexts?.one).toBe(broken);
 
       // Correcting the text unblocks commands without losing the fix.
       session.editText('one', '@class-diagram "one"\nclass Order @pos(1, 2) @size(200, 100) {\n}\n');
@@ -381,5 +379,94 @@ describe('A03.07 diagram rules before GUI commands', () => {
       expect(session.snapshot().project.diagramTexts?.one).toBe(broken);
       session.dispose();
     });
+  });
+});
+
+describe('A04.10 text and canvas undo ordering', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const valid = (name: string) => `@class-diagram "one"\nclass ${name} @pos(10, 20) @size(200, 100) {\n}\n`;
+  const move = { type: 'element-move', elementId: 'one-element', position: { x: 5, y: 5 } } as const;
+
+  it('undoes an invalid paste without fixing it first, then redoes it', () => {
+    const session = new ProjectSession(project(), vi.fn());
+    const original = session.text('one');
+    session.editText('one', '@class-diagram "one"\nclass {{{');
+    session.getSession('one')!.sync.flushPendingText();
+    expect(session.getSession('one')!.sync.getErrors().length).toBeGreaterThan(0);
+    session.undo('one');
+    expect(session.text('one')).toBe(original);
+    expect(session.getSession('one')!.sync.getErrors()).toEqual([]);
+    session.redo('one');
+    expect(session.text('one')).toBe('@class-diagram "one"\nclass {{{');
+    expect(session.getSession('one')!.sync.getErrors().length).toBeGreaterThan(0);
+    session.dispose();
+  });
+
+  it('keeps text edits and canvas edits in one ordered history', () => {
+    const session = new ProjectSession(project(), vi.fn());
+    const original = session.text('one');
+    session.editText('one', valid('Order'));
+    vi.advanceTimersByTime(400);
+    session.tryEditCanvas('one', move);
+    session.editText('one', '@class-diagram "one"\nclass {{{');
+    session.getSession('one')!.sync.flushPendingText();
+    session.undo('one'); // the bad paste
+    expect(session.tryEditCanvas('one', { ...move, position: { x: 7, y: 7 } })).toEqual({ ok: true });
+    session.undo('one'); // that move
+    session.undo('one'); // the first move
+    expect(session.project.diagrams.one.elements[0].position).toEqual({ x: 10, y: 20 });
+    session.undo('one'); // the text edit
+    expect(session.text('one')).toBe(original);
+    session.dispose();
+  });
+
+  it('groups keystrokes inside the debounce window into one step', () => {
+    const session = new ProjectSession(project(), vi.fn());
+    const original = session.text('one');
+    session.editText('one', valid('Ord'));
+    session.editText('one', valid('Orde'));
+    session.editText('one', valid('Order'));
+    vi.advanceTimersByTime(400);
+    session.undo('one');
+    expect(session.text('one')).toBe(original);
+    session.dispose();
+  });
+
+  it('keeps 50 edit groups, drops older ones, and clears redo on a new edit', () => {
+    const session = new ProjectSession(project(), vi.fn());
+    for (let i = 0; i < 60; i++) {
+      session.editText('one', valid(`N${i}`));
+      session.getSession('one')!.sync.flushPendingText();
+    }
+    let undone = 0;
+    for (; undone < 70; undone++) {
+      const before = session.text('one');
+      session.undo('one');
+      if (session.text('one') === before) break;
+    }
+    expect(undone).toBe(50);
+    session.redo('one');
+    session.editText('one', valid('Fresh'));
+    session.getSession('one')!.sync.flushPendingText();
+    const after = session.text('one');
+    session.redo('one');
+    expect(session.text('one')).toBe(after);
+    session.dispose();
+  });
+
+  it('does not leak history between diagrams', () => {
+    const session = new ProjectSession(project(), vi.fn());
+    const twoText = session.text('two');
+    session.editText('one', valid('Order'));
+    session.getSession('one')!.sync.flushPendingText();
+    session.getSession('two');
+    session.undo('two');
+    expect(session.text('two')).toBe(twoText);
+    expect(session.text('one')).toBe(valid('Order'));
+    session.undo('one');
+    expect(session.text('one')).not.toBe(valid('Order'));
+    session.dispose();
   });
 });

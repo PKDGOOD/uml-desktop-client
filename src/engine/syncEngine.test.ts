@@ -95,7 +95,8 @@ describe('A03.06 diagram rules after DSL parsing', () => {
     expect(engine.getText()).toBe(SELF_LINK);
     expect(engine.getDiagram()).toEqual(before);
     expect(onDiagramUpdate).not.toHaveBeenCalled();
-    expect(history.canUndo()).toBe(false);
+    // The draft is an undo step, so a bad paste can be taken back (A04.10).
+    expect(history.canUndo()).toBe(true);
     expect(onErrors).toHaveBeenLastCalledWith([
       { line: 9, column: 1, message: expect.stringMatching(/self-links are not supported/) },
     ]);

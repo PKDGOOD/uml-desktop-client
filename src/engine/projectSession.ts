@@ -125,14 +125,18 @@ export class ProjectSession {
 
   undo(id: string): void {
     const session = this.getSession(id);
-    if (!session?.sync.flushPendingText() || !session.history.canUndo()) return;
+    if (!session) return;
+    session.sync.flushPendingText(); // an invalid draft is an undo step of its own
+    if (!session.history.canUndo()) return;
     session.history.undo();
     this.touch();
   }
 
   redo(id: string): void {
     const session = this.getSession(id);
-    if (!session?.sync.flushPendingText() || !session.history.canRedo()) return;
+    if (!session) return;
+    session.sync.flushPendingText();
+    if (!session.history.canRedo()) return;
     session.history.redo();
     this.touch();
   }

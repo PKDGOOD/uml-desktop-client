@@ -11,6 +11,11 @@ export class UndoManager {
 
   execute(command: Command): void {
     command.execute();
+    this.record(command);
+  }
+
+  /** Add a step whose effect has already happened (the user typed it). */
+  record(command: Command): void {
     this.undoStack.push(command);
     // Clear redo stack when a new command is executed
     this.redoStack = [];
