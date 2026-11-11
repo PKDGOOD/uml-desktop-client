@@ -6,6 +6,7 @@
 // the inspector reject the same values. Nothing is repaired or trimmed here.
 // =============================================================================
 
+import { formatName, isBareIdentifier } from '../parser/dsl/escaping';
 import type { Connector, ConnectorType, DiagramData, DiagramElement, DiagramType, DSLError, DSLParseResult, ElementType } from '../types';
 import { parseDSL } from '../parser/dsl/peggyParser';
 import { CONNECTOR_TYPES, ELEMENT_TYPES } from './elementFactory';
@@ -16,8 +17,6 @@ export interface DiagramRuleError {
   path: string;
 }
 
-/** Same character classes as `Identifier` in `uml.pegjs`. */
-const IDENTIFIER = /^[a-zA-Z_À-ɏ가-힯][a-zA-Z0-9_À-ɏ가-힯]*$/;
 /** `TypeExpr` characters; the parser trims the result, so edges cannot be spaces. */
 const TYPE_EXPR = /^[a-zA-Z0-9_[\]<>,.À-ɏ가-힯 ]+$/;
 const VISIBILITIES = new Set(['public', 'private', 'protected', 'package']);
@@ -28,9 +27,7 @@ const MULTIPLICITY_RELATIONS = new Set<ConnectorType>(['association', 'directed-
 const UNLABELED = new Set<ConnectorType>(['include', 'extend']);
 const MESSAGES = new Set<ConnectorType>(['sync-message', 'async-message', 'return-message']);
 
-export function isIdentifier(value: unknown): value is string {
-  return typeof value === 'string' && IDENTIFIER.test(value);
-}
+export const isIdentifier = isBareIdentifier;
 
 /** A type the DSL reads back as written. Parameter types also cannot hold a comma. */
 export function isTypeExpression(value: unknown, inParameterList = false): value is string {
@@ -316,7 +313,7 @@ export function validateDiagramRules(diagram: DiagramData): DiagramRuleError[] {
 const ARROW = /--|\.\.|->|<-/;
 
 function nameTokens(name: string): string[] {
-  return IDENTIFIER.test(name) ? [name] : [JSON.stringify(name)];
+  return [formatName(name)];
 }
 
 const NAME_PART = /[a-zA-Z0-9_\u00C0-\u024F\uAC00-\uD7AF]/;

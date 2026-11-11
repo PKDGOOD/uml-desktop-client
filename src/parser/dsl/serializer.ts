@@ -10,6 +10,9 @@ import type {
   Method,
   ConnectorType,
 } from '../../types';
+import { formatName, quoteString } from './escaping';
+
+export { formatName };
 
 // Visibility → DSL marker
 const visibilityMarker: Record<string, string> = {
@@ -27,7 +30,7 @@ export function serializeDSL(diagram: DiagramData): string {
   const lines: string[] = [];
 
   // Header
-  lines.push(`@${diagram.type}-diagram ${JSON.stringify(diagram.name)}`);
+  lines.push(`@${diagram.type}-diagram ${quoteString(diagram.name)}`);
   lines.push('');
 
   // Build reverse lookup: element ID → element name
@@ -61,14 +64,6 @@ export function serializeDSL(diagram: DiagramData): string {
 // =============================================================================
 // Helpers
 // =============================================================================
-
-/** Format a name: quote it if it contains spaces or special chars, otherwise bare identifier */
-export function formatName(name: string): string {
-  if (/^[a-zA-Z_\u00C0-\u024F\uAC00-\uD7AF][a-zA-Z0-9_\u00C0-\u024F\uAC00-\uD7AF]*$/.test(name)) {
-    return name;
-  }
-  return JSON.stringify(name);
-}
 
 /** Format a stereotype as ` <<name>>`; empty or unrepresentable values are omitted */
 function formatStereotype(stereotype: string | undefined): string {
