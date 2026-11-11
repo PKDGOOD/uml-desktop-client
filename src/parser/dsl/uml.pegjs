@@ -43,6 +43,78 @@
     return Object.assign(properties, rest);
   }
 
+  // ---- Source spans (A04.01, ADR 0002 §5) ----
+  // Half-open [start, end) UTF-16 offsets into the parsed text, as editors use.
+  function spanOf(loc) {
+    return { start: loc.start.offset, end: loc.end.offset };
+  }
+
+  // A span that stops before trailing whitespace the rule consumed (labels and types are trimmed too).
+  function trimmedSpan(loc, matched) {
+    return { start: loc.start.offset, end: loc.start.offset + matched.trimEnd().length };
+  }
+
+  function element(type, nameTok, ann, properties, loc, extra) {
+    const spans = {
+      declaration: spanOf(loc),
+      name: nameTok.span,
+      posInsertAt: ann.insertAt,
+      sizeInsertAt: ann.posSpan ? ann.posSpan.end : ann.insertAt,
+    };
+    if (ann.posSpan) spans.pos = ann.posSpan;
+    if (ann.sizeSpan) spans.size = ann.sizeSpan;
+    if (extra && extra.members) spans.members = extra.members;
+    if (extra && extra.closeBrace !== undefined) spans.closeBrace = extra.closeBrace;
+    const node = {
+      _nodeType: 'element',
+      type,
+      position: ann.position,
+      size: ann.size,
+      properties,
+      _spans: spans,
+    };
+    if (extra && extra.children) node.children = extra.children;
+    return node;
+  }
+
+  function connector(type, src, tgt, loc, matched, rest) {
+    const spans = { line: trimmedSpan(loc, matched), source: src.span, target: tgt.span };
+    if (rest.labelSpan) spans.label = rest.labelSpan;
+    if (rest.sourceMultiplicitySpan) spans.sourceMultiplicity = rest.sourceMultiplicitySpan;
+    if (rest.targetMultiplicitySpan) spans.targetMultiplicity = rest.targetMultiplicitySpan;
+    const node = {
+      _nodeType: 'connector',
+      id: makeId('conn'),
+      type,
+      sourceId: src.value,
+      targetId: tgt.value,
+    };
+    if ('sourceMultiplicity' in rest) node.sourceMultiplicity = rest.sourceMultiplicity;
+    if ('targetMultiplicity' in rest) node.targetMultiplicity = rest.targetMultiplicity;
+    if ('label' in rest) node.label = rest.label;
+    node.properties = {};
+    node._spans = spans;
+    return node;
+  }
+
+  // Members in source order, with where each one lands in the model.
+  function classifierMembers(members) {
+    const attrs = [];
+    const methods = [];
+    const spans = [];
+    for (const m of members) {
+      if (!m) continue;
+      if (m._memberType === 'method') {
+        spans.push({ kind: 'method', index: methods.length, span: m.span });
+        methods.push({ name: m.name, returnType: m.returnType, parameters: m.parameters, visibility: m.visibility });
+      } else {
+        spans.push({ kind: 'attribute', index: attrs.length, span: m.span });
+        attrs.push({ name: m.name, type: m.type, visibility: m.visibility });
+      }
+    }
+    return { attrs, methods, spans };
+  }
+
   function defaultPos(index) {
     return { x: 50 + (index % 4) * 250, y: 50 + Math.floor(index / 4) * 200 };
   }
@@ -53,6 +125,7 @@
 Diagram
   = (_ NL)* _ header:DiagramHeader _ NL* body:BodyItem* _ {
       const elements = [];
+      const elementSpans = [];
       const connectors = [];
       let elementIndex = 0;
       const nameToId = new Map();
@@ -63,6 +136,7 @@ Diagram
         const size = item.size || defaultSize(item.type);
         const id = makeId(item.type);
         nameToId.set(item.properties.name, id);
+        elementSpans.push(item._spans);
         elements.push({
           id,
           type: item.type,
@@ -100,8 +174,13 @@ Diagram
         if (nameToId.has(conn.targetId)) conn.targetId = nameToId.get(conn.targetId);
         delete conn._nodeType;
       }
+      const connectorSpans = connectors.map((conn) => {
+        const spans = conn._spans;
+        delete conn._spans;
+        return spans;
+      });
 
-      return {
+      const diagram = {
         id: makeId('diagram'),
         name: header.name,
         type: header.type,
@@ -109,14 +188,24 @@ Diagram
         connectors,
         viewport: { x: 0, y: 0, zoom: 1.0 },
       };
+      return {
+        diagram,
+        spans: {
+          header: header.span,
+          headerName: header.nameSpan,
+          lineEnding: /\r\n/.test(input) ? '\r\n' : /\r/.test(input) ? '\r' : '\n',
+          elements: elementSpans,
+          connectors: connectorSpans,
+        },
+      };
     }
 
 DiagramHeader
-  = "@class-diagram" _ name:QuotedString { return { type: 'class', name }; }
-  / "@sequence-diagram" _ name:QuotedString { return { type: 'sequence', name }; }
-  / "@usecase-diagram" _ name:QuotedString { return { type: 'usecase', name }; }
-  / "@activity-diagram" _ name:QuotedString { return { type: 'activity', name }; }
-  / "@state-diagram" _ name:QuotedString { return { type: 'state', name }; }
+  = "@class-diagram" _ name:NameQuoted { return { type: 'class', name: name.value, nameSpan: name.span, span: spanOf(location()) }; }
+  / "@sequence-diagram" _ name:NameQuoted { return { type: 'sequence', name: name.value, nameSpan: name.span, span: spanOf(location()) }; }
+  / "@usecase-diagram" _ name:NameQuoted { return { type: 'usecase', name: name.value, nameSpan: name.span, span: spanOf(location()) }; }
+  / "@activity-diagram" _ name:NameQuoted { return { type: 'activity', name: name.value, nameSpan: name.span, span: spanOf(location()) }; }
+  / "@state-diagram" _ name:NameQuoted { return { type: 'state', name: name.value, nameSpan: name.span, span: spanOf(location()) }; }
 
 BodyItem
   = _ NL { return null; }
@@ -149,88 +238,53 @@ BodyItem
 
 PosAnnotation
   = "@pos" _ "(" _ x:Integer _ "," _ y:Integer _ ")" {
-      return { x, y };
+      return { value: { x, y }, span: spanOf(location()) };
     }
 
 SizeAnnotation
   = "@size" _ "(" _ w:Integer _ "," _ h:Integer _ ")" {
-      return { width: w, height: h };
+      return { value: { width: w, height: h }, span: spanOf(location()) };
     }
 
+// insertAt: where a missing @pos goes (after the name, or after its stereotype).
 Annotations
   = pos:(_ PosAnnotation)? size:(_ SizeAnnotation)? {
       return {
-        position: pos ? pos[1] : null,
-        size: size ? size[1] : null,
+        position: pos ? pos[1].value : null,
+        size: size ? size[1].value : null,
+        posSpan: pos ? pos[1].span : undefined,
+        sizeSpan: size ? size[1].span : undefined,
+        insertAt: location().start.offset,
       };
     }
 
 // ============ Class Diagram Elements ============
 
 ClassDef
-  = vis:ElementVisibility? "class" S name:IdentifierOrQuoted stereo:StereotypeAnnotation? ann:Annotations _ "{" _ NL members:MemberLine* _ "}" {
-      const attrs = [];
-      const methods = [];
-      for (const m of members) {
-        if (!m) continue;
-        if (m._memberType === 'method') methods.push({ name: m.name, returnType: m.returnType, parameters: m.parameters, visibility: m.visibility });
-        else attrs.push({ name: m.name, type: m.type, visibility: m.visibility });
-      }
-      return {
-        _nodeType: 'element',
-        type: 'class',
-        position: ann.position,
-        size: ann.size,
-        properties: classifierProperties(name, vis, stereo, { attributes: attrs, methods }),
-      };
+  = vis:ElementVisibility? "class" S name:NameToken stereo:StereotypeAnnotation? ann:Annotations _ "{" _ NL members:MemberLine* _ close:CloseBrace {
+      const m = classifierMembers(members);
+      return element('class', name, ann, classifierProperties(name.value, vis, stereo, { attributes: m.attrs, methods: m.methods }), location(), { members: m.spans, closeBrace: close });
     }
 
 AbstractClassDef
-  = vis:ElementVisibility? "abstract" S "class" S name:IdentifierOrQuoted stereo:StereotypeAnnotation? ann:Annotations _ "{" _ NL members:MemberLine* _ "}" {
-      const attrs = [];
-      const methods = [];
-      for (const m of members) {
-        if (!m) continue;
-        if (m._memberType === 'method') methods.push({ name: m.name, returnType: m.returnType, parameters: m.parameters, visibility: m.visibility });
-        else attrs.push({ name: m.name, type: m.type, visibility: m.visibility });
-      }
-      return {
-        _nodeType: 'element',
-        type: 'abstract-class',
-        position: ann.position,
-        size: ann.size,
-        properties: classifierProperties(name, vis, stereo, { attributes: attrs, methods }),
-      };
+  = vis:ElementVisibility? "abstract" S "class" S name:NameToken stereo:StereotypeAnnotation? ann:Annotations _ "{" _ NL members:MemberLine* _ close:CloseBrace {
+      const m = classifierMembers(members);
+      return element('abstract-class', name, ann, classifierProperties(name.value, vis, stereo, { attributes: m.attrs, methods: m.methods }), location(), { members: m.spans, closeBrace: close });
     }
 
 InterfaceDef
-  = vis:ElementVisibility? "interface" S name:IdentifierOrQuoted stereo:StereotypeAnnotation? ann:Annotations _ "{" _ NL members:MemberLine* _ "}" {
-      const attrs = [];
-      const methods = [];
-      for (const m of members) {
-        if (!m) continue;
-        if (m._memberType === 'method') methods.push({ name: m.name, returnType: m.returnType, parameters: m.parameters, visibility: m.visibility });
-        else attrs.push({ name: m.name, type: m.type, visibility: m.visibility });
-      }
-      return {
-        _nodeType: 'element',
-        type: 'interface',
-        position: ann.position,
-        size: ann.size,
-        properties: classifierProperties(name, vis, stereo, { attributes: attrs, methods }),
-      };
+  = vis:ElementVisibility? "interface" S name:NameToken stereo:StereotypeAnnotation? ann:Annotations _ "{" _ NL members:MemberLine* _ close:CloseBrace {
+      const m = classifierMembers(members);
+      return element('interface', name, ann, classifierProperties(name.value, vis, stereo, { attributes: m.attrs, methods: m.methods }), location(), { members: m.spans, closeBrace: close });
     }
 
 EnumDef
-  = vis:ElementVisibility? "enum" S name:IdentifierOrQuoted stereo:StereotypeAnnotation? ann:Annotations _ "{" _ NL values:EnumLine* _ "}" {
+  = vis:ElementVisibility? "enum" S name:NameToken stereo:StereotypeAnnotation? ann:Annotations _ "{" _ NL values:EnumLine* _ close:CloseBrace {
       const filtered = values.filter(Boolean);
-      return {
-        _nodeType: 'element',
-        type: 'enum',
-        position: ann.position,
-        size: ann.size,
-        properties: classifierProperties(name, vis, stereo, { attributes: filtered.map(v => ({ name: v, type: '', visibility: 'public' })), methods: [] }),
-      };
+      return element('enum', name, ann,
+        classifierProperties(name.value, vis, stereo, { attributes: filtered.map(v => ({ name: v.name, type: '', visibility: 'public' })), methods: [] }),
+        location(),
+        { members: filtered.map((v, index) => ({ kind: 'attribute', index, span: v.span })), closeBrace: close });
     }
 
 // Optional element visibility before the keyword, e.g. `- class Order { ... }`
@@ -247,12 +301,12 @@ MemberLine
 
 AttributeMember
   = vis:VisibilityMarker S name:Identifier _ ":" _ type:TypeExpr {
-      return { _memberType: 'attribute', name, type, visibility: vis };
+      return { _memberType: 'attribute', name, type, visibility: vis, span: trimmedSpan(location(), text()) };
     }
 
 MethodMember
   = vis:VisibilityMarker S name:Identifier _ "(" _ params:ParameterList _ ")" _ ":" _ ret:TypeExpr {
-      return { _memberType: 'method', name, returnType: ret, parameters: params, visibility: vis };
+      return { _memberType: 'method', name, returnType: ret, parameters: params, visibility: vis, span: trimmedSpan(location(), text()) };
     }
 
 VisibilityMarker
@@ -279,28 +333,36 @@ TypeChar
   = [a-zA-Z0-9_\[\]<>,.\u00C0-\u024F\uAC00-\uD7AF ]
 
 EnumLine
-  = _ name:Identifier _ NL { return name; }
+  = _ name:EnumValue _ NL { return name; }
   / _ NL { return null; }
+
+EnumValue
+  = name:Identifier { return { name, span: spanOf(location()) }; }
+
+// The offset of a block's closing brace, where a first member or child goes.
+CloseBrace
+  = "}" { return location().start.offset; }
 
 // ============ Class Diagram Relations ============
 
 RelationDef
-  = src:IdentifierOrQuoted _ srcMult:Multiplicity? _ rel:RelationType _ tgtMult:Multiplicity? _ tgt:IdentifierOrQuoted label:(_ ":" _ LabelText)? {
-      return {
-        _nodeType: 'connector',
-        id: makeId('conn'),
-        type: rel,
-        sourceId: src,
-        targetId: tgt,
-        sourceMultiplicity: srcMult || undefined,
-        targetMultiplicity: tgtMult || undefined,
-        label: label ? label[3] : undefined,
-        properties: {},
-      };
+  = src:NameToken _ srcMult:Multiplicity? _ rel:RelationType _ tgtMult:Multiplicity? _ tgt:NameToken label:(_ ":" _ LabelToken)? {
+      return connector(rel, src, tgt, location(), text(), {
+        // An empty "" is the placeholder the serializer writes to keep the arrow direction, not a multiplicity.
+        sourceMultiplicity: srcMult && srcMult.value ? srcMult.value : undefined,
+        targetMultiplicity: tgtMult && tgtMult.value ? tgtMult.value : undefined,
+        label: label ? label[3].value : undefined,
+        sourceMultiplicitySpan: srcMult ? srcMult.span : undefined,
+        targetMultiplicitySpan: tgtMult ? tgtMult.span : undefined,
+        labelSpan: label ? label[3].span : undefined,
+      });
     }
 
 Multiplicity
-  = '"' chars:[^"]* '"' _ { return chars.join(''); }
+  = m:MultiplicityToken _ { return m; }
+
+MultiplicityToken
+  = '"' chars:[^"]* '"' { return { value: chars.join(''), span: spanOf(location()) }; }
 
 RelationType
   = "..|>" { return 'realization'; }
@@ -319,27 +381,13 @@ RelationType
 // ============ Sequence Diagram Elements ============
 
 LifelineDef
-  = "lifeline" S name:IdentifierOrQuoted ann:Annotations {
-      return {
-        _nodeType: 'element',
-        type: 'lifeline',
-        position: ann.position,
-        size: ann.size,
-        properties: { name },
-      };
+  = "lifeline" S name:NameToken ann:Annotations {
+      return element('lifeline', name, ann, { name: name.value }, location());
     }
 
 MessageDef
-  = src:IdentifierOrQuoted _ msgType:MessageType _ tgt:IdentifierOrQuoted _ ":" _ label:LabelText {
-      return {
-        _nodeType: 'connector',
-        id: makeId('conn'),
-        type: msgType,
-        sourceId: src,
-        targetId: tgt,
-        label: label,
-        properties: {},
-      };
+  = src:NameToken _ msgType:MessageType _ tgt:NameToken _ ":" _ label:LabelToken {
+      return connector(msgType, src, tgt, location(), text(), { label: label.value, labelSpan: label.span });
     }
 
 MessageType
@@ -350,38 +398,18 @@ MessageType
 // ============ Usecase Diagram Elements ============
 
 ActorDef
-  = "actor" S name:IdentifierOrQuoted ann:Annotations {
-      return {
-        _nodeType: 'element',
-        type: 'actor',
-        position: ann.position,
-        size: ann.size,
-        properties: { name },
-      };
+  = "actor" S name:NameToken ann:Annotations {
+      return element('actor', name, ann, { name: name.value }, location());
     }
 
 UsecaseDef
-  = "usecase" S name:IdentifierOrQuoted ann:Annotations {
-      return {
-        _nodeType: 'element',
-        type: 'usecase',
-        position: ann.position,
-        size: ann.size,
-        properties: { name },
-      };
+  = "usecase" S name:NameToken ann:Annotations {
+      return element('usecase', name, ann, { name: name.value }, location());
     }
 
 SystemBoundaryDef
-  = "system-boundary" S name:IdentifierOrQuoted ann:Annotations _ "{" _ NL items:SystemBoundaryItem* _ "}" {
-      const children = items.filter(Boolean);
-      return {
-        _nodeType: 'element',
-        type: 'system-boundary',
-        position: ann.position,
-        size: ann.size,
-        properties: { name },
-        children: children,
-      };
+  = "system-boundary" S name:NameToken ann:Annotations _ "{" _ NL items:SystemBoundaryItem* _ close:CloseBrace {
+      return element('system-boundary', name, ann, { name: name.value }, location(), { children: items.filter(Boolean), closeBrace: close });
     }
 
 SystemBoundaryItem
@@ -389,25 +417,8 @@ SystemBoundaryItem
   / _ NL { return null; }
 
 UsecaseRelationDef
-  = src:IdentifierOrQuoted _ "-->" _ tgt:IdentifierOrQuoted _ stereotype:UsecaseStereotype {
-      return {
-        _nodeType: 'connector',
-        id: makeId('conn'),
-        type: stereotype,
-        sourceId: src,
-        targetId: tgt,
-        properties: {},
-      };
-    }
-  / src:IdentifierOrQuoted _ "..>" _ tgt:IdentifierOrQuoted _ stereotype:UsecaseStereotype {
-      return {
-        _nodeType: 'connector',
-        id: makeId('conn'),
-        type: stereotype,
-        sourceId: src,
-        targetId: tgt,
-        properties: {},
-      };
+  = src:NameToken _ ("-->" / "..>") _ tgt:NameToken _ stereotype:UsecaseStereotype {
+      return connector(stereotype, src, tgt, location(), text(), {});
     }
 
 UsecaseStereotype
@@ -417,95 +428,45 @@ UsecaseStereotype
 // ============ Activity Diagram Elements ============
 
 ActionDef
-  = "action" S name:IdentifierOrQuoted ann:Annotations {
-      return {
-        _nodeType: 'element',
-        type: 'action',
-        position: ann.position,
-        size: ann.size,
-        properties: { name },
-      };
+  = "action" S name:NameToken ann:Annotations {
+      return element('action', name, ann, { name: name.value }, location());
     }
 
 DecisionDef
-  = "decision" S name:IdentifierOrQuoted ann:Annotations {
-      return {
-        _nodeType: 'element',
-        type: 'decision',
-        position: ann.position,
-        size: ann.size,
-        properties: { name },
-      };
+  = "decision" S name:NameToken ann:Annotations {
+      return element('decision', name, ann, { name: name.value }, location());
     }
 
 ForkDef
-  = "fork" S name:IdentifierOrQuoted ann:Annotations {
-      return {
-        _nodeType: 'element',
-        type: 'fork',
-        position: ann.position,
-        size: ann.size,
-        properties: { name },
-      };
+  = "fork" S name:NameToken ann:Annotations {
+      return element('fork', name, ann, { name: name.value }, location());
     }
 
 JoinDef
-  = "join" S name:IdentifierOrQuoted ann:Annotations {
-      return {
-        _nodeType: 'element',
-        type: 'join',
-        position: ann.position,
-        size: ann.size,
-        properties: { name },
-      };
+  = "join" S name:NameToken ann:Annotations {
+      return element('join', name, ann, { name: name.value }, location());
     }
 
 InitialNodeDef
-  = "initial-node" S name:IdentifierOrQuoted ann:Annotations {
-      return {
-        _nodeType: 'element',
-        type: 'initial-node',
-        position: ann.position,
-        size: ann.size,
-        properties: { name },
-      };
+  = "initial-node" S name:NameToken ann:Annotations {
+      return element('initial-node', name, ann, { name: name.value }, location());
     }
 
 FinalNodeDef
-  = "final-node" S name:IdentifierOrQuoted ann:Annotations {
-      return {
-        _nodeType: 'element',
-        type: 'final-node',
-        position: ann.position,
-        size: ann.size,
-        properties: { name },
-      };
+  = "final-node" S name:NameToken ann:Annotations {
+      return element('final-node', name, ann, { name: name.value }, location());
     }
 
 // ============ State Diagram Elements ============
 
 StateDef
-  = "state" S name:IdentifierOrQuoted ann:Annotations !(_ "{") {
-      return {
-        _nodeType: 'element',
-        type: 'state',
-        position: ann.position,
-        size: ann.size,
-        properties: { name },
-      };
+  = "state" S name:NameToken ann:Annotations !(_ "{") {
+      return element('state', name, ann, { name: name.value }, location());
     }
 
 CompositeStateDef
-  = "composite-state" S name:IdentifierOrQuoted ann:Annotations _ "{" _ NL items:CompositeStateItem* _ "}" {
-      const children = items.filter(Boolean);
-      return {
-        _nodeType: 'element',
-        type: 'composite-state',
-        position: ann.position,
-        size: ann.size,
-        properties: { name },
-        children: children,
-      };
+  = "composite-state" S name:NameToken ann:Annotations _ "{" _ NL items:CompositeStateItem* _ close:CloseBrace {
+      return element('composite-state', name, ann, { name: name.value }, location(), { children: items.filter(Boolean), closeBrace: close });
     }
 
 CompositeStateItem
@@ -513,40 +474,23 @@ CompositeStateItem
   / _ NL { return null; }
 
 InitialStateDef
-  = "initial-state" S name:IdentifierOrQuoted ann:Annotations {
-      return {
-        _nodeType: 'element',
-        type: 'initial-state',
-        position: ann.position,
-        size: ann.size,
-        properties: { name },
-      };
+  = "initial-state" S name:NameToken ann:Annotations {
+      return element('initial-state', name, ann, { name: name.value }, location());
     }
 
 FinalStateDef
-  = "final-state" S name:IdentifierOrQuoted ann:Annotations {
-      return {
-        _nodeType: 'element',
-        type: 'final-state',
-        position: ann.position,
-        size: ann.size,
-        properties: { name },
-      };
+  = "final-state" S name:NameToken ann:Annotations {
+      return element('final-state', name, ann, { name: name.value }, location());
     }
 
 // ============ Transitions (activity + state) ============
 
 TransitionDef
-  = src:IdentifierOrQuoted _ "-->" _ tgt:IdentifierOrQuoted label:(_ ":" _ LabelText)? {
-      return {
-        _nodeType: 'connector',
-        id: makeId('conn'),
-        type: 'transition',
-        sourceId: src,
-        targetId: tgt,
-        label: label ? label[3] : undefined,
-        properties: {},
-      };
+  = src:NameToken _ "-->" _ tgt:NameToken label:(_ ":" _ LabelToken)? {
+      return connector('transition', src, tgt, location(), text(), {
+        label: label ? label[3].value : undefined,
+        labelSpan: label ? label[3].span : undefined,
+      });
     }
 
 // ============ Primitives ============
@@ -558,11 +502,24 @@ IdentifierOrQuoted
   = QuotedString
   / Identifier
 
+// A name with its span, quotes included.
+NameToken
+  = value:IdentifierOrQuoted { return { value, span: spanOf(location()) }; }
+
+NameQuoted
+  = value:QuotedString { return { value, span: spanOf(location()) }; }
+
 Identifier
   = head:[a-zA-Z_\u00C0-\u024F\uAC00-\uD7AF] tail:[a-zA-Z0-9_\u00C0-\u024F\uAC00-\uD7AF]* { return head + tail.join(''); }
 
-LabelText
-  = chars:[^\n\r]+ { return chars.join('').trim(); }
+// A label: the rest of the line, trimmed, with the span of the trimmed text.
+LabelToken
+  = raw:$[^\n\r]+ {
+      const lead = raw.length - raw.trimStart().length;
+      const value = raw.trim();
+      const start = location().start.offset + lead;
+      return { value, span: { start, end: start + value.length } };
+    }
 
 Integer
   = digits:[0-9]+ { return parseInt(digits.join(''), 10); }

@@ -34,7 +34,7 @@ const parser = peggy.generate(await read('src/parser/dsl/uml.pegjs'));
 const examples = (await fs.readdir(path.join(root, 'examples'))).filter((name) => name.endsWith('.uml'));
 if (!examples.length) throw new Error('No runnable DSL example');
 for (const example of examples) {
-  const diagram = parser.parse(await read(`examples/${example}`));
+  const { diagram } = parser.parse(await read(`examples/${example}`));
   const ids = new Set(diagram.elements.map((element) => element.id));
   if (!diagram.elements.length || diagram.connectors.some((link) => !ids.has(link.sourceId) || !ids.has(link.targetId))) {
     throw new Error(`Invalid example references: ${example}`);

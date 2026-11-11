@@ -4,6 +4,7 @@
 
 import peggy from 'peggy';
 import type { DiagramData, DSLParseResult, DSLError } from '../../types';
+import type { DiagramSpans } from './sourceSpans';
 
 // Import the grammar as a raw string
 import umlGrammar from './uml.pegjs?raw';
@@ -32,6 +33,19 @@ function getParser(): peggy.Parser {
  * @returns DSLParseResult with either the parsed diagram or error details
  */
 export function parseDSL(text: string): DSLParseResult {
+  const result = parseDSLWithSpans(text);
+  return result.success ? { success: true, diagram: result.diagram } : result;
+}
+
+export type DSLParseWithSpansResult =
+  | { success: true; diagram: DiagramData; spans: DiagramSpans }
+  | { success: false; errors: DSLError[] };
+
+/**
+ * Parse DSL text and also return where each element, member and connector
+ * sits in it (A04.01). The spans are a side table; the model has no new fields.
+ */
+export function parseDSLWithSpans(text: string): DSLParseWithSpansResult {
   const trimmed = text.trim();
   if (!trimmed) {
     return {
@@ -46,8 +60,8 @@ export function parseDSL(text: string): DSLParseResult {
 
   try {
     const parser = getParser();
-    const diagram: DiagramData = parser.parse(text);
-    return { success: true, diagram };
+    const { diagram, spans } = parser.parse(text) as { diagram: DiagramData; spans: DiagramSpans };
+    return { success: true, diagram, spans };
   } catch (err: unknown) {
     if (isPeggySyntaxError(err)) {
       const loc = err.location;
