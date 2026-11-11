@@ -117,4 +117,25 @@ describe('A03.01 input ceilings and closed keys', () => {
     file.comments = [];
     expect(errors(JSON.stringify(file))).toEqual([expect.objectContaining({ path: 'schemaVersion' })]);
   });
+
+  it('refuses unknown keys in legacy diagram-index entries', () => {
+    const project = legacy() as unknown as Record<string, any>;
+    project.metadata.diagramIndex.d.color = 'red';
+    expect(errors(JSON.stringify(project))).toEqual([{ message: 'Unknown field: color', path: 'metadata.diagramIndex.d.color' }]);
+  });
+
+  it('bounds the text migration generates for a legacy diagram without text', () => {
+    const project = legacy();
+    project.diagrams.d.elements[0].properties.name = 'A'.repeat(PROJECT_LIMITS.textBytesPerDiagram + 1);
+    expect(errors(JSON.stringify(project))).toEqual([expect.objectContaining({ message: 'Diagram text is larger than 1 MiB' })]);
+  });
+
+  it('refuses a very deep tree without overflowing the stack', () => {
+    const depth = 100_000;
+    const node = '{"id":"f","type":"folder","name":"f","children":[';
+    const file = schema2();
+    const tree = node.repeat(depth) + ']}'.repeat(depth);
+    const content = JSON.stringify({ ...file, tree: [] }).replace('"tree":[]', `"tree":[${tree}]`);
+    expect(errors(content)).toEqual([expect.objectContaining({ message: expect.stringMatching(/nested at most/) })]);
+  });
 });

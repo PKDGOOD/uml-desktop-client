@@ -82,7 +82,6 @@ export function checkProjectLimits(file: Record<string, unknown>, legacy: boolea
   if (connectorTotal > PROJECT_LIMITS.connectorsPerProject) {
     errors.push({ message: `A project can have at most ${PROJECT_LIMITS.connectorsPerProject} connectors`, path: 'diagrams' });
   }
-  errors.push(...checkTreeDepth(file.tree));
   return errors;
 }
 
@@ -117,23 +116,34 @@ function checkGeometry(model: Record<string, unknown>, elements: unknown[], conn
   return errors;
 }
 
-/** Folders nest at most 8 levels below the top level (depth 0). */
-function checkTreeDepth(tree: unknown): ProjectFileParseError[] {
+/**
+ * Folders nest at most 8 levels below the top level (depth 0), and nothing sits
+ * below a diagram. Runs right after JSON.parse, before any recursive walk of the
+ * tree, so a deeply nested file is refused instead of overflowing the stack.
+ */
+export function checkTreeDepth(file: Record<string, unknown>): ProjectFileParseError[] {
   const errors: ProjectFileParseError[] = [];
   const walk = (nodes: unknown, depth: number, path: string): void => {
     if (!Array.isArray(nodes)) return;
     nodes.forEach((node, index) => {
-      if (!isRecord(node) || node.type !== 'folder') return;
+      if (!isRecord(node) || errors.length > 0) return;
       const nodePath = `${path}[${index}]`;
-      if (depth > PROJECT_LIMITS.folderDepth) {
+      if (depth > PROJECT_LIMITS.folderDepth + 1 || (node.type === 'folder' && depth > PROJECT_LIMITS.folderDepth)) {
         errors.push({ message: `Folders can be nested at most ${PROJECT_LIMITS.folderDepth} levels deep`, path: nodePath });
         return;
       }
       walk(node.children, depth + 1, `${nodePath}.children`);
     });
   };
-  walk(tree, 0, 'tree');
+  walk(file.tree, 0, 'tree');
   return errors;
+}
+
+/** Text the file carries or migration generated; each is bounded at 1 MiB. */
+export function checkTextSizes(texts: Record<string, string>, legacy: boolean): ProjectFileParseError[] {
+  return Object.entries(texts)
+    .filter(([, text]) => text.length > PROJECT_LIMITS.textBytesPerDiagram / 3 && byteLength(text) > PROJECT_LIMITS.textBytesPerDiagram)
+    .map(([id]) => ({ message: 'Diagram text is larger than 1 MiB', path: legacy ? `diagramTexts.${id}` : `diagrams.${id}.text` }));
 }
 
 // -----------------------------------------------------------------------------
@@ -146,6 +156,7 @@ const KEYS = {
   envelope: ['format', 'schemaVersion', 'writer', 'project', 'tree', 'diagrams', 'sharedElements'],
   legacyEnvelope: ['metadata', 'tree', 'sharedElements', 'diagrams', 'diagramTexts'],
   legacyMetadata: ['name', 'version', 'createdAt', 'updatedAt', 'diagramIndex'],
+  legacyIndexEntry: ['id', 'name', 'type', 'parentFolderId'],
   writer: ['app', 'version'],
   project: ['id', 'name', 'createdAt', 'updatedAt'],
   treeNode: ['id', 'name', 'type', 'diagramType', 'children', 'expanded'],
@@ -177,6 +188,10 @@ export function checkUnknownKeys(file: Record<string, unknown>, legacy: boolean)
   if (legacy) {
     check(file, KEYS.legacyEnvelope, '');
     check(file.metadata, KEYS.legacyMetadata, 'metadata');
+    const index = isRecord(file.metadata) ? file.metadata.diagramIndex : undefined;
+    if (isRecord(index)) {
+      for (const [id, entry] of Object.entries(index)) check(entry, KEYS.legacyIndexEntry, `metadata.diagramIndex.${id}`);
+    }
   } else {
     check(file, KEYS.envelope, '');
     check(file.writer, KEYS.writer, 'writer');

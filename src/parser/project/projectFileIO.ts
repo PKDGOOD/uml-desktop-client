@@ -6,7 +6,7 @@
 
 import type { DiagramMeta, ProjectData, ProjectDocument, ProjectFileWriter, ProjectTreeNode } from '@/types';
 import { CURRENT_SCHEMA_VERSION, PROJECT_FILE_FORMAT, decodeProjectFile, encodeProjectFile } from './projectFileCodec';
-import { checkFileSize, checkProjectLimits, checkUnknownKeys } from './projectFileLimits';
+import { checkFileSize, checkProjectLimits, checkTextSizes, checkTreeDepth, checkUnknownKeys } from './projectFileLimits';
 import { migrateLegacyProjectFile } from './legacyMigration';
 import { tryParseJson, validateProjectReferences, type ProjectFileParseResult } from './projectFileParser';
 
@@ -34,6 +34,8 @@ export function readProjectFile(content: string, options: ReadProjectFileOptions
   if (!json.success) return json;
   const file = json.data as Record<string, unknown>;
   const legacy = file.format === undefined;
+  const depthErrors = checkTreeDepth(file);
+  if (depthErrors.length > 0) return { success: false, errors: depthErrors };
   // Version detection comes first (ADR 0001 §6): a newer or foreign file gets
   // that message, not limit or unknown-key errors.
   if (!legacy && (file.format !== PROJECT_FILE_FORMAT || file.schemaVersion !== CURRENT_SCHEMA_VERSION)) {
@@ -47,12 +49,19 @@ export function readProjectFile(content: string, options: ReadProjectFileOptions
   }
 
   // Ceilings and closed keys run before any DSL text is parsed (A03.01).
-  const limitErrors = [...checkProjectLimits(file, legacy), ...checkUnknownKeys(file, legacy)];
+  const limitErrors = checkProjectLimits(file, legacy);
   if (limitErrors.length > 0) return { success: false, errors: limitErrors };
+  const keyErrors = checkUnknownKeys(file, legacy);
+  if (keyErrors.length > 0) return { success: false, errors: keyErrors };
 
   const read = legacy ? migrateLegacyProjectFile(content, options) : decodeProjectFile(content);
   if (!read.success) return read;
   const document: ProjectDocument = 'document' in read.data ? read.data.document : read.data;
+
+  // Migration may have generated text for diagrams the old file had none for.
+  const generated = Object.fromEntries(Object.entries(document.diagrams).map(([id, diagram]) => [id, diagram.text]));
+  const textErrors = checkTextSizes(generated, legacy);
+  if (textErrors.length > 0) return { success: false, errors: textErrors };
 
   const project = documentToProjectData(document);
   const errors = validateProjectReferences(project).map((error) => ({
