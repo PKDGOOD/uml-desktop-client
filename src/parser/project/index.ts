@@ -10,3 +10,5 @@ export {
 export type { DecodedProjectFile } from './projectFileCodec';
 export { migrateLegacyProjectFile } from './legacyMigration';
 export type { LegacyMigrationOptions } from './legacyMigration';
+export { documentToProjectData, readProjectFile, writeProjectFile } from './projectFileIO';
+export type { OpenedProjectFile, ReadProjectFileOptions } from './projectFileIO';
