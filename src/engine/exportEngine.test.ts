@@ -44,3 +44,16 @@ it('includes generated sequence message rows in export bounds', () => {
   expect(last.source.y).toBeGreaterThan(300);
   expect(height).toBeGreaterThanOrEqual(last.source.y + 20);
 });
+
+it('places sequence messages by messageOrder, not by array position', () => {
+  const lifelines = ['a', 'b'].map((id, i) => ({ id, type: 'lifeline' as const, position: { x: i * 300, y: 0 }, size: { width: 100, height: 300 }, properties: { name: id } }));
+  const messages = [
+    { id: 'late', type: 'sync-message' as const, sourceId: 'a', targetId: 'b', messageOrder: 2, properties: {} },
+    { id: 'early', type: 'sync-message' as const, sourceId: 'a', targetId: 'b', messageOrder: 1, properties: {} },
+  ];
+  const svg = ExportEngine.exportSVG({ ...diagram, type: 'sequence', elements: lifelines, connectors: messages });
+  const y = (row: number) => connectorGeometry(messages[0], lifelines, row)!.source.y;
+  // `late` (array first) sits on row 1, `early` on row 0.
+  const rowsInSvg = [...svg.matchAll(/points="[\d.]+,([\d.]+) [\d.]+,([\d.]+)"/g)].map((m) => Number(m[1]) + 0);
+  expect(rowsInSvg.slice(0, 2)).toEqual([y(1) + 20, y(0) + 20]);
+});

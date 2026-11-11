@@ -306,6 +306,8 @@ export interface ConnectorUpdate {
   label?: string;
   sourceMultiplicity?: string;
   targetMultiplicity?: string;
+  /** New 1-based position of a sequence message; the others shift and everything is renumbered. */
+  messageOrder?: number;
 }
 
 export type CanvasChange =

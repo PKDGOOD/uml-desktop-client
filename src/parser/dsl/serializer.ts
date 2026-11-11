@@ -11,6 +11,7 @@ import type {
   ConnectorType,
 } from '../../types';
 import { formatName, quoteString } from './escaping';
+import { inDisplayOrder } from './messageOrder';
 
 export { formatName };
 
@@ -242,7 +243,7 @@ function serializeSequenceElements(
     'return-message': '<--',
   };
 
-  for (const conn of connectors) {
+  for (const conn of inDisplayOrder(connectors)) {
     const src = formatName(idToName.get(conn.sourceId) ?? conn.sourceId);
     const tgt = formatName(idToName.get(conn.targetId) ?? conn.targetId);
     const arrow = messageSyntax[conn.type] || '->';

@@ -26,5 +26,6 @@ Changes are documented here before a tagged release. The package version `0.1.0`
 - When a file's stored text and diagram disagree, Open asks which to keep for each diagram instead of picking one; the project opens unsaved.
 
 ### Known issues
+- Sequence messages keep one order in the DSL and the model: the text order is the message order, and moving a message moves its line in place with its comment, label and identity.
 
 Model/DSL information loss, containment changes, invalid property inputs, reference validation and security hardening remain open. See [known limitations](docs/known-limitations.md). These are not claimed fixed by repository preparation.

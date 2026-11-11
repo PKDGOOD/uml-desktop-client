@@ -10,6 +10,7 @@ import { ElementRenderer } from './ElementRenderer';
 import { ConnectorRenderer } from './ConnectorRenderer';
 import { createCanvasConnector, createCanvasElement } from '../../engine/elementFactory';
 import { ClipboardManager } from '../../engine/clipboardManager';
+import { messageRows } from '../../parser/dsl/messageOrder';
 import type { CanvasTool, Position, Size, CanvasChange } from '../../types';
 
 export interface UMLCanvasProps {
@@ -53,6 +54,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
 
   const elements = diagram?.elements ?? [];
   const connectors = diagram?.connectors ?? [];
+  const messageRowById = React.useMemo(() => messageRows(connectors), [connectors]);
   const gridSize = 40;
   const gridLines = React.useMemo(() => {
     const lines: { points: number[]; major: boolean }[] = [];
@@ -483,11 +485,11 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
         </Layer>
         <Layer listening={!readOnly}>
           {/* Connectors rendered below elements */}
-          {connectors.map((conn, index) => (
+          {connectors.map((conn) => (
             <ConnectorRenderer
               key={conn.id}
               connector={conn}
-              sequenceIndex={diagram?.type === 'sequence' ? index : undefined}
+              sequenceIndex={diagram?.type === 'sequence' ? messageRowById.get(conn.id) : undefined}
               elements={elements}
               isSelected={selectedConnectorIds.has(conn.id)}
               onSelect={handleConnectorSelect}

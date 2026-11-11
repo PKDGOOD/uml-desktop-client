@@ -1,3 +1,4 @@
+import { messageRows } from '../parser/dsl/messageOrder';
 import { connectorGeometry } from './connectorGeometry';
 // =============================================================================
 // Export Engine - PNG, SVG, PDF export from DiagramData
@@ -44,8 +45,9 @@ function computeBounds(diagram: DiagramData): {
     maxX = Math.max(maxX, el.position.x + el.size.width);
     maxY = Math.max(maxY, el.position.y + el.size.height);
   }
-  diagram.connectors.forEach((connector, index) => {
-    const geometry = connectorGeometry(connector, diagram.elements, diagram.type === 'sequence' ? index : undefined);
+  const rows = messageRows(diagram.connectors);
+  diagram.connectors.forEach((connector) => {
+    const geometry = connectorGeometry(connector, diagram.elements, diagram.type === 'sequence' ? rows.get(connector.id) : undefined);
     if (!geometry) return;
     for (const point of [geometry.source, ...geometry.waypoints, geometry.target]) {
       minX = Math.min(minX, point.x); minY = Math.min(minY, point.y);
@@ -245,8 +247,9 @@ function buildSVGString(diagram: DiagramData, options: Required<ExportOptions>):
   parts.push(`<rect width="100%" height="100%" fill="${escapeXml(backgroundColor)}" />`);
 
   // Render connectors first (behind elements)
-  diagram.connectors.forEach((conn, index) => {
-    parts.push(renderConnectorSVG(conn, diagram.elements, offsetX, offsetY, diagram.type === 'sequence' ? index : undefined));
+  const rows = messageRows(diagram.connectors);
+  diagram.connectors.forEach((conn) => {
+    parts.push(renderConnectorSVG(conn, diagram.elements, offsetX, offsetY, diagram.type === 'sequence' ? rows.get(conn.id) : undefined));
   });
 
   // Render elements

@@ -61,6 +61,8 @@ export function parseDSLWithSpans(text: string): DSLParseWithSpansResult {
   try {
     const parser = getParser();
     const { diagram, spans } = parser.parse(text) as { diagram: DiagramData; spans: DiagramSpans };
+    // Text order is message order (A04.08).
+    if (diagram.type === 'sequence') diagram.connectors.forEach((connector, index) => { connector.messageOrder = index + 1; });
     return { success: true, diagram, spans };
   } catch (err: unknown) {
     if (isPeggySyntaxError(err)) {
