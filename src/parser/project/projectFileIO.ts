@@ -64,7 +64,7 @@ export function readProjectFile(content: string, options: ReadProjectFileOptions
   if (textErrors.length > 0) return { success: false, errors: textErrors };
 
   const project = documentToProjectData(document);
-  const errors = validateProjectReferences(project).map((error) => ({
+  const errors = validateProjectReferences(project, { strict: true }).map((error) => ({
     ...error,
     // Schema-2 models live one level deeper than the in-memory layout.
     path: legacy || !error.path ? error.path : error.path.replace(/^diagrams\.([^.[]+)\./, 'diagrams.$1.model.'),
