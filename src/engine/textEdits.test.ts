@@ -124,3 +124,126 @@ describe('A04.02 targeted rename', () => {
     expect(eng.getDiagram()!.elements.some((e) => e.id === orderId)).toBe(true);
   });
 });
+
+describe('A04.04 in-place property, member and layout patches', () => {
+  const SRC = `@class-diagram "D"
+// header note
+- class Order <<entity>> @pos(40, 40) @size(260, 180) {   // aggregate root
+  // identifiers
+  - id: String   // internal id
+  - total: int   // cents
+  + cancel(reason: String): void   // cancels
+}
+
+enum Status @pos(400, 40) @size(180, 140) {
+  PENDING   // initial
+  DONE
+}
+interface Plain {
+}
+// tail comment
+Order --> Status : has
+`;
+
+  function setup(undo?: UndoManager) {
+    const ctx = engineWith(SRC, undo);
+    ctx.engine.onTextChange(SRC);
+    ctx.engine.flushPendingText();
+    return { ...ctx, order: idOf(ctx.state.diagram, 'Order'), status: idOf(ctx.state.diagram, 'Status'), plain: idOf(ctx.state.diagram, 'Plain') };
+  }
+  const update = (ctx: ReturnType<typeof setup>, elementId: string, properties: Record<string, unknown>) =>
+    ctx.engine.applyCanvasChange({ type: 'element-update', elementId, properties: properties as never });
+  const props = (ctx: ReturnType<typeof setup>, id: string) => ctx.state.diagram!.elements.find((e) => e.id === id)!.properties;
+
+  it('changes the stereotype and the visibility in place (F1)', () => {
+    const ctx = setup();
+    expect(update(ctx, ctx.order, { stereotype: 'aggregate', visibility: 'protected' })).toEqual({ ok: true });
+    expect(ctx.state.text).toBe(SRC.replace('- class Order <<entity>>', '# class Order <<aggregate>>'));
+    expect(update(ctx, ctx.order, { stereotype: undefined, visibility: undefined })).toEqual({ ok: true });
+    expect(ctx.state.text).toBe(SRC.replace('- class Order <<entity>>', 'class Order'));
+    expect(props(ctx, ctx.order).visibility).toBeUndefined();
+  });
+
+  it('adds a stereotype and a visibility to a declaration that has none', () => {
+    const ctx = setup();
+    update(ctx, ctx.plain, { stereotype: 'port', visibility: 'public' });
+    expect(ctx.state.text).toBe(SRC.replace('interface Plain {', '+ interface Plain <<port>> {'));
+  });
+
+  it('edits one attribute and leaves the other lines and their comments alone', () => {
+    const ctx = setup();
+    const attributes = [...props(ctx, ctx.order).attributes!];
+    attributes[1] = { ...attributes[1], type: 'long', visibility: 'private' };
+    update(ctx, ctx.order, { attributes });
+    expect(ctx.state.text).toBe(SRC.replace('- total: int', '- total: long'));
+  });
+
+  it('adds members before the closing brace and removes a member with its line', () => {
+    const ctx = setup();
+    const p = props(ctx, ctx.order);
+    update(ctx, ctx.order, {
+      attributes: [...p.attributes!, { name: 'note', type: 'String', visibility: 'public' }],
+      methods: [...p.methods!, { name: 'ship', returnType: 'void', parameters: [{ name: 'to', type: 'String' }], visibility: 'public' }],
+    });
+    expect(ctx.state.text).toBe(SRC.replace('}\n\nenum', '  + note: String\n  + ship(to: String): void\n}\n\nenum'));
+    update(ctx, ctx.order, { attributes: p.attributes!.slice(1), methods: [] });
+    expect(ctx.state.text).not.toContain('- id: String');
+    expect(ctx.state.text).not.toContain('internal id');
+    expect(ctx.state.text).not.toContain('cancel');
+    expect(ctx.state.text).toContain('// identifiers');
+    expect(ctx.state.text).toContain('- total: int   // cents');
+    expect(ctx.state.text).toContain('// aggregate root');
+  });
+
+  it('keeps the line and comment of a renamed member, and regenerates when members are reordered', () => {
+    const ctx = setup();
+    const attributes = [...props(ctx, ctx.order).attributes!];
+    attributes[0] = { ...attributes[0], name: 'code' };
+    update(ctx, ctx.order, { attributes });
+    expect(ctx.state.text).toBe(SRC.replace('- id: String   // internal id', '- code: String   // internal id'));
+    const reordered = [...props(ctx, ctx.order).attributes!].reverse();
+    expect(update(ctx, ctx.order, { attributes: reordered })).toEqual({ ok: true });
+    const parsed = parseDSL(ctx.state.text);
+    expect(parsed.success && parsed.diagram.elements[0].properties.attributes?.map((a) => a.name)).toEqual(['total', 'code']);
+  });
+
+  it('edits enum values in place', () => {
+    const ctx = setup();
+    const attributes = [{ ...props(ctx, ctx.status).attributes![0], name: 'OPEN' }, props(ctx, ctx.status).attributes![1], { name: 'LATE', type: '', visibility: 'public' as const }];
+    update(ctx, ctx.status, { attributes });
+    expect(ctx.state.text).toBe(SRC.replace('PENDING   // initial', 'OPEN   // initial').replace('  DONE\n}', '  DONE\n  LATE\n}'));
+  });
+
+  it('moves and resizes by replacing only the annotation', () => {
+    const ctx = setup();
+    ctx.engine.applyCanvasChange({ type: 'element-move', elementId: ctx.order, position: { x: 120, y: 80 } });
+    expect(ctx.state.text).toBe(SRC.replace('@pos(40, 40)', '@pos(120, 80)'));
+    ctx.engine.applyCanvasChange({ type: 'element-resize', elementId: ctx.order, size: { width: 300, height: 200 } });
+    expect(ctx.state.text).toBe(SRC.replace('@pos(40, 40) @size(260, 180)', '@pos(120, 80) @size(300, 200)'));
+  });
+
+  it('inserts @pos and @size where the text has none', () => {
+    const ctx = setup();
+    ctx.engine.applyCanvasChange({ type: 'element-move', elementId: ctx.plain, position: { x: 7, y: 9 } });
+    expect(ctx.state.text).toBe(SRC.replace('interface Plain {', 'interface Plain @pos(7, 9) {'));
+    ctx.engine.applyCanvasChange({ type: 'element-resize', elementId: ctx.plain, size: { width: 111, height: 66 } });
+    expect(ctx.state.text).toBe(SRC.replace('interface Plain {', 'interface Plain @pos(7, 9) @size(111, 66) {'));
+  });
+
+  it('undoes a patch to the exact previous text', () => {
+    const undo = new UndoManager();
+    const ctx = setup(undo);
+    update(ctx, ctx.order, { stereotype: 'x' });
+    undo.undo();
+    expect(ctx.state.text).toBe(SRC);
+  });
+
+  it('keeps the model and the text meaning the same after every patch', () => {
+    const ctx = setup();
+    update(ctx, ctx.order, { stereotype: 'a' });
+    ctx.engine.applyCanvasChange({ type: 'element-move', elementId: ctx.status, position: { x: 1, y: 2 } });
+    const reparsed = parseDSL(ctx.state.text);
+    expect(reparsed.success && reparsed.diagram.elements.map((e) => [e.properties.name, e.position])).toEqual(
+      ctx.state.diagram!.elements.map((e) => [e.properties.name, e.position]));
+  });
+});
