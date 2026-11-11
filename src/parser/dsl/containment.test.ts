@@ -94,6 +94,21 @@ Free --> Top
   });
 });
 
+describe('A04.07 nesting depth limit', () => {
+  const nested = (levels: number) => {
+    let text = '@state-diagram "S"\n';
+    for (let i = 0; i < levels; i++) text += `${'  '.repeat(i)}composite-state C${i} {\n`;
+    text += `${'  '.repeat(levels)}state Leaf\n`;
+    for (let i = levels - 1; i >= 0; i--) text += `${'  '.repeat(i)}}\n`;
+    return text;
+  };
+
+  it('accepts 8 levels and rejects 9 in hand-written text', () => {
+    expect(parseCheckedDSL(nested(8)).success).toBe(true);
+    expect(parseCheckedDSL(nested(9)).success).toBe(false);
+  });
+});
+
 describe('A04.07 canvas changes cannot silently reparent', () => {
   it('refuses an added element whose parent the DSL cannot express, leaving text and model alone', async () => {
     const { SyncEngine } = await import('../../engine/syncEngine');
