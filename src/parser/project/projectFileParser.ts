@@ -293,7 +293,7 @@ export function validateProjectReferences(project: ProjectData, options: Referen
       const parent = elementsById.get(element.parentId);
       if (element.parentId === element.id || !parent) {
         errors.push({ message: `Element ${element.id} has an unknown parent ${element.parentId}`, path: `${path}.parentId` });
-      } else if (!CONTAINMENT[parent.type]?.includes(element.type)) {
+      } else if (!Object.prototype.hasOwnProperty.call(CONTAINMENT, parent.type) || !CONTAINMENT[parent.type]!.includes(element.type)) {
         errors.push({ message: `A ${parent.type} cannot contain a ${element.type} (element ${element.id})`, path: `${path}.parentId` });
       }
     });

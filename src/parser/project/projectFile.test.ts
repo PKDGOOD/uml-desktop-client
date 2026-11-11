@@ -420,6 +420,10 @@ describe('A03.05 ownership and containment', () => {
     }, /composite-state cannot contain a usecase/],
     ['a cycle', (d) => { byId(d, 's-active').parentId = 's-review'; }, /inside itself/],
     ['self-parenting', (d) => { byId(d, 's-inside').parentId = 's-inside'; }, /unknown parent/],
+    ['a parent typed like an Object.prototype key', (d) => {
+      (byId(d, 's-outside') as { type: string }).type = 'constructor';
+      byId(d, 's-end').parentId = 's-outside';
+    }, /constructor cannot contain a final-state/],
   ])('refuses %s', (_name, mutate, message) => {
     expect(validateProjectReferences(project(mutate))).toContainEqual(expect.objectContaining({ message: expect.stringMatching(message) }));
   });

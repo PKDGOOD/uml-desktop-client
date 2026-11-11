@@ -34,7 +34,7 @@ Updated: **2026-11-11**. This is the live ledger for the [145-task backlog](atom
 | A03.05 | Done | `validateProjectReferences` checks explicit ownership on every opened file and history snapshot: a parent must exist and differ from the child, a `composite-state` may own states, pseudostates and composite states, a `system-boundary` may own use cases, chains are acyclic and at most 8 levels deep (A01.10). Siblings outside a container are reported independently. Tests use the A02.03 nested-state fixture. Writing nested composite states back as DSL is still A04.07/A04.08 (the grammar does not nest composites yet). |
 | A01.13 | Planned | Needs A01.12 and actual remote CI evidence. |
 
-Every task not named above remains **Planned**. **23 of 145 local tasks are Done**, including reproduction tasks, not 23 shipped features. G0 (local baseline) is satisfied; M0 is still incomplete until baseline commits and remote CI are verified. G1–G4 remain unmet. Current validation: **26 test files, 426 passing tests and no expected failures**; `npm run check` and `npm run build:app` passed after A03.05. Notices, package and the packaged smoke were last run at the A01 baseline.
+Every task not named above remains **Planned**. **23 of 145 local tasks are Done**, including reproduction tasks, not 23 shipped features. G0 (local baseline) is satisfied; M0 is still incomplete until baseline commits and remote CI are verified. G1–G4 remain unmet. Current validation: **26 test files, 427 passing tests and no expected failures**; `npm run check` and `npm run build:app` passed after A03.05. Notices, package and the packaged smoke were last run at the A01 baseline.
 
 ## Dependency correction
 
