@@ -185,7 +185,7 @@ function serializeClassConnectors(
   lines: string[],
 ): void {
   // Arrows that overlap with TransitionDef's "-->" pattern.
-  // When no multiplicities are present, we add empty "" multiplicity
+  // When there is no source multiplicity, we add an empty "" multiplicity
   // so the parser matches RelationDef instead of TransitionDef.
   const ambiguousArrows = new Set(['-->']);
 
@@ -194,8 +194,9 @@ function serializeClassConnectors(
     const tgt = formatName(idToName.get(conn.targetId) ?? conn.targetId);
     const arrow = classRelationSyntax[conn.type] || '-->';
 
-    const needsDisambiguation =
-      ambiguousArrows.has(arrow) && !conn.sourceMultiplicity && !conn.targetMultiplicity;
+    // Without a source multiplicity, `A --> "2" B` reads as a transition to a node named "2",
+    // so the empty placeholder is needed whether or not a target multiplicity follows.
+    const needsDisambiguation = ambiguousArrows.has(arrow) && !conn.sourceMultiplicity;
 
     let line = '';
     if (conn.sourceMultiplicity) {

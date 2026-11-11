@@ -9,7 +9,7 @@
 import type { DiagramData } from '../types';
 import { parseDSLWithSpans } from '../parser/dsl';
 import { formatName, formatPosition, formatSize, formatStereotype, serializeAttribute, serializeMethod, visibilityMarker } from '../parser/dsl/serializer';
-import type { DiagramElement } from '../types';
+import type { Connector, DiagramElement } from '../types';
 import type { SourceSpan } from '../parser/dsl/sourceSpans';
 import { preserveIds } from './syncEngine';
 
@@ -196,3 +196,65 @@ function patchMembers(text: string, eol: string, s: ElementSpansLike, before: Di
 }
 
 type ElementSpansLike = import('../parser/dsl/sourceSpans').ElementSpans;
+
+/**
+ * The text after changing one connector (A04.05): its endpoint names, label and
+ * multiplicities are edited in place; the rest of the line and everything
+ * around it stay. A change of relation type needs a different arrow, so it
+ * returns null and the caller regenerates. `after` is the connector in
+ * `afterDiagram`, whose elements give the new endpoint names.
+ */
+export function patchConnectorInText(text: string, model: DiagramData, after: Connector, afterDiagram: DiagramData): string | null {
+  const parsed = mapToModel(text, model);
+  if (!parsed) return null;
+  const { diagram, spans } = parsed;
+  const index = diagram.connectors.findIndex((connector) => connector.id === after.id);
+  const before = model.connectors.find((connector) => connector.id === after.id);
+  if (index < 0 || !before || before.type !== after.type) return null;
+  const s = spans.connectors[index];
+  const nameOf = (id: string) => afterDiagram.elements.find((element) => element.id === id)?.properties.name;
+  const edits: TextEdit[] = [];
+
+  if (before.sourceId !== after.sourceId) {
+    const name = nameOf(after.sourceId);
+    if (name === undefined) return null;
+    edits.push({ span: s.source, text: formatName(name) });
+  }
+  if (before.targetId !== after.targetId) {
+    const name = nameOf(after.targetId);
+    if (name === undefined) return null;
+    edits.push({ span: s.target, text: formatName(name) });
+  }
+
+  const label = (value: string | undefined) => (value === undefined || value === '' ? undefined : value);
+  if (label(before.label) !== label(after.label)) {
+    const next = label(after.label);
+    if (s.label && next !== undefined) edits.push({ span: s.label, text: next });
+    else if (s.label) edits.push({ span: { start: s.target.end, end: s.label.end }, text: '' });
+    else if (next !== undefined) edits.push({ span: { start: s.target.end, end: s.target.end }, text: ` : ${next}` });
+  }
+
+  const multiplicity = (
+    side: 'source' | 'target',
+    old: string | undefined,
+    next: string | undefined,
+  ) => {
+    if ((old || undefined) === (next || undefined)) return;
+    const existing = side === 'source' ? s.sourceMultiplicity : s.targetMultiplicity;
+    if (existing && next) edits.push({ span: existing, text: `"${next}"` });
+    else if (existing) edits.push({ span: existing, text: '""' });
+    else if (next) {
+      edits.push(side === 'source'
+        ? { span: { start: s.source.end, end: s.source.end }, text: ` "${next}"` }
+        : { span: { start: s.target.start, end: s.target.start }, text: `"${next}" ` });
+      // `A --> "2" B` would read as a transition to a node named "2": keep the empty source placeholder.
+      if (side === 'target' && after.type === 'directed-association' && !s.sourceMultiplicity && !after.sourceMultiplicity) {
+        edits.push({ span: { start: s.source.end, end: s.source.end }, text: ' ""' });
+      }
+    }
+  };
+  multiplicity('source', before.sourceMultiplicity, after.sourceMultiplicity);
+  multiplicity('target', before.targetMultiplicity, after.targetMultiplicity);
+
+  return applyTextEdits(text, edits);
+}

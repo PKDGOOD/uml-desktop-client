@@ -17,7 +17,7 @@ import { parseDSL } from '../parser/dsl';
 import { serializeDSL } from '../parser/dsl/serializer';
 import { UndoManager } from './undoManager';
 import { parseCheckedDSL, validateDiagramRules, type DiagramRuleError } from './diagramRules';
-import { patchElementInText } from './textEdits';
+import { patchConnectorInText, patchElementInText } from './textEdits';
 
 export interface SyncEngineOptions {
   onDiagramUpdate: (diagram: DiagramData) => void;
@@ -249,6 +249,18 @@ export class SyncEngine {
           case 'connector-delete':
             d.connectors = d.connectors.filter(c => c.id !== ch.connectorId);
             break;
+          case 'connector-update': {
+            const conn = d.connectors.find(c => c.id === ch.connectorId);
+            if (conn) {
+              // A key present with `undefined` clears the value; an absent key keeps it.
+              for (const key of Object.keys(ch.changes) as Array<keyof typeof ch.changes>) {
+                const value = ch.changes[key];
+                if (value === undefined) delete conn[key];
+                else conn[key] = value;
+              }
+            }
+            break;
+          }
           case 'connector-waypoint': {
             const conn = d.connectors.find(c => c.id === ch.connectorId);
             if (conn) conn.waypoints = ch.waypoints.map(w => ({ ...w }));
@@ -293,10 +305,14 @@ export class SyncEngine {
    * model says; otherwise null, and the caller regenerates the text.
    */
   private patchedText(change: CanvasChange, oldDiagram: DiagramData, oldText: string, newDiagram: DiagramData): string | null {
-    if (change.type !== 'element-update' && change.type !== 'element-move' && change.type !== 'element-resize') return null;
-    const after = newDiagram.elements.find((element) => element.id === change.elementId);
-    if (!after) return null;
-    const patched = patchElementInText(oldText, oldDiagram, after);
+    let patched: string | null = null;
+    if (change.type === 'element-update' || change.type === 'element-move' || change.type === 'element-resize') {
+      const after = newDiagram.elements.find((element) => element.id === change.elementId);
+      if (after) patched = patchElementInText(oldText, oldDiagram, after);
+    } else if (change.type === 'connector-update') {
+      const after = newDiagram.connectors.find((connector) => connector.id === change.connectorId);
+      if (after) patched = patchConnectorInText(oldText, oldDiagram, after, newDiagram);
+    }
     if (patched === null) return null;
     const check = parseCheckedDSL(patched);
     if (!check.success) return null;
