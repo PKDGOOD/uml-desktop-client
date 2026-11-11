@@ -648,14 +648,14 @@ describe('serializeDSL - explicit containment', () => {
     expect(parentNames(result.diagram)).toEqual({ Shop: null, Cancel: 'Shop', Support: null });
   });
 
-  it('falls back to flattened order for diagrams without any parentId', () => {
+  it('never nests by array order: a container without parentId children stays empty (F2)', () => {
     const elements = [
       makeElement({ id: 'a', type: 'composite-state', properties: { name: 'Active' } }),
       makeElement({ id: 'i', type: 'state', properties: { name: 'Inside' } }),
     ];
     const result = parseDSL(serializeDSL(makeDiagram({ type: 'state', name: 'S', elements })));
     expect(result.success).toBe(true);
-    if (result.success) expect(parentNames(result.diagram)).toEqual({ Active: null, Inside: 'Active' });
+    if (result.success) expect(parentNames(result.diagram)).toEqual({ Active: null, Inside: null });
   });
 });
 

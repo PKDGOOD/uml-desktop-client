@@ -394,30 +394,30 @@ function serializeStateElements(
       default: return null;
     }
   };
-  const parents = resolveParents(elements, 'composite-state', new Set(['state', 'initial-state', 'final-state']));
+  const parents = resolveParents(elements, 'composite-state', new Set(['state', 'initial-state', 'final-state', 'composite-state']));
 
-  for (const el of elements) {
-    if (parents.has(el.id)) continue;
+  // A composite state writes its children (nested composites included) and the
+  // transitions between two of its direct children inside its block.
+  const writeElement = (el: DiagramElement, indent: string): void => {
     if (el.type !== 'composite-state') {
-      const line = stateLine(el, '');
+      const line = stateLine(el, indent);
       if (line) lines.push(line);
-      continue;
+      return;
     }
-
-    lines.push(`composite-state ${formatName(el.properties.name)}${formatAnnotations(el)} {`);
+    lines.push(`${indent}composite-state ${formatName(el.properties.name)}${formatAnnotations(el)} {`);
     for (const child of elements) {
-      if (parents.get(child.id) !== el.id) continue;
-      const line = stateLine(child, '  ');
-      if (line) lines.push(line);
+      if (parents.get(child.id) === el.id) writeElement(child, `${indent}  `);
     }
-    // Transitions between two children of this composite state
     for (const conn of connectors) {
       if (parents.get(conn.sourceId) !== el.id || parents.get(conn.targetId) !== el.id) continue;
       const src = formatName(idToName.get(conn.sourceId) ?? conn.sourceId);
       const tgt = formatName(idToName.get(conn.targetId) ?? conn.targetId);
-      lines.push(`  ${src} --> ${tgt}${conn.label ? ` : ${conn.label}` : ''}`);
+      lines.push(`${indent}  ${src} --> ${tgt}${conn.label ? ` : ${conn.label}` : ''}`);
     }
-    lines.push('}');
+    lines.push(`${indent}}`);
+  };
+  for (const el of elements) {
+    if (!parents.has(el.id)) writeElement(el, '');
   }
   lines.push('');
 
@@ -430,9 +430,10 @@ function serializeStateElements(
 }
 
 /**
- * Map child element IDs to their container. Uses explicit `parentId` when the diagram has any;
- * diagrams saved before `parentId` existed fall back to the old flattened order
- * (children directly follow their container).
+ * Map child element IDs to their container. Only an explicit `parentId` nests an
+ * element: array order never does (ADR 0001 §6, F2), so a container followed by
+ * unrelated elements stays empty. Files from before `parentId` existed are
+ * given explicit parents when they are opened (`recoverContainment`).
  */
 function resolveParents(
   elements: DiagramElement[],
@@ -441,17 +442,8 @@ function resolveParents(
 ): Map<string, string> {
   const parents = new Map<string, string>();
   const containers = new Set(elements.filter((el) => el.type === containerType).map((el) => el.id));
-  if (elements.some((el) => el.parentId !== undefined)) {
-    for (const el of elements) {
-      if (el.parentId && containers.has(el.parentId) && childTypes.has(el.type)) parents.set(el.id, el.parentId);
-    }
-    return parents;
-  }
-  let current: string | undefined;
   for (const el of elements) {
-    if (el.type === containerType) current = el.id;
-    else if (current && childTypes.has(el.type)) parents.set(el.id, current);
-    else current = undefined;
+    if (el.parentId && containers.has(el.parentId) && childTypes.has(el.type)) parents.set(el.id, el.parentId);
   }
   return parents;
 }

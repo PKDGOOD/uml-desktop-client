@@ -280,7 +280,10 @@ export class SyncEngine {
       if (added.length > 0) return refuse('rules', added);
       // Then anything else the DSL cannot write and read back.
       const newText = this.patchedText(change, oldDiagram, oldText, newDiagram) ?? serializeDSL(newDiagram);
-      if (!parseDSL(newText).success) return refuse('dsl');
+      const written = parseDSL(newText);
+      if (!written.success) return refuse('dsl');
+      // The text must also put every element under the parent the model says (ADR 0001 §6, F2).
+      if (!sameContainment(newDiagram, written.diagram)) return refuse('dsl');
 
       if (this.undoManager) {
         const diagramForUndo = deepClone(newDiagram);
@@ -356,6 +359,16 @@ export class SyncEngine {
 // =============================================================================
 // Helpers
 // =============================================================================
+
+/** True when both diagrams give every named element the same parent name. */
+function sameContainment(a: DiagramData, b: DiagramData): boolean {
+  const parents = (d: DiagramData) => new Map(d.elements.map((element) => [
+    element.properties.name, d.elements.find((candidate) => candidate.id === element.parentId)?.properties.name ?? null,
+  ]));
+  const left = parents(a);
+  const right = parents(b);
+  return left.size === right.size && [...left].every(([name, parent]) => right.get(name) === parent);
+}
 
 function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
