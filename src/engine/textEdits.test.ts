@@ -412,4 +412,29 @@ Order --> Item : has
     expect(ctx.engine.applyCanvasChange({ type: 'element-add', element: NEW('n1', 'Order') }).ok).toBe(false);
     expect(ctx.state.text).toBe(before);
   });
+
+  it('deletes only the selected item when several share a line', () => {
+    const text = '@class-diagram "D"\nclass A {\n}\nclass B {\n}\nA ..> B   B ..> A // both\n';
+    const ctx = engineWith(text);
+    ctx.engine.onTextChange(text);
+    ctx.engine.flushPendingText();
+    const first = ctx.state.diagram!.connectors[0];
+    expect(ctx.engine.applyCanvasChange({ type: 'connector-delete', connectorId: first.id })).toEqual({ ok: true });
+    expect(ctx.state.text).toBe('@class-diagram "D"\nclass A {\n}\nclass B {\n}\nB ..> A // both\n');
+    expect(ctx.state.diagram!.connectors).toHaveLength(1);
+  });
+
+  it('writes a new transition after the last top-level declaration, not inside a composite state', () => {
+    const text = '@state-diagram "S"\ncomposite-state C {\n  state A\n  state B\n  A --> B\n}\nstate Z\n';
+    const ctx = engineWith(text);
+    ctx.engine.onTextChange(text);
+    ctx.engine.flushPendingText();
+    const d = ctx.state.diagram!;
+    const z = idOf(d, 'Z');
+    const c = idOf(d, 'C');
+    expect(ctx.engine.applyCanvasChange({
+      type: 'connector-add', connector: { id: 'cz', type: 'transition', sourceId: z, targetId: c, properties: {} },
+    })).toEqual({ ok: true });
+    expect(ctx.state.text).toBe(`${text}Z --> C\n`);
+  });
 });

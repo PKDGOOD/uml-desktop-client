@@ -277,6 +277,32 @@ function insertLines(text: string, offset: number, block: string, eol: string): 
   return { span: { start: offset, end: offset }, text: `${needsBreak ? eol : ''}${block}${eol}` };
 }
 
+/**
+ * Remove one body item. When it is alone on its line (a trailing comment counts as
+ * nothing), the whole line goes; when other items share the line, only the item
+ * and the spaces before it go, so its neighbours stay.
+ */
+function removeItem(text: string, span: Span): TextEdit {
+  const start = lineStart(text, span.start);
+  const end = lineEndWithBreak(text, Math.max(span.start, span.end - 1));
+  const before = text.slice(start, span.start);
+  const after = text.slice(span.end, end).replace(/(?:\r\n|\r|\n)$/, '');
+  if (before.trim() === '' && (after.trim() === '' || after.trim().startsWith('//'))) {
+    return { span: { start, end }, text: '' };
+  }
+  if (before.trim() === '') {
+    // First on its line: take the spaces after it, keep the indentation.
+    return { span: { start: span.start, end: span.end + /^[ \t]*/.exec(after)![0].length }, text: '' };
+  }
+  const lead = /[ \t]*$/.exec(before)![0].length;
+  return { span: { start: span.start - lead, end: span.end }, text: '' };
+}
+
+/** Whether `span` lies inside any element's block. */
+const nested = (span: Span, elements: Array<{ declaration: Span }>) => elements.some((e) => (
+  e.declaration.start < span.start && span.end <= e.declaration.end
+));
+
 const shell = (model: DiagramData): DiagramData => ({ ...model, elements: [], connectors: [] });
 
 /** The DSL lines a new element is written as, without header or blank lines. */
@@ -316,10 +342,9 @@ export function patchDeleteElementInText(text: string, model: DiagramData, eleme
   const { diagram, spans } = parsed;
   const index = diagram.elements.findIndex((element) => element.id === elementId);
   if (index < 0 || diagram.elements.some((element) => element.parentId === elementId)) return null;
-  const whole = (span: Span): TextEdit => ({ span: { start: lineStart(text, span.start), end: lineEndWithBreak(text, span.end - 1) }, text: '' });
-  const edits = [whole(spans.elements[index].declaration)];
+  const edits = [removeItem(text, spans.elements[index].declaration)];
   diagram.connectors.forEach((connector, i) => {
-    if (connector.sourceId === elementId || connector.targetId === elementId) edits.push(whole(spans.connectors[i].line));
+    if (connector.sourceId === elementId || connector.targetId === elementId) edits.push(removeItem(text, spans.connectors[i].line));
   });
   return applyTextEdits(text, edits);
 }
@@ -340,9 +365,12 @@ export function patchAddConnectorInText(text: string, model: DiagramData, connec
   const line = connectorLine(afterDiagram, connector);
   if (line === null) return null;
   const { spans } = parsed;
-  const anchor = spans.connectors.length > 0
-    ? Math.max(...spans.connectors.map((c) => c.line.end))
-    : Math.max(spans.header.end, ...spans.elements.map((e) => e.declaration.end));
+  // Anchor outside every block: after the last top-level connector, else the last top-level declaration.
+  const topConnectors = spans.connectors.filter((c) => !nested(c.line, spans.elements));
+  const tops = topLevel(spans.elements);
+  const anchor = topConnectors.length > 0
+    ? Math.max(...topConnectors.map((c) => c.line.end))
+    : Math.max(spans.header.end, ...tops.map((i) => spans.elements[i].declaration.end));
   return applyTextEdits(text, [insertLines(text, lineEndWithBreak(text, anchor), line, spans.lineEnding)]);
 }
 
@@ -352,6 +380,5 @@ export function patchDeleteConnectorInText(text: string, model: DiagramData, con
   if (!parsed) return null;
   const index = parsed.diagram.connectors.findIndex((connector) => connector.id === connectorId);
   if (index < 0) return null;
-  const { line } = parsed.spans.connectors[index];
-  return applyTextEdits(text, [{ span: { start: lineStart(text, line.start), end: lineEndWithBreak(text, line.end - 1) }, text: '' }]);
+  return applyTextEdits(text, [removeItem(text, parsed.spans.connectors[index].line)]);
 }
