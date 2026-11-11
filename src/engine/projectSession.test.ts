@@ -285,3 +285,53 @@ describe('ProjectSession review follow-ups', () => {
     expect(diagnostics.two.length).toBeGreaterThan(0);
   });
 });
+
+describe('A03.07 diagram rules before GUI commands', () => {
+  it('refuses an invalid inspector command with the field at fault and keeps revision, model and undo', () => {
+    const onChange = vi.fn();
+    const session = new ProjectSession(project(), onChange);
+    const before = { revision: session.revision, model: structuredClone(session.project.diagrams.one), text: session.text('one') };
+
+    const result = session.tryEditCanvas('one', { type: 'element-update', elementId: 'one-element',
+      properties: { attributes: [{ name: 'bad name', type: 'String', visibility: 'private' }] } });
+
+    expect(result).toEqual({ ok: false, reason: 'rules', errors: [
+      { path: 'elements[0].properties.attributes[0].name', message: expect.stringMatching(/must be an identifier/) },
+    ] });
+    expect(session.revision).toBe(before.revision);
+    expect(session.dirty).toBe(false);
+    expect(session.project.diagrams.one).toEqual(before.model);
+    expect(session.text('one')).toBe(before.text);
+    expect(session.getSession('one')!.history.canUndo()).toBe(false);
+    expect(onChange).not.toHaveBeenCalled();
+    session.dispose();
+  });
+
+  it('refuses a connector between incompatible ends and accepts a valid one as one undo step', () => {
+    const session = new ProjectSession(project(), vi.fn());
+    const add = (type: 'inheritance' | 'dependency') => session.tryEditCanvas('one', {
+      type: 'connector-add',
+      connector: { id: `c-${type}`, type, sourceId: 'one-element', targetId: 'one-element', properties: {} },
+    });
+    expect(add('inheritance')).toMatchObject({ ok: false, reason: 'rules', errors: [{ path: 'connectors[0].targetId' }] });
+
+    expect(session.tryEditCanvas('one', { type: 'element-add', element: {
+      id: 'i', type: 'interface', position: { x: 0, y: 0 }, size: { width: 100, height: 60 }, properties: { name: 'Port' },
+    } })).toEqual({ ok: true });
+    expect(session.tryEditCanvas('one', { type: 'connector-add', connector: {
+      id: 'r', type: 'realization', sourceId: 'one-element', targetId: 'i', properties: {},
+    } })).toEqual({ ok: true });
+    session.undo('one');
+    expect(session.project.diagrams.one.connectors).toEqual([]);
+    expect(session.project.diagrams.one.elements).toHaveLength(2);
+    session.dispose();
+  });
+
+  it('says when a draft with errors blocks canvas edits', () => {
+    const session = new ProjectSession(project(), vi.fn());
+    session.editText('one', '@class-diagram "one"\nclass {{{');
+    expect(session.tryEditCanvas('one', { type: 'element-move', elementId: 'one-element', position: { x: 1, y: 1 } }))
+      .toEqual({ ok: false, reason: 'draft', errors: [] });
+    session.dispose();
+  });
+});

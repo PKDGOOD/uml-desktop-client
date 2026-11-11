@@ -2,7 +2,7 @@ import type {
   CanvasChange, DSLError, DiagramData, DiagramDocument, DiagramType, ProjectData, ProjectDocument, ProjectTreeNode,
 } from '../types';
 import { parseCheckedDSL } from './diagramRules';
-import { SyncEngine } from './syncEngine';
+import { SyncEngine, type CanvasChangeResult } from './syncEngine';
 import { UndoManager } from './undoManager';
 import { serializeDSL } from '../parser/dsl/serializer';
 import { renameDiagramHeader } from '../parser/dsl/diagramHeader';
@@ -111,9 +111,16 @@ export class ProjectSession {
   }
 
   editCanvas(id: string, change: CanvasChange): boolean {
-    if (!this.getSession(id)?.sync.onCanvasChange(change)) return false;
-    this.touch();
-    return true;
+    return this.tryEditCanvas(id, change).ok;
+  }
+
+  /** Apply a canvas or inspector command; a refusal leaves the revision unchanged. */
+  tryEditCanvas(id: string, change: CanvasChange): CanvasChangeResult {
+    const session = this.getSession(id);
+    if (!session) return { ok: false, reason: 'busy', errors: [] };
+    const result = session.sync.applyCanvasChange(change);
+    if (result.ok) this.touch();
+    return result;
   }
 
   undo(id: string): void {
