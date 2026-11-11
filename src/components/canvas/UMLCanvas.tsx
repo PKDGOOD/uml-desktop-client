@@ -158,6 +158,10 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
     setSelectedConnectorIds(new Set());
   }, []);
 
+  // Selection belongs to one diagram: never carry it over to another (A04.11).
+  const diagramId = diagram?.id;
+  useEffect(() => { clearSelection(); setConnectorSourceId(null); }, [diagramId, clearSelection]);
+
   const copySelection = useCallback((cut = false) => {
     if (readOnly || !diagram) return;
     const selected = elements.filter((element) => selectedElementIds.has(element.id));

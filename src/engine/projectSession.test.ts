@@ -470,3 +470,43 @@ describe('A04.10 text and canvas undo ordering', () => {
     session.dispose();
   });
 });
+
+describe('A04.11 session lifecycle', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const bad = '@class-diagram "one"\nclass {{{';
+
+  it('keeps the draft and history of a diagram whose tab was closed and reopened', () => {
+    const session = new ProjectSession(project(), vi.fn());
+    const first = session.getSession('one')!;
+    session.editText('one', bad);
+    first.sync.flushPendingText();
+    session.getSession('two'); // another tab becomes active; 'one' tab is closed
+    const again = session.getSession('one')!;
+    expect(again).toBe(first);
+    expect(session.text('one')).toBe(bad);
+    expect(again.sync.getErrors().length).toBeGreaterThan(0);
+    expect(again.history.canUndo()).toBe(true);
+    session.dispose();
+  });
+
+  it('ignores timers, callbacks and edits after the project was replaced', () => {
+    const onChange = vi.fn();
+    const session = new ProjectSession(project(), onChange);
+    const original = session.text('one');
+    session.editText('one', '@class-diagram "one"\nclass Late @pos(1, 2) @size(10, 10) {\n}\n');
+    session.dispose();
+    onChange.mockClear();
+    vi.advanceTimersByTime(1000); // the pending debounce must not fire into the old project
+    expect(onChange).not.toHaveBeenCalled();
+    expect(session.getSession('one')).toBeUndefined();
+    expect(session.tryEditCanvas('one', { type: 'element-move', elementId: 'one-element', position: { x: 9, y: 9 } }))
+      .toEqual({ ok: false, reason: 'busy', errors: [] });
+    session.undo('one');
+    session.redo('one');
+    session.editText('one', original);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(session.project.diagrams.one.elements[0].position).toEqual({ x: 10, y: 20 });
+  });
+});

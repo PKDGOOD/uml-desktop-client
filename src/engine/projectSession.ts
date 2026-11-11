@@ -44,6 +44,7 @@ export class ProjectSession {
   revision = 0;
   private savedRevision = 0;
   private sessions = new Map<string, DiagramSession>();
+  private disposed = false;
 
   constructor(project: ProjectData, private readonly onChange: () => void, options: ProjectSessionOptions = {}) {
     this.project = structuredClone(project);
@@ -73,6 +74,7 @@ export class ProjectSession {
   }
 
   getSession(id: string): DiagramSession | undefined {
+    if (this.disposed) return undefined;
     const existing = this.sessions.get(id);
     if (existing) return existing;
     if (!Object.prototype.hasOwnProperty.call(this.project.diagrams, id)) return undefined;
@@ -83,14 +85,16 @@ export class ProjectSession {
     const sync = new SyncEngine({
       undoManager: history,
       onDiagramUpdate: (updated) => {
+        if (this.disposed) return;
         this.updateDiagram(id, updated);
         this.onChange();
       },
       onTextUpdate: (text) => {
+        if (this.disposed) return;
         this.storeText(id, text);
         this.onChange();
       },
-      onErrors: () => this.onChange(),
+      onErrors: () => { if (!this.disposed) this.onChange(); },
     });
     sync.setDiagram(diagram, this.project.diagramTexts?.[id]);
     const session = { sync, history };
@@ -263,12 +267,15 @@ export class ProjectSession {
     this.onChange();
   }
 
+  /** After this the session ignores late timers and callbacks, and refuses every edit. */
   dispose(): void {
+    this.disposed = true;
     for (const { sync } of this.sessions.values()) sync.dispose();
     this.sessions.clear();
   }
 
   private touch(): void {
+    if (this.disposed) return;
     this.revision++;
     this.onChange();
   }
