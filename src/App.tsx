@@ -594,7 +594,12 @@ const App: React.FC = () => {
               />
             }
             canvasPanel={
-              <div ref={canvasContainerRef} style={{ width: '100%', height: '100%' }}>
+              <div ref={canvasContainerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+                {dslErrors.length > 0 && (
+                  <div className="canvas-stale" role="status">
+                    Showing the last valid version. Fix the DSL errors to edit the canvas; your text draft is kept.
+                  </div>
+                )}
                 <UMLCanvas
                   width={canvasSize.width}
                   height={canvasSize.height}
@@ -614,6 +619,7 @@ const App: React.FC = () => {
           <PropertyPanel
             element={selectedElement}
             onPropertyChange={handlePropertyChange}
+            disabled={dslErrors.length > 0}
           />
         </div>
       </div>

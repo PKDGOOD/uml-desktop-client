@@ -334,4 +334,52 @@ describe('A03.07 diagram rules before GUI commands', () => {
       .toEqual({ ok: false, reason: 'draft', errors: [] });
     session.dispose();
   });
+
+  describe('A04.09 invalid drafts', () => {
+    const broken = '@class-diagram "one"\n// pasted from a chat\nclass Order {{{ nonsense';
+    const move = { type: 'element-move', elementId: 'one-element', position: { x: 5, y: 5 } } as const;
+
+    it('keeps a pasted invalid draft verbatim next to the last valid model through save', () => {
+      const session = new ProjectSession(project(), vi.fn());
+      session.editText('one', broken);
+      const snapshot = session.snapshot();
+      expect(snapshot.project.diagramTexts?.one).toBe(broken);
+      expect(snapshot.project.diagrams.one).toEqual(project().diagrams.one);
+      expect(session.getSession('one')?.sync.getDiagram()).toEqual(project().diagrams.one);
+      session.dispose();
+    });
+
+    it('refuses every kind of canvas command and undo until the text is corrected, then accepts them', () => {
+      const session = new ProjectSession(project(), vi.fn());
+      session.tryEditCanvas('one', move);
+      session.editText('one', broken);
+      const revision = session.snapshot().revision;
+      const refused = [
+        move,
+        { type: 'element-update', elementId: 'one-element', properties: { name: 'Other' } },
+        { type: 'element-delete', elementId: 'one-element' },
+        { type: 'connector-add', connector: { id: 'c', type: 'association', sourceId: 'one-element', targetId: 'one-element', properties: {} } },
+      ] as const;
+      for (const change of refused) {
+        expect(session.tryEditCanvas('one', change)).toEqual({ ok: false, reason: 'draft', errors: [] });
+      }
+      session.undo('one');
+      expect(session.snapshot().revision).toBe(revision);
+      expect(session.snapshot().project.diagramTexts?.one).toBe(broken);
+
+      // Correcting the text unblocks commands without losing the fix.
+      session.editText('one', '@class-diagram "one"\nclass Order @pos(1, 2) @size(200, 100) {\n}\n');
+      expect(session.tryEditCanvas('one', move)).toEqual({ ok: true });
+      expect(session.project.diagrams.one.elements[0].position).toEqual({ x: 5, y: 5 });
+      session.dispose();
+    });
+
+    it('leaves other diagrams editable while one has an invalid draft', () => {
+      const session = new ProjectSession(project(), vi.fn());
+      session.editText('one', broken);
+      expect(session.tryEditCanvas('two', { ...move, elementId: 'two-element' })).toEqual({ ok: true });
+      expect(session.snapshot().project.diagramTexts?.one).toBe(broken);
+      session.dispose();
+    });
+  });
 });
