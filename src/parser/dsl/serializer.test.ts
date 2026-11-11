@@ -658,3 +658,23 @@ describe('serializeDSL - explicit containment', () => {
     if (result.success) expect(parentNames(result.diagram)).toEqual({ Active: null, Inside: 'Active' });
   });
 });
+
+describe('directed association with only a target multiplicity', () => {
+  it('round trips instead of reading as a transition to a node named "2"', () => {
+    const text = serializeDSL({
+      id: 'd', name: 'D', type: 'class', viewport: { x: 0, y: 0, zoom: 1 },
+      elements: [
+        { id: 'a', type: 'class', position: { x: 0, y: 0 }, size: { width: 100, height: 60 }, properties: { name: 'A' } },
+        { id: 'b', type: 'class', position: { x: 0, y: 0 }, size: { width: 100, height: 60 }, properties: { name: 'B' } },
+      ],
+      connectors: [{ id: 'c', type: 'directed-association', sourceId: 'a', targetId: 'b', targetMultiplicity: '2', label: 'has', properties: {} }],
+    });
+    const parsed = parseDSL(text);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.diagram.connectors).toHaveLength(1);
+      expect(parsed.diagram.connectors[0]).toMatchObject({ type: 'directed-association', targetMultiplicity: '2', label: 'has' });
+      expect(parsed.diagram.elements.map((e) => e.properties.name)).toEqual(['A', 'B']);
+    }
+  });
+});

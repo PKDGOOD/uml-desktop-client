@@ -299,6 +299,15 @@ export interface DiffLine {
 
 // --- Sync Engine ---
 
+/** The parts of a connector an inspector edits. `undefined` clears a label or multiplicity. */
+export interface ConnectorUpdate {
+  sourceId?: string;
+  targetId?: string;
+  label?: string;
+  sourceMultiplicity?: string;
+  targetMultiplicity?: string;
+}
+
 export type CanvasChange =
   | { type: 'batch'; changes: CanvasChange[] }
   | { type: 'element-add'; element: DiagramElement }
@@ -308,4 +317,5 @@ export type CanvasChange =
   | { type: 'element-update'; elementId: string; properties: Partial<ElementProperties> }
   | { type: 'connector-add'; connector: Connector }
   | { type: 'connector-delete'; connectorId: string }
+  | { type: 'connector-update'; connectorId: string; changes: ConnectorUpdate }
   | { type: 'connector-waypoint'; connectorId: string; waypoints: Position[] };

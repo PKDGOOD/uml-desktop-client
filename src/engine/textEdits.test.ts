@@ -247,3 +247,82 @@ Order --> Status : has
       ctx.state.diagram!.elements.map((e) => [e.properties.name, e.position]));
   });
 });
+
+describe('A04.05 in-place connector patches', () => {
+  const SRC = `@class-diagram "D"
+// start
+class Order @pos(40, 40) @size(200, 100) {
+}
+class Item @pos(300, 40) @size(200, 100) {
+}
+class Other @pos(560, 40) @size(200, 100) {
+}
+// relations
+Order "1" --* "1..*" Item : contains
+// parallel pair
+Order --> Item : first
+Order --> Item : second
+Other ..> Item
+`;
+
+  function setup() {
+    const ctx = engineWith(SRC);
+    ctx.engine.onTextChange(SRC);
+    ctx.engine.flushPendingText();
+    const d = ctx.state.diagram!;
+    return { ...ctx, conn: (label?: string) => d.connectors.find((c) => c.label === label)!, d };
+  }
+  const update = (ctx: ReturnType<typeof setup>, id: string, changes: Record<string, unknown>) =>
+    ctx.engine.applyCanvasChange({ type: 'connector-update', connectorId: id, changes });
+
+  it('changes a label and multiplicities in place, keeping surrounding comments and identity', () => {
+    const ctx = setup();
+    const main = ctx.conn('contains');
+    expect(update(ctx, main.id, { label: 'holds', sourceMultiplicity: '0..1', targetMultiplicity: '*' })).toEqual({ ok: true });
+    expect(ctx.state.text).toBe(SRC.replace('"1" --* "1..*" Item : contains', '"0..1" --* "*" Item : holds'));
+    expect(ctx.state.diagram!.connectors.find((c) => c.id === main.id)?.label).toBe('holds');
+  });
+
+  it('adds and clears a label and a multiplicity', () => {
+    const ctx = setup();
+    const first = ctx.conn('first');
+    update(ctx, first.id, { targetMultiplicity: '2' });
+    expect(ctx.state.text).toBe(SRC.replace('Order --> Item : first', 'Order "" --> "2" Item : first'));
+    update(ctx, first.id, { label: undefined });
+    expect(ctx.state.text).toBe(SRC.replace('Order --> Item : first', 'Order "" --> "2" Item'));
+    const dep = ctx.d.connectors.find((c) => c.type === 'dependency')!;
+    update(ctx, dep.id, { label: 'uses' });
+    expect(ctx.state.text).toBe(SRC.replace('Order --> Item : first', 'Order "" --> "2" Item').replace('Other ..> Item', 'Other ..> Item : uses'));
+  });
+
+  it('keeps parallel connections apart when one changes', () => {
+    const ctx = setup();
+    const second = ctx.conn('second');
+    update(ctx, second.id, { label: 'renamed' });
+    expect(ctx.state.text).toBe(SRC.replace(': second', ': renamed'));
+    expect(ctx.state.diagram!.connectors.map((c) => c.label)).toEqual(['contains', 'first', 'renamed', undefined]);
+  });
+
+  it('retargets an endpoint by name', () => {
+    const ctx = setup();
+    const dep = ctx.d.connectors.find((c) => c.type === 'dependency')!;
+    const order = ctx.d.elements.find((e) => e.properties.name === 'Order')!;
+    expect(update(ctx, dep.id, { sourceId: order.id })).toEqual({ ok: true });
+    expect(ctx.state.text).toBe(SRC.replace('Other ..> Item', 'Order ..> Item'));
+  });
+
+  it('refuses an endpoint change that breaks a rule, without touching text or model', () => {
+    const ctx = setup();
+    const dep = ctx.d.connectors.find((c) => c.type === 'dependency')!;
+    const before = ctx.state.text;
+    const result = update(ctx, dep.id, { targetId: dep.sourceId });
+    expect(result.ok).toBe(false);
+    expect(ctx.state.text).toBe(before);
+  });
+
+  it('refuses a multiplicity on a relation that cannot carry one', () => {
+    const ctx = setup();
+    const dep = ctx.d.connectors.find((c) => c.type === 'dependency')!;
+    expect(update(ctx, dep.id, { sourceMultiplicity: '1' }).ok).toBe(false);
+  });
+});
