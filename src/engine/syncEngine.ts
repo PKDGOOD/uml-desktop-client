@@ -122,7 +122,9 @@ export class SyncEngine {
     this.currentText = text;
     this.onDiagramUpdate(deepClone(diagram));
     this.onTextUpdate(text);
-    this.reportErrors([]);
+    // The text may be an invalid draft that an undo step brings back (A04.10).
+    const parsed = parseCheckedDSL(text);
+    this.reportErrors(parsed.success ? [] : parsed.errors);
   }
 
   /**
@@ -166,13 +168,7 @@ export class SyncEngine {
           const command: Command = {
             description: 'Text edit',
             execute: () => this.restore(diagramForUndo, newText),
-            undo: () => {
-              if (oldDiagram) {
-                // An invalid draft has no corresponding canvas state to restore.
-                const previous = parseCheckedDSL(oldText);
-                this.restore(oldDiagram, previous.success ? oldText : serializeDSL(oldDiagram));
-              }
-            },
+            undo: () => { if (oldDiagram) this.restore(oldDiagram, oldText); },
           };
           this.undoManager.execute(command);
         } else {
@@ -184,7 +180,17 @@ export class SyncEngine {
         // Clear errors on success
         this.reportErrors([]);
       } else {
-        // Syntax or rule error: keep last valid state, report errors
+        // Syntax or rule error: keep last valid state, report errors. The draft is an undo step
+        // too, so a bad paste can be taken back without first being fixed (A04.10).
+        const lastValid = this.currentDiagram ? deepClone(this.currentDiagram) : null;
+        if (this.undoManager && lastValid && newText !== oldText) {
+          const command: Command = {
+            description: 'Text edit (invalid)',
+            execute: () => this.restore(lastValid, newText),
+            undo: () => this.restore(lastValid, oldText),
+          };
+          this.undoManager.record(command);
+        }
         this.reportErrors(result.errors);
       }
     } finally {
