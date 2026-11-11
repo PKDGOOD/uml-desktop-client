@@ -507,7 +507,7 @@ const App: React.FC = () => {
         <button onClick={handleSaveProject} disabled={fileBusy} title="Save project (Cmd/Ctrl+S)" className="menu-button">{fileBusy ? 'Working…' : 'Save'}</button>
         <button
           onClick={handleUndo}
-          disabled={!activeSession?.history.canUndo() || dslErrors.length > 0}
+          disabled={!activeSession?.history.canUndo()}
           className="menu-button"
           title="Undo (Cmd/Ctrl+Z)"
         >
@@ -515,7 +515,7 @@ const App: React.FC = () => {
         </button>
         <button
           onClick={handleRedo}
-          disabled={!activeSession?.history.canRedo() || dslErrors.length > 0}
+          disabled={!activeSession?.history.canRedo()}
           className="menu-button"
           title="Redo (Cmd/Ctrl+Shift+Z)"
         >
