@@ -8,3 +8,5 @@ export {
   encodeProjectFile,
 } from './projectFileCodec';
 export type { DecodedProjectFile } from './projectFileCodec';
+export { migrateLegacyProjectFile } from './legacyMigration';
+export type { LegacyMigrationOptions } from './legacyMigration';

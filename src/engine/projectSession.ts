@@ -2,14 +2,13 @@ import type { DiagramData, DiagramType, ProjectData, ProjectTreeNode, CanvasChan
 import { SyncEngine } from './syncEngine';
 import { UndoManager } from './undoManager';
 import { serializeDSL } from '../parser/dsl/serializer';
+import { renameDiagramHeader } from '../parser/dsl/diagramHeader';
 
 interface DiagramSession {
   sync: SyncEngine;
   history: UndoManager;
 }
 
-/** The `@<type>-diagram "Name"` header, possibly preceded by blank lines and comments. */
-const DIAGRAM_HEADER = /^((?:\s*\/\/[^\n]*\n)*\s*)(@[a-z]+-diagram)[ \t]+"(?:\\.|[^"\\])*"/;
 
 function collectNames(nodes: ProjectTreeNode[], result = new Map<string, string>()): Map<string, string> {
   for (const node of nodes) {
@@ -130,7 +129,7 @@ export class ProjectSession {
 
   private renameDiagram(id: string, name: string): void {
     const text = this.text(id);
-    const renamed = text.replace(DIAGRAM_HEADER, (_match, prefix: string, keyword: string) => `${prefix}${keyword} ${JSON.stringify(name)}`);
+    const renamed = renameDiagramHeader(text, name);
     const session = this.sessions.get(id);
     if (renamed !== text) {
       this.storeText(id, renamed);
