@@ -5,7 +5,8 @@
 // =============================================================================
 
 import type { DiagramMeta, ProjectData, ProjectDocument, ProjectFileWriter, ProjectTreeNode } from '@/types';
-import { decodeProjectFile, encodeProjectFile } from './projectFileCodec';
+import { CURRENT_SCHEMA_VERSION, PROJECT_FILE_FORMAT, decodeProjectFile, encodeProjectFile } from './projectFileCodec';
+import { checkFileSize, checkProjectLimits, checkTextSizes, checkTreeDepth, checkUnknownKeys } from './projectFileLimits';
 import { migrateLegacyProjectFile } from './legacyMigration';
 import { tryParseJson, validateProjectReferences, type ProjectFileParseResult } from './projectFileParser';
 
@@ -27,20 +28,40 @@ export interface ReadProjectFileOptions {
 }
 
 export function readProjectFile(content: string, options: ReadProjectFileOptions): ProjectFileParseResult<OpenedProjectFile> {
+  const sizeError = checkFileSize(content);
+  if (sizeError) return { success: false, errors: [sizeError] };
   const json = tryParseJson(content);
   if (!json.success) return json;
-  const legacy = (json.data as Record<string, unknown>).format === undefined;
-
-  let document: ProjectDocument;
-  if (legacy) {
-    const migrated = migrateLegacyProjectFile(content, options);
-    if (!migrated.success) return migrated;
-    document = migrated.data;
-  } else {
-    const decoded = decodeProjectFile(content);
-    if (!decoded.success) return decoded;
-    document = decoded.data.document;
+  const file = json.data as Record<string, unknown>;
+  const legacy = file.format === undefined;
+  const depthErrors = checkTreeDepth(file);
+  if (depthErrors.length > 0) return { success: false, errors: depthErrors };
+  // Version detection comes first (ADR 0001 §6): a newer or foreign file gets
+  // that message, not limit or unknown-key errors.
+  if (!legacy && (file.format !== PROJECT_FILE_FORMAT || file.schemaVersion !== CURRENT_SCHEMA_VERSION)) {
+    const refused = decodeProjectFile(content);
+    if (!refused.success) return refused;
   }
+  if (legacy && !isLegacyMajorOne(file)) {
+    // Refused by the legacy parser with the version or shape message.
+    const refused = migrateLegacyProjectFile(content, options);
+    if (!refused.success) return refused;
+  }
+
+  // Ceilings and closed keys run before any DSL text is parsed (A03.01).
+  const limitErrors = checkProjectLimits(file, legacy);
+  if (limitErrors.length > 0) return { success: false, errors: limitErrors };
+  const keyErrors = checkUnknownKeys(file, legacy);
+  if (keyErrors.length > 0) return { success: false, errors: keyErrors };
+
+  const read = legacy ? migrateLegacyProjectFile(content, options) : decodeProjectFile(content);
+  if (!read.success) return read;
+  const document: ProjectDocument = 'document' in read.data ? read.data.document : read.data;
+
+  // Migration may have generated text for diagrams the old file had none for.
+  const generated = Object.fromEntries(Object.entries(document.diagrams).map(([id, diagram]) => [id, diagram.text]));
+  const textErrors = checkTextSizes(generated, legacy);
+  if (textErrors.length > 0) return { success: false, errors: textErrors };
 
   const project = documentToProjectData(document);
   const errors = validateProjectReferences(project).map((error) => ({
@@ -99,4 +120,10 @@ function deriveIndex(nodes: ProjectTreeNode[], parentFolderId = '', index: Recor
     if (node.children) deriveIndex(node.children, node.id, index);
   }
   return index;
+}
+
+function isLegacyMajorOne(file: Record<string, unknown>): boolean {
+  const metadata = file.metadata;
+  const version = typeof metadata === 'object' && metadata !== null ? (metadata as Record<string, unknown>).version : undefined;
+  return typeof version === 'string' && /^1(?:\.|$)/.test(version);
 }
