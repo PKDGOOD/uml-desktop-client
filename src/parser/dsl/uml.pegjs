@@ -55,14 +55,14 @@ Diagram
       const elements = [];
       const connectors = [];
       let elementIndex = 0;
-      const nameToId = {};
+      const nameToId = new Map();
 
       function addElement(item, parentId) {
         if (!item) return;
         const pos = item.position || defaultPos(elementIndex);
         const size = item.size || defaultSize(item.type);
         const id = makeId(item.type);
-        nameToId[item.properties.name] = id;
+        nameToId.set(item.properties.name, id);
         elements.push({
           id,
           type: item.type,
@@ -95,8 +95,9 @@ Diagram
         if (conn.type === 'transition' && (header.type === 'class' || header.type === 'usecase')) {
           conn.type = 'directed-association';
         }
-        if (nameToId[conn.sourceId]) conn.sourceId = nameToId[conn.sourceId];
-        if (nameToId[conn.targetId]) conn.targetId = nameToId[conn.targetId];
+        // A Map, so names such as __proto__ resolve like any other.
+        if (nameToId.has(conn.sourceId)) conn.sourceId = nameToId.get(conn.sourceId);
+        if (nameToId.has(conn.targetId)) conn.targetId = nameToId.get(conn.targetId);
         delete conn._nodeType;
       }
 
