@@ -9,7 +9,6 @@ import { CURRENT_SCHEMA_VERSION, PROJECT_FILE_FORMAT, decodeProjectFile, encodeP
 import { checkFileSize, checkProjectLimits, checkTextSizes, checkTreeDepth, checkUnknownKeys } from './projectFileLimits';
 import { migrateLegacyProjectFile } from './legacyMigration';
 import { tryParseJson, validateProjectReferences, type ProjectFileParseResult } from './projectFileParser';
-import { ProjectFileSerializer } from './projectFileSerializer';
 
 /** The in-memory version marker of a project opened from or saved as schema 2. */
 const IN_MEMORY_VERSION = '1.0.0';
@@ -26,10 +25,15 @@ export interface OpenedProjectFile {
 export interface ReadProjectFileOptions {
   /** Assigns the project ID of a legacy file (ADR 0001 §3). */
   createId: () => string;
+  /**
+   * Apply the per-file byte ceiling (default true). Off only for content the app
+   * generated from an already-open project, whose size says nothing about a file.
+   */
+  checkFileSize?: boolean;
 }
 
 export function readProjectFile(content: string, options: ReadProjectFileOptions): ProjectFileParseResult<OpenedProjectFile> {
-  const sizeError = checkFileSize(content);
+  const sizeError = options.checkFileSize === false ? undefined : checkFileSize(content);
   if (sizeError) return { success: false, errors: [sizeError] };
   const json = tryParseJson(content);
   if (!json.success) return json;
@@ -95,12 +99,14 @@ export function readProjectFile(content: string, options: ReadProjectFileOptions
 export function checkProjectData(project: ProjectData): ProjectFileParseResult<Pick<OpenedProjectFile, 'project' | 'invalidDrafts'>> {
   let content: string;
   try {
-    content = ProjectFileSerializer.serialize(project);
+    // Every own key, so a field the reader does not know is refused rather than dropped.
+    content = JSON.stringify(project);
   } catch (error) {
     return { success: false, errors: [{ message: `The project cannot be written as a file: ${(error as Error).message}` }] };
   }
   // The ID is irrelevant here: the caller keeps the session's own project ID.
-  const result = readProjectFile(content, { createId: () => 'unchecked' });
+  // Count, text and geometry limits apply; the byte ceiling belongs to files.
+  const result = readProjectFile(content, { createId: () => 'unchecked', checkFileSize: false });
   if (!result.success) return result;
   return { success: true, data: { project: result.data.project, invalidDrafts: result.data.invalidDrafts } };
 }

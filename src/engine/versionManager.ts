@@ -15,7 +15,8 @@ import type {
   DiagramData,
 } from '../types';
 import { ProjectFileSerializer } from '../parser/project/projectFileSerializer';
-import { ProjectFileParser } from '../parser/project/projectFileParser';
+import { ProjectFileParser, tryParseJson } from '../parser/project/projectFileParser';
+import { checkUnknownKeys } from '../parser/project/projectFileLimits';
 
 // =============================================================================
 // File System Abstraction (for testability)
@@ -153,6 +154,14 @@ export class VersionManager {
 
     const snapshotFile = `${this.versionsDir(projectPath)}/${entry.path}/project.uml.json`;
     const content = await this.fs.readFile(snapshotFile);
+    // parseAll keeps only the fields it knows, so refuse unknown ones first rather than drop them.
+    const json = tryParseJson(content);
+    if (json.success && typeof json.data === 'object' && json.data !== null && !Array.isArray(json.data)) {
+      const unknown = checkUnknownKeys(json.data as Record<string, unknown>, true);
+      if (unknown.length > 0) {
+        throw new Error(`Failed to restore snapshot: ${unknown.map((e) => e.message).join(', ')}`);
+      }
+    }
     const result = ProjectFileParser.parseAll(content);
     if (!result.success) {
       throw new Error(`Failed to restore snapshot: ${result.errors.map((e) => e.message).join(', ')}`);

@@ -202,6 +202,15 @@ describe('VersionManager', () => {
       expect(Object.keys(restored.diagrams)).toHaveLength(2);
     });
 
+    it('refuses a snapshot with a field it does not know instead of dropping it (A03.08)', async () => {
+      const snapshot = await vm.createSnapshot(PROJECT_PATH, makeProjectData('Original', 1), 'Backup');
+      const file = snapshot.projectDataPath;
+      const stored = JSON.parse(await fs.readFile(file));
+      stored.comments = ['kept by a newer build'];
+      await fs.writeFile(file, JSON.stringify(stored));
+      await expect(vm.restoreSnapshot(PROJECT_PATH, snapshot.id)).rejects.toThrow(/comments/);
+    });
+
     it('should throw when snapshot does not exist', async () => {
       await expect(
         vm.restoreSnapshot(PROJECT_PATH, 'nonexistent'),

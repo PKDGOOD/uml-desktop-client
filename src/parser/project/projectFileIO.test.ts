@@ -210,6 +210,31 @@ describe('A03.08 checkProjectData before replacing a session', () => {
     expect(project).toEqual(before);
   });
 
+  it('keeps a project with an unknown root field from being dropped silently', () => {
+    const project = legacyProject() as ProjectData & { comments?: string[] };
+    project.comments = ['from a newer build'];
+    const result = checkProjectData(project);
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.errors.map((error) => error.message).join('\n')).toMatch(/comments/);
+  });
+
+  it('does not apply the file byte ceiling to an open project', () => {
+    const project = legacyProject();
+    const [id, diagram] = Object.entries(project.diagrams)[0];
+    const copies = 20 - Object.keys(project.diagrams).length;
+    for (let i = 0; i < copies; i++) {
+      const copy = `${id}-big-${i}`;
+      project.diagrams[copy] = { ...structuredClone(diagram), id: copy };
+      project.tree[0].children!.push({ id: copy, type: 'diagram', name: diagram.name, diagramType: diagram.type });
+      project.metadata.diagramIndex[copy] = { ...project.metadata.diagramIndex[id], id: copy };
+    }
+    for (const key of Object.keys(project.diagrams)) project.diagramTexts![key] = 'x'.repeat(1_000_000);
+    expect(new TextEncoder().encode(JSON.stringify(project)).length).toBeGreaterThan(16 * 1024 * 1024);
+    const result = checkProjectData(project);
+    if (!result.success) throw new Error(JSON.stringify(result.errors.slice(0, 3)));
+    expect(result.data.invalidDrafts.length).toBeGreaterThan(0);
+  });
+
   it('repairs a restored snapshot whose model name drifted from the tree, as Open does', () => {
     const project = legacyProject();
     const id = project.tree[0].children![0].id;
