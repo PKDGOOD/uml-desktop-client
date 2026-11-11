@@ -18,8 +18,8 @@ import { createProject } from './engine/projectFactory';
 import { CreateDialog } from './components/project/CreateDialog';
 import { HistoryDialog } from './components/project/HistoryDialog';
 import { ExportEngine } from './engine/exportEngine';
-import { ProjectFileSerializer } from './parser/project/projectFileSerializer';
-import { ProjectFileParser } from './parser/project/projectFileParser';
+import { readProjectFile, writeProjectFile } from './parser/project/projectFileIO';
+import { version as appVersion } from '../package.json';
 import type {
   ProjectData,
   ProjectTreeNode,
@@ -275,9 +275,9 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const replaceProject = useCallback((project: ProjectData, filePath: string | null) => {
+  const replaceProject = useCallback((project: ProjectData, filePath: string | null, projectId?: string) => {
     workspaceRef.current?.dispose();
-    workspaceRef.current = new ProjectSession(project, refreshWorkspace);
+    workspaceRef.current = new ProjectSession(project, refreshWorkspace, { projectId });
     setProjectGeneration((generation) => generation + 1);
     const store = useProjectStore.getState();
     store.reset();
@@ -398,13 +398,13 @@ const App: React.FC = () => {
           return;
         }
       }
-      const snapshot = workspace.snapshot();
-      const serialized = ProjectFileSerializer.serialize(snapshot.project);
+      const snapshot = workspace.documentSnapshot();
+      const serialized = writeProjectFile(snapshot.document, { app: 'UML Studio', version: appVersion });
       if (api && savePath) {
         await api.saveProject(savePath, serialized);
         setProjectFilePath(savePath);
       } else {
-        downloadProject(serialized, snapshot.project.metadata.name);
+        downloadProject(serialized, snapshot.document.project.name);
         // A browser request has no persistence acknowledgement. Keep the saved
         // revision unchanged so blocked/cancelled downloads retain dirty guards.
         setFileNotice({ text: workspace.dirty
@@ -412,7 +412,7 @@ const App: React.FC = () => {
           : 'Download requested (.uml.json). Verify the file before closing.' });
         return;
       }
-      workspace.markSaved(snapshot.revision, snapshot.project.metadata.updatedAt);
+      workspace.markSaved(snapshot.revision, snapshot.document.project.updatedAt);
       setFileNotice({ text: workspace.dirty
         ? 'Saved. Newer edits are still unsaved.'
         : 'Project saved.' });
@@ -426,15 +426,23 @@ const App: React.FC = () => {
   }, [projectFilePath]);
 
   const loadProjectContent = useCallback((content: string, path: string | null): boolean => {
-    const result = ProjectFileParser.parseAll(content);
+    const result = readProjectFile(content, { createId: () => crypto.randomUUID() });
     if (!result.success) {
       setFileNotice({ text: `Could not open project: ${result.errors.map((error) => error.message).join('; ')}`, error: true });
       return false;
     }
     // Check after reading so edits made while the picker/read was pending are protected.
     if (!confirmUnsavedChanges()) return false;
-    replaceProject(result.data, path);
-    setFileNotice({ text: 'Project opened.' });
+    const { project, projectId, migrated, invalidDrafts } = result.data;
+    replaceProject(project, path, projectId);
+    // A migrated file is not on disk in the new format yet (ADR 0001 §3).
+    if (migrated) workspaceRef.current?.markUnsaved();
+    const drafts = invalidDrafts.length > 0
+      ? ` ${invalidDrafts.length} diagram${invalidDrafts.length > 1 ? 's have' : ' has'} DSL errors; the canvas shows the last valid diagram.`
+      : '';
+    setFileNotice({ text: (migrated
+      ? 'Opened a project saved by an older version. Save to upgrade the file.'
+      : 'Project opened.') + drafts });
     return true;
   }, [confirmUnsavedChanges, replaceProject]);
 
@@ -587,7 +595,7 @@ const App: React.FC = () => {
         getSnapshot={() => workspaceRef.current!.snapshot().project}
         onClose={() => setHistoryOpen(false)}
         onRestore={(project) => {
-          replaceProject(project, projectFilePath);
+          replaceProject(project, projectFilePath, workspaceRef.current?.projectId);
           workspaceRef.current?.markUnsaved();
           setHistoryOpen(false);
           setFileNotice({ text: 'Snapshot restored. Save to update your project file.' });

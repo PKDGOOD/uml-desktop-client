@@ -196,16 +196,22 @@ const SUPPORTED_MAJOR_VERSION = 1;
  * Assumes the shape checks passed.
  */
 function validateReferences(project: ProjectData): ProjectFileParseError[] {
-  const errors: ProjectFileParseError[] = [];
   const major = /^(\d+)(?:\.|$)/.exec(project.metadata.version)?.[1];
   if (Number(major) !== SUPPORTED_MAJOR_VERSION) {
-    errors.push({
+    return [{
       message: `Unsupported file version ${project.metadata.version}: it was saved by a newer or unknown version of the app`,
       path: 'metadata.version',
-    });
-    return errors;
+    }];
   }
+  return validateProjectReferences(project);
+}
 
+/**
+ * ADR 0001 §4 reference rules for an in-memory project, whichever file version
+ * it came from. Error paths use the schema-1 layout.
+ */
+export function validateProjectReferences(project: ProjectData): ProjectFileParseError[] {
+  const errors: ProjectFileParseError[] = [];
   const treeIds = new Set<string>();
   const treeDiagrams = new Map<string, ProjectTreeNode>();
   const walk = (nodes: ProjectTreeNode[], path: string): void => nodes.forEach((node, index) => {
