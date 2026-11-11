@@ -232,3 +232,54 @@ describe('A02.06 legacy (schema 1) migration', () => {
     expect(calls).toBe(0);
   });
 });
+
+describe('A02.07 ambiguous legacy containment', () => {
+  /** Schema 1 never stored parentId: strip it, as an old build would have written the file. */
+  function withoutParents(type: 'usecase' | 'state') {
+    const legacy = legacyFixture();
+    const id = Object.keys(legacy.diagrams).find((key) => legacy.diagrams[key].type === type)!;
+    for (const element of legacy.diagrams[id].elements) delete element.parentId;
+    return { legacy, id };
+  }
+
+  function ownership(model: ProjectData['diagrams'][string]) {
+    const byId = new Map(model.elements.map((element) => [element.id, element.properties.name]));
+    return Object.fromEntries(model.elements.map((element) => [element.properties.name, element.parentId ? byId.get(element.parentId) : null]));
+  }
+
+  it.each(['usecase', 'state'] as const)('recovers %s containment from saved DSL text without new IDs', (type) => {
+    const { legacy, id } = withoutParents(type);
+    const model = migrate(JSON.stringify(legacy)).diagrams[id].model;
+    const expected = expectations.find((fixture) => fixture.type === type)!.ownership as Record<string, string | null>;
+
+    expect(model.elements.map((element) => element.id)).toEqual(legacy.diagrams[id].elements.map((element) => element.id));
+    for (const [name, parent] of Object.entries(expected)) expect(ownership(model)[name]).toBe(parent);
+  });
+
+  it.each<[string, (project: ProjectData, id: string) => void]>([
+    ['no saved text', (project, id) => { delete project.diagramTexts![id]; }],
+    ['unparsable text', (project, id) => { project.diagramTexts![id] = '@usecase-diagram "x"\nusecase {{{'; }],
+    ['text that names other elements', (project, id) => {
+      project.diagramTexts![id] = project.diagramTexts![id].replace(/RefundPayment/g, 'IssueRefund');
+    }],
+  ])('refuses to guess containment with %s', (_name, mutate) => {
+    const { legacy, id } = withoutParents('usecase');
+    mutate(legacy, id);
+    let calls = 0;
+    const result = migrateLegacyProjectFile(JSON.stringify(legacy), { createId: () => `id-${++calls}` });
+
+    expect(result).toMatchObject({ success: false, errors: [{ path: `diagrams.${id}.elements` }] });
+    if (!result.success) expect(result.errors[0].message).toMatch(/"OrderSystem".*Nothing was changed/);
+    expect(calls).toBe(0);
+  });
+
+  it('accepts a container with nothing that could be inside it', () => {
+    const { legacy, id } = withoutParents('usecase');
+    delete legacy.diagramTexts![id];
+    const diagram = legacy.diagrams[id];
+    diagram.elements = diagram.elements.filter((element) => element.type !== 'usecase');
+    diagram.connectors = [];
+
+    expect(migrate(JSON.stringify(legacy)).diagrams[id].model.elements).toEqual(diagram.elements);
+  });
+});
