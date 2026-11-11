@@ -11,6 +11,7 @@ Changes are documented here before a tagged release. The package version `0.1.0`
 - Project-file validation and workflow regression tests.
 - Open-source contribution, security, governance, issue/PR, and release guidance.
 - CI configuration, dependency update configuration, and reproducible third-party notices.
+- `parseDSLWithSpans` reports where each element, member and connector sits in the DSL text (UTF-16 offsets), the groundwork for edits that change only the affected text.
 - Synthetic five-type fixtures, explicit known-failure regressions, reference engine measurements and a macOS packaged save/restart/open smoke harness.
 
 ### Changed
