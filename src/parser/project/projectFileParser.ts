@@ -187,6 +187,82 @@ function validateMetadata(
   return errors;
 }
 
+/** Schema-1 files carry a semver `metadata.version`; only major version 1 is understood. */
+const SUPPORTED_MAJOR_VERSION = 1;
+
+/**
+ * Reference rules from ADR 0001 §4 that shape checks cannot express:
+ * known version, unique IDs, existing endpoints/parents and a tree that agrees with the index.
+ * Assumes the shape checks passed.
+ */
+function validateReferences(project: ProjectData): ProjectFileParseError[] {
+  const errors: ProjectFileParseError[] = [];
+  const major = /^(\d+)(?:\.|$)/.exec(project.metadata.version)?.[1];
+  if (Number(major) !== SUPPORTED_MAJOR_VERSION) {
+    errors.push({
+      message: `Unsupported file version ${project.metadata.version}: it was saved by a newer or unknown version of the app`,
+      path: 'metadata.version',
+    });
+    return errors;
+  }
+
+  const treeIds = new Set<string>();
+  const treeDiagrams = new Map<string, ProjectTreeNode>();
+  const walk = (nodes: ProjectTreeNode[], path: string): void => nodes.forEach((node, index) => {
+    const nodePath = `${path}[${index}]`;
+    if (treeIds.has(node.id)) errors.push({ message: `Duplicate tree node ID: ${node.id}`, path: `${nodePath}.id` });
+    treeIds.add(node.id);
+    if (node.type === 'diagram') treeDiagrams.set(node.id, node);
+    if (node.children) walk(node.children, `${nodePath}.children`);
+  });
+  walk(project.tree, 'tree');
+
+  const index = project.metadata.diagramIndex;
+  for (const [id, node] of treeDiagrams) {
+    const diagram = project.diagrams[id];
+    if (!diagram) errors.push({ message: `Diagram in the tree has no data: ${id}`, path: `diagrams.${id}` });
+    else if (node.diagramType !== undefined && node.diagramType !== diagram.type) {
+      errors.push({ message: `Tree says ${node.diagramType} but diagram ${id} is ${diagram.type}`, path: `diagrams.${id}.type` });
+    }
+    if (!index[id]) errors.push({ message: `Diagram ${id} is missing from metadata.diagramIndex`, path: `metadata.diagramIndex.${id}` });
+    else if (diagram && index[id].type !== diagram.type) {
+      errors.push({ message: `metadata.diagramIndex says ${index[id].type} but diagram ${id} is ${diagram.type}`, path: `metadata.diagramIndex.${id}.type` });
+    }
+  }
+  for (const id of Object.keys(project.diagrams)) {
+    if (!treeDiagrams.has(id)) errors.push({ message: `Diagram ${id} is not in the tree`, path: `diagrams.${id}` });
+  }
+  for (const id of Object.keys(index)) {
+    if (!treeDiagrams.has(id)) errors.push({ message: `metadata.diagramIndex lists ${id}, which is not in the tree`, path: `metadata.diagramIndex.${id}` });
+  }
+
+  for (const [id, diagram] of Object.entries(project.diagrams)) {
+    const ids = new Set<string>();
+    const elementIds = new Set(diagram.elements.map((element) => element.id));
+    const claim = (itemId: string, path: string) => {
+      if (ids.has(itemId)) errors.push({ message: `Duplicate ID ${itemId} in diagram ${id}`, path });
+      ids.add(itemId);
+    };
+    diagram.elements.forEach((element, i) => {
+      const path = `diagrams.${id}.elements[${i}]`;
+      claim(element.id, `${path}.id`);
+      if (element.parentId !== undefined && (element.parentId === element.id || !elementIds.has(element.parentId))) {
+        errors.push({ message: `Element ${element.id} has an unknown parent ${element.parentId}`, path: `${path}.parentId` });
+      }
+    });
+    diagram.connectors.forEach((connector, i) => {
+      const path = `diagrams.${id}.connectors[${i}]`;
+      claim(connector.id, `${path}.id`);
+      for (const end of ['sourceId', 'targetId'] as const) {
+        if (!elementIds.has(connector[end])) {
+          errors.push({ message: `Connector ${connector.id} points to a missing element ${connector[end]}`, path: `${path}.${end}` });
+        }
+      }
+    });
+  }
+  return errors;
+}
+
 export const ProjectFileParser = {
   /**
    * Parse only metadata, tree, and sharedElements (for lazy loading).
@@ -289,15 +365,18 @@ export const ProjectFileParser = {
       return { success: false, errors: validationErrors };
     }
 
-    return {
-      success: true,
-      data: {
-        metadata: obj.metadata as ProjectMetadata,
-        tree: obj.tree as ProjectTreeNode[],
-        sharedElements: obj.sharedElements as Record<string, DiagramElement>,
-        diagrams: obj.diagrams as Record<string, DiagramData>,
-        ...(obj.diagramTexts !== undefined ? { diagramTexts: obj.diagramTexts as Record<string, string> } : {}),
-      },
+    const project: ProjectData = {
+      metadata: obj.metadata as ProjectMetadata,
+      tree: obj.tree as ProjectTreeNode[],
+      sharedElements: obj.sharedElements as Record<string, DiagramElement>,
+      diagrams: obj.diagrams as Record<string, DiagramData>,
+      ...(obj.diagramTexts !== undefined ? { diagramTexts: obj.diagramTexts as Record<string, string> } : {}),
     };
+    const referenceErrors = validateReferences(project);
+    if (referenceErrors.length > 0) {
+      return { success: false, errors: referenceErrors };
+    }
+
+    return { success: true, data: project };
   },
 };

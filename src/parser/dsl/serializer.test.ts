@@ -597,3 +597,64 @@ describe('serializeDSL - roundtrip', () => {
     expect(result.diagram.connectors[0].type).toBe('include');
   });
 });
+
+describe('serializeDSL - explicit containment', () => {
+  function parentNames(diagram: DiagramData): Record<string, string | null> {
+    const byId = new Map(diagram.elements.map((el) => [el.id, el.properties.name]));
+    return Object.fromEntries(diagram.elements.map((el) => [el.properties.name, el.parentId ? byId.get(el.parentId) ?? null : null]));
+  }
+
+  it('keeps a top-level state outside a composite state even when it follows the children', () => {
+    const elements = [
+      makeElement({ id: 'a', type: 'composite-state', properties: { name: 'Active' } }),
+      makeElement({ id: 'i', type: 'state', parentId: 'a', properties: { name: 'Inside' } }),
+      makeElement({ id: 'o', type: 'state', properties: { name: 'Outside' } }),
+    ];
+    const connectors: Connector[] = [{ id: 't', type: 'transition', sourceId: 'i', targetId: 'o', properties: {} }];
+    const dsl = serializeDSL(makeDiagram({ type: 'state', name: 'S', elements, connectors }));
+    expect(dsl.split('\n').some((line) => line.startsWith('state Outside '))).toBe(true);
+
+    const result = parseDSL(dsl);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(parentNames(result.diagram)).toEqual({ Active: null, Inside: 'Active', Outside: null });
+    expect(result.diagram.connectors).toHaveLength(1);
+  });
+
+  it('nests children by parentId regardless of array order', () => {
+    const elements = [
+      makeElement({ id: 'i', type: 'state', parentId: 'a', properties: { name: 'Inside' } }),
+      makeElement({ id: 'o', type: 'state', properties: { name: 'Outside' } }),
+      makeElement({ id: 'a', type: 'composite-state', properties: { name: 'Active' } }),
+      makeElement({ id: 'j', type: 'state', parentId: 'a', properties: { name: 'Second' } }),
+    ];
+    const connectors: Connector[] = [{ id: 't', type: 'transition', sourceId: 'i', targetId: 'j', label: 'next', properties: {} }];
+    const result = parseDSL(serializeDSL(makeDiagram({ type: 'state', name: 'S', elements, connectors })));
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(parentNames(result.diagram)).toEqual({ Outside: null, Active: null, Inside: 'Active', Second: 'Active' });
+    expect(result.diagram.connectors.map((c) => c.label)).toEqual(['next']);
+  });
+
+  it('keeps a use case listed right after a boundary outside it', () => {
+    const elements = [
+      makeElement({ id: 'b', type: 'system-boundary', properties: { name: 'Shop' } }),
+      makeElement({ id: 'x', type: 'usecase', properties: { name: 'Support' } }),
+      makeElement({ id: 'y', type: 'usecase', parentId: 'b', properties: { name: 'Cancel' } }),
+    ];
+    const result = parseDSL(serializeDSL(makeDiagram({ type: 'usecase', name: 'U', elements })));
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(parentNames(result.diagram)).toEqual({ Shop: null, Cancel: 'Shop', Support: null });
+  });
+
+  it('falls back to flattened order for diagrams without any parentId', () => {
+    const elements = [
+      makeElement({ id: 'a', type: 'composite-state', properties: { name: 'Active' } }),
+      makeElement({ id: 'i', type: 'state', properties: { name: 'Inside' } }),
+    ];
+    const result = parseDSL(serializeDSL(makeDiagram({ type: 'state', name: 'S', elements })));
+    expect(result.success).toBe(true);
+    if (result.success) expect(parentNames(result.diagram)).toEqual({ Active: null, Inside: 'Active' });
+  });
+});

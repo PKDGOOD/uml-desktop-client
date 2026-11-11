@@ -154,6 +154,22 @@ describe('SyncEngine draft safety', () => {
     expect(engine.getText()).toBe(VALID_CLASS_DSL);
   });
 
+  it('keeps parentId pointing at preserved element IDs after a text edit', () => {
+    const { engine } = createEngine();
+    engine.setDiagram(makeDiagram({ type: 'state', elements: [] }), '@state-diagram "S"\n');
+    engine.onTextChange('@state-diagram "S"\ncomposite-state Active {\n  state Inside\n}\nstate Outside\n');
+    engine.flushPendingText();
+    const before = engine.getDiagram()!;
+    const activeId = before.elements.find((e) => e.properties.name === 'Active')!.id;
+
+    engine.onTextChange(`${engine.getText()}\n`);
+    engine.flushPendingText();
+    const after = engine.getDiagram()!;
+    expect(after.elements.find((e) => e.properties.name === 'Active')!.id).toBe(activeId);
+    expect(after.elements.find((e) => e.properties.name === 'Inside')!.parentId).toBe(activeId);
+    expect(after.elements.find((e) => e.properties.name === 'Outside')!.parentId).toBeUndefined();
+  });
+
   it('rejects a canvas command the DSL cannot represent without changing state or history', () => {
     const history = new UndoManager();
     const { engine, onDiagramUpdate, onTextUpdate } = createEngine({ undoManager: history });

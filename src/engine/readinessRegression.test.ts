@@ -70,19 +70,18 @@ beforeAll(() => {
   }
 });
 
-describe('OPEN readiness defects: expected failures are NOT supported behavior', () => {
-  // Remove .fails in the linked fix task; unexpected success deliberately turns red.
+describe('Readiness defects F1–F4 stay fixed', () => {
   it('F1 / A01.05 → A04.04: preserve GUI properties after text whitespace edits', () => {
     expect(propertiesAfterText).toMatchObject({ stereotype: 'entity', visibility: 'private' });
   });
-  it.fails('F2 / A01.06 → A04.07: keep Outside at top level after serialization', () => {
+  it('F2 / A01.06 → A04.07: keep Outside at top level after serialization', () => {
     expect(serializedContainment.split('\n').some((line) => /^state Outside(?:\s|$)/.test(line))).toBe(true);
   });
   it('F3 / A01.07 → A03.07: reject an invalid member command before commit', () => {
     expect(invalidCommandAccepted).toBe(false);
   });
   for (const name of ['duplicate element ID', 'missing connector endpoint', 'tree/index mismatch', 'future file version']) {
-    it.fails(`F4 / A01.08 → A03.08: reject ${name}`, () => {
+    it(`F4 / A01.08 → A03.08: reject ${name}`, () => {
       expect(invalidFiles[name]).toBe(false);
     });
   }

@@ -8,6 +8,7 @@
 import type { DiagramData, DiagramDocument, ProjectData, ProjectDocument, ProjectTreeNode } from '@/types';
 import { parseDSL } from '../dsl/peggyParser';
 import { serializeDSL } from '../dsl/serializer';
+import { renameDiagramHeader } from '../dsl/diagramHeader';
 import {
   ProjectFileParser,
   type ProjectFileParseError,
@@ -27,15 +28,14 @@ export function migrateLegacyProjectFile(
   if (!parsed.success) return parsed;
   const legacy = parsed.data;
 
-  const versionError = checkLegacyVersion(legacy.metadata.version);
-  if (versionError) return { success: false, errors: [versionError] };
-
+  // ProjectFileParser.parseAll has already refused every major version other than 1.
   const indexErrors = checkDiagramIndex(legacy);
   if (indexErrors.length > 0) return { success: false, errors: indexErrors };
 
+  const names = treeDiagramNames(legacy.tree);
   const diagrams: Record<string, DiagramDocument> = {};
   for (const [id, model] of Object.entries(legacy.diagrams)) {
-    diagrams[id] = migrateDiagram(model, legacy.diagramTexts?.[id]);
+    diagrams[id] = migrateDiagram(model, legacy.diagramTexts?.[id], names.get(id) ?? model.name);
   }
 
   return {
@@ -54,20 +54,12 @@ export function migrateLegacyProjectFile(
   };
 }
 
-function checkLegacyVersion(version: string): ProjectFileParseError | undefined {
-  const major = /^(\d+)(\.|$)/.exec(version)?.[1];
-  if (major === '1') return undefined;
-  if (major === undefined) return { message: 'Invalid legacy file version', path: 'metadata.version' };
-  return {
-    message: `This project was saved by a newer version of UML Studio (file version ${version}). Update the app to open it.`,
-    path: 'metadata.version',
-  };
-}
-
 /**
  * The legacy index must describe the same diagrams, types and parent folders as
- * the tree before it is dropped (F4c). Names are not compared: renaming a
- * diagram in the project tree never updated the index name.
+ * the tree before it is dropped (F4c). Names are not compared: before #23,
+ * renaming a diagram in the project tree changed only the tree label, so files
+ * saved by those builds carry stale index and model names. The tree name, which
+ * the user saw, wins during migration (see migrateDiagram).
  */
 function checkDiagramIndex(legacy: ProjectData): ProjectFileParseError[] {
   const index = legacy.metadata.diagramIndex;
@@ -100,8 +92,23 @@ function treeDiagrams(
   return result;
 }
 
-function migrateDiagram(model: DiagramData, text: string | undefined): DiagramDocument {
-  if (text === undefined) return { model, text: serializeDSL(model), textStatus: 'in-sync' };
+function treeDiagramNames(nodes: ProjectTreeNode[], result = new Map<string, string>()): Map<string, string> {
+  for (const node of nodes) {
+    if (node.type === 'diagram') result.set(node.id, node.name);
+    if (node.children) treeDiagramNames(node.children, result);
+  }
+  return result;
+}
+
+/**
+ * Schema 2 requires the model name to equal the tree name (ADR 0001 §4). A
+ * legacy name drift is repaired by renaming the model and the DSL header to the
+ * tree name, which is what the user saw in the project tree.
+ */
+function migrateDiagram(source: DiagramData, sourceText: string | undefined, name: string): DiagramDocument {
+  const model = source.name === name ? source : { ...source, name };
+  if (sourceText === undefined) return { model, text: serializeDSL(model), textStatus: 'in-sync' };
+  const text = source.name === name ? sourceText : renameDiagramHeader(sourceText, name);
   // A parsable draft is in-sync here; comparing its meaning with the model is A03.09.
   return { model, text, textStatus: parseDSL(text).success ? 'in-sync' : 'invalid' };
 }

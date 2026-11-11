@@ -166,10 +166,38 @@ describe('A02.06 legacy (schema 1) migration', () => {
     expect(migrate(JSON.stringify(legacy)).tree).toEqual(legacy.tree);
   });
 
+  it('renames a drifted model and its DSL header to the tree name', () => {
+    const legacy = legacyFixture();
+    const id = Object.keys(legacy.diagrams)[0];
+    const before = legacy.diagramTexts![id];
+    legacy.tree[0].children![0].name = 'Renamed in tree';
+    const document = migrate(JSON.stringify(legacy)).diagrams[id];
+
+    expect(document.model.name).toBe('Renamed in tree');
+    expect(document.text).toContain('-diagram "Renamed in tree"');
+    expect(document.text.replace(/"Renamed in tree"/, '')).toBe(before.replace(/"[^"]*"/, ''));
+    expect(document.textStatus).toBe('in-sync');
+    expect(decodeProjectFile(encodeProjectFile(migrate(JSON.stringify(legacy)), { app: 'UML Studio', version: '0.1.0' })).success).toBe(true);
+  });
+
+  it('renames a drifted model without diagramTexts and keeps an invalid draft invalid', () => {
+    const legacy = legacyFixture();
+    const [first, second] = Object.keys(legacy.diagrams);
+    legacy.tree[0].children![0].name = 'First';
+    legacy.tree[0].children![1].name = 'Second';
+    delete legacy.diagramTexts![first];
+    legacy.diagramTexts![second] = `@${legacy.diagrams[second].type}-diagram "old"\nclass {{{`;
+    const migrated = migrate(JSON.stringify(legacy));
+
+    expect(migrated.diagrams[first].text).toBe(serializeDSL({ ...legacy.diagrams[first], name: 'First' }));
+    expect(migrated.diagrams[second]).toMatchObject({ textStatus: 'invalid', model: { name: 'Second' } });
+    expect(migrated.diagrams[second].text).toBe(`@${legacy.diagrams[second].type}-diagram "Second"\nclass {{{`);
+  });
+
   it.each([
-    ['999.0.0', /newer version.*999\.0\.0/],
-    ['2.0.0', /newer version/],
-    ['beta', /Invalid legacy file version/],
+    ['999.0.0', /Unsupported file version 999\.0\.0.*newer/],
+    ['2.0.0', /Unsupported file version 2\.0\.0/],
+    ['beta', /Unsupported file version beta/],
   ])('refuses legacy version %s', (version, message) => {
     const legacy = legacyFixture();
     legacy.metadata.version = version;
