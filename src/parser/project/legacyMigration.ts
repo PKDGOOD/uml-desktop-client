@@ -1,11 +1,11 @@
 // =============================================================================
-// Schema-1 → schema-2 migration (ADR 0001 §7, A02.06)
+// Schema-1 → schema-2 migration (ADR 0001 §7, A02.06/A02.07)
 // Produces a detached ProjectDocument from legacy file text. The source text is
-// only read. Ambiguous containment (A02.07) and session wiring (A02.08) are
-// separate tasks.
+// only read. Containment that cannot be recovered without guessing is refused
+// with a recovery diagnostic (A02.07). Session wiring is A02.08.
 // =============================================================================
 
-import type { DiagramData, DiagramDocument, ProjectData, ProjectDocument, ProjectTreeNode } from '@/types';
+import type { DiagramData, DiagramDocument, DiagramElement, ProjectData, ProjectDocument, ProjectTreeNode } from '@/types';
 import { parseDSL } from '../dsl/peggyParser';
 import { serializeDSL } from '../dsl/serializer';
 import { renameDiagramHeader } from '../dsl/diagramHeader';
@@ -34,9 +34,17 @@ export function migrateLegacyProjectFile(
 
   const names = treeDiagramNames(legacy.tree);
   const diagrams: Record<string, DiagramDocument> = {};
-  for (const [id, model] of Object.entries(legacy.diagrams)) {
-    diagrams[id] = migrateDiagram(model, legacy.diagramTexts?.[id], names.get(id) ?? model.name);
+  const containmentErrors: ProjectFileParseError[] = [];
+  for (const [id, source] of Object.entries(legacy.diagrams)) {
+    const text = legacy.diagramTexts?.[id];
+    const recovered = recoverContainment(id, source, text);
+    if ('error' in recovered) {
+      containmentErrors.push(recovered.error);
+      continue;
+    }
+    diagrams[id] = migrateDiagram(recovered.model, text, names.get(id) ?? source.name);
   }
+  if (containmentErrors.length > 0) return { success: false, errors: containmentErrors };
 
   return {
     success: true,
@@ -111,4 +119,77 @@ function migrateDiagram(source: DiagramData, sourceText: string | undefined, nam
   const text = source.name === name ? sourceText : renameDiagramHeader(sourceText, name);
   // A parsable draft is in-sync here; comparing its meaning with the model is A03.09.
   return { model, text, textStatus: parseDSL(text).success ? 'in-sync' : 'invalid' };
+}
+
+// -----------------------------------------------------------------------------
+// Containment recovery (A02.07)
+// -----------------------------------------------------------------------------
+
+const CONTAINMENT_RULES: { container: DiagramElement['type']; children: ReadonlySet<string> }[] = [
+  { container: 'composite-state', children: new Set(['state', 'initial-state', 'final-state']) },
+  { container: 'system-boundary', children: new Set(['usecase']) },
+];
+
+const elementKey = (element: DiagramElement) => `${element.type}:${element.properties.name}`;
+
+/**
+ * Schema 1 never stored `parentId`. Old builds inferred nesting from array order,
+ * which F2 showed to be wrong, so the order is never trusted. Containment is
+ * recovered only when nothing could be nested, or when the saved DSL text
+ * parses and names every relevant element exactly once. Anything else is
+ * refused rather than guessed.
+ */
+function recoverContainment(
+  id: string,
+  model: DiagramData,
+  text: string | undefined,
+): { model: DiagramData } | { error: ProjectFileParseError } {
+  if (model.elements.some((element) => element.parentId !== undefined)) return { model };
+  const rules = CONTAINMENT_RULES.filter((rule) => model.elements.some((element) => element.type === rule.container));
+  const relevant = (element: DiagramElement) => rules.some((rule) => rule.container === element.type || rule.children.has(element.type));
+  const candidates = model.elements.filter((element) => rules.some((rule) => rule.children.has(element.type)));
+  if (rules.length === 0 || candidates.length === 0) return { model };
+
+  const parsed = text === undefined ? undefined : parseDSL(text);
+  if (parsed?.success) {
+    const parsedRelevant = parsed.diagram.elements.filter(relevant);
+    const modelRelevant = model.elements.filter(relevant);
+    const parsedByKey = uniqueByKey(parsedRelevant);
+    const modelByKey = uniqueByKey(modelRelevant);
+    if (parsedByKey && modelByKey && sameKeys(parsedByKey, modelByKey)) {
+      const parsedById = new Map(parsedRelevant.map((element) => [element.id, element]));
+      const elements = model.elements.map((element) => {
+        if (!relevant(element)) return element;
+        const parentId = parsedByKey.get(elementKey(element))!.parentId;
+        const parent = parentId === undefined ? undefined : parsedById.get(parentId);
+        return parent ? { ...element, parentId: modelByKey.get(elementKey(parent))!.id } : element;
+      });
+      return { model: { ...model, elements } };
+    }
+  }
+
+  const containers = model.elements
+    .filter((element) => rules.some((rule) => rule.container === element.type))
+    .map((element) => JSON.stringify(element.properties.name))
+    .join(', ');
+  return {
+    error: {
+      message: `Diagram ${JSON.stringify(model.name)} comes from an older file that does not record which elements are inside ${containers}, `
+        + 'and its saved DSL text cannot settle it. Nothing was changed. Fix the diagram text in the version that saved it, save, and open the file again.',
+      path: `diagrams.${id}.elements`,
+    },
+  };
+}
+
+function uniqueByKey(elements: DiagramElement[]): Map<string, DiagramElement> | undefined {
+  const result = new Map<string, DiagramElement>();
+  for (const element of elements) {
+    if (result.has(elementKey(element))) return undefined;
+    result.set(elementKey(element), element);
+  }
+  return result;
+}
+
+function sameKeys(a: Map<string, unknown>, b: Map<string, unknown>): boolean {
+  return a.size === b.size && [...a.keys()].every((key) => b.has(key));
 }
