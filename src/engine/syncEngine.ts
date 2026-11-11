@@ -16,7 +16,7 @@ import type {
 import { parseDSL } from '../parser/dsl';
 import { serializeDSL } from '../parser/dsl/serializer';
 import { UndoManager } from './undoManager';
-import { parseCheckedDSL, validateDiagramRules } from './diagramRules';
+import { parseCheckedDSL, validateDiagramRules, type DiagramRuleError } from './diagramRules';
 
 export interface SyncEngineOptions {
   onDiagramUpdate: (diagram: DiagramData) => void;
@@ -25,6 +25,19 @@ export interface SyncEngineOptions {
   undoManager?: UndoManager;
   debounceMs?: number;
 }
+
+/**
+ * Outcome of a canvas or inspector command (A03.07). A refused command changes
+ * neither the model, the text nor the undo history.
+ */
+export type CanvasChangeResult =
+  | { ok: true }
+  | {
+    ok: false;
+    /** `busy`: no diagram, paused or mid-sync; `draft`: the text has errors; `rules`: a diagram rule; `dsl`: the DSL cannot write it. */
+    reason: 'busy' | 'draft' | 'rules' | 'dsl';
+    errors: DiagramRuleError[];
+  };
 
 export class SyncEngine {
   private currentDiagram: DiagramData | null = null;
@@ -180,9 +193,17 @@ export class SyncEngine {
    * Canvas changes are applied immediately (no debouncing).
    */
   onCanvasChange(change: CanvasChange): boolean {
-    if (this.paused || this.syncing || !this.currentDiagram) return false;
+    return this.applyCanvasChange(change).ok;
+  }
+
+  /** Like `onCanvasChange`, but says why a command was refused. */
+  applyCanvasChange(change: CanvasChange): CanvasChangeResult {
+    const refuse = (reason: 'busy' | 'draft' | 'rules' | 'dsl', errors: DiagramRuleError[] = []): CanvasChangeResult => (
+      { ok: false, reason, errors }
+    );
+    if (this.paused || this.syncing || !this.currentDiagram) return refuse('busy');
     // Keep an invalid draft intact instead of replacing it with generated text.
-    if (!this.flushPendingText()) return false;
+    if (!this.flushPendingText()) return refuse('draft');
 
     this.syncing = true;
 
@@ -237,12 +258,14 @@ export class SyncEngine {
       };
 
       const newDiagram = applyChange(this.currentDiagram, change);
-      const newText = serializeDSL(newDiagram);
-      // Reject commands whose result the DSL cannot represent, before touching state or history.
-      if (!parseDSL(newText).success) return false;
-      // Reject commands that break a diagram rule the model did not already break.
+      // Reject commands that break a diagram rule the model did not already break,
+      // before touching state or history (A03.07).
       const before = new Set(validateDiagramRules(oldDiagram).map((error) => error.message));
-      if (validateDiagramRules(newDiagram).some((error) => !before.has(error.message))) return false;
+      const added = validateDiagramRules(newDiagram).filter((error) => !before.has(error.message));
+      if (added.length > 0) return refuse('rules', added);
+      // Then anything else the DSL cannot write and read back.
+      const newText = serializeDSL(newDiagram);
+      if (!parseDSL(newText).success) return refuse('dsl');
 
       if (this.undoManager) {
         const diagramForUndo = deepClone(newDiagram);
@@ -256,7 +279,7 @@ export class SyncEngine {
       } else {
         this.restore(newDiagram, newText);
       }
-      return true;
+      return { ok: true };
     } finally {
       this.syncing = false;
     }
