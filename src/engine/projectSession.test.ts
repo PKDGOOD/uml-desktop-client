@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectSession } from './projectSession';
+import { parseDSL } from '../parser/dsl/peggyParser';
 import { ProjectFileParser } from '../parser/project/projectFileParser';
 import { ProjectFileSerializer } from '../parser/project/projectFileSerializer';
 import { decodeProjectFile, encodeProjectFile } from '../parser/project/projectFileCodec';
@@ -261,5 +262,26 @@ describe('ProjectSession snapshot boundary (A02.05)', () => {
     const decoded = decodeProjectFile(encodeProjectFile(document, { app: 'UML Studio', version: '0.1.0' }));
     if (!decoded.success) throw new Error(JSON.stringify(decoded.errors));
     expect(decoded.data.document).toEqual(document);
+  });
+});
+
+describe('ProjectSession review follow-ups', () => {
+  it('renames a header written without a space before the name', () => {
+    const source = project();
+    source.diagramTexts = { one: '@class-diagram"one"\nclass Order {\n}\n' };
+    const session = new ProjectSession(source, vi.fn());
+    session.setTree(source.tree.map((node) => (node.id === 'one' ? { ...node, name: 'Orders' } : node)));
+    expect(session.text('one').startsWith('@class-diagram "Orders"')).toBe(true);
+    expect(session.project.diagrams.one.name).toBe('Orders');
+  });
+
+  it('reports generated text of an unopened diagram that does not parse', () => {
+    const source = project();
+    source.diagrams.two.elements[0].properties.attributes = [{ name: 'has space', type: 'int', visibility: 'private' }];
+    const session = new ProjectSession(source, vi.fn());
+    const { document, diagnostics } = session.documentSnapshot();
+    expect(parseDSL(document.diagrams.two.text).success).toBe(false);
+    expect(document.diagrams.two.textStatus).toBe('invalid');
+    expect(diagnostics.two.length).toBeGreaterThan(0);
   });
 });

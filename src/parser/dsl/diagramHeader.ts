@@ -1,5 +1,5 @@
 /** The `@<type>-diagram "Name"` header, possibly preceded by blank lines and comments. */
-const DIAGRAM_HEADER = /^((?:\s*\/\/[^\n]*\n)*\s*)(@[a-z]+-diagram)[ \t]+"(?:\\.|[^"\\])*"/;
+const DIAGRAM_HEADER = /^((?:\s*\/\/[^\n]*\n)*\s*)(@[a-z]+-diagram)[ \t]*"(?:\\.|[^"\\])*"/;
 
 /**
  * Rewrites the diagram name in a DSL header and leaves the rest of the text,
