@@ -336,6 +336,25 @@ function isWord(line: string, token: string): boolean {
   return wordCount(line, token) > 0;
 }
 
+/** A relation line without its `: label`, so names inside a label do not count as ends. */
+function relationPart(line: string): string {
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (quoted && char === '\\') i++;
+    else if (char === '"') quoted = !quoted;
+    else if (char === ':' && !quoted) return line.slice(0, i);
+  }
+  return line;
+}
+
+/** A relation line whose ends name every wanted element; a self-link names its element twice. */
+function isRelationLine(line: string, wanted: string[][]): boolean {
+  const ends = relationPart(line);
+  if (!ARROW.test(ends) || !wanted.every((tokens) => tokens.some((token) => isWord(ends, token)))) return false;
+  return wanted.length < 2 || wanted[0][0] !== wanted[1][0] || wordCount(ends, wanted[0][0]) >= 2;
+}
+
 /** Best-effort source line of a rule error: the line that names the element or both connector ends. */
 function locate(diagram: DiagramData, error: DiagramRuleError, lines: string[]): number {
   const match = /^(elements|connectors)\[(\d+)\]/.exec(error.path);
@@ -358,9 +377,7 @@ function locate(diagram: DiagramData, error: DiagramRuleError, lines: string[]):
     // Connector lines are in model order, so the n-th connector between the same two
     // elements sits on the n-th relation line that names both of them.
     const hits = lines.flatMap((line, i) => (
-      ARROW.test(line) && wanted.every((tokens) => tokens.some((token) => isWord(line, token)))
-        // A self-link names its element twice.
-        && (wanted.length < 2 || wanted[0][0] !== wanted[1][0] || wordCount(line, wanted[0][0]) >= 2) ? [i + 1] : []
+      isRelationLine(line, wanted) ? [i + 1] : []
     ));
     const pair = (connector: Connector) => [names.get(connector.sourceId), names.get(connector.targetId)].sort().join('\u0000');
     const key = pair(diagram.connectors[index]);
@@ -403,9 +420,7 @@ function unresolvedEnds(diagram: DiagramData, text: string): DSLError[] {
     for (const name of new Set([connector.sourceId, connector.targetId])) {
       if (ids.has(name)) continue;
       const tokens = nameTokens(name);
-      const hits = lines.flatMap((line, i) => (
-        ARROW.test(line) && tokens.some((token) => isWord(line, token)) ? [i + 1] : []
-      ));
+      const hits = lines.flatMap((line, i) => (isRelationLine(line, [tokens]) ? [i + 1] : []));
       const seen = used.get(name) ?? 0;
       used.set(name, seen + 1);
       errors.push({

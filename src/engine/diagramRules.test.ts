@@ -265,4 +265,17 @@ describe('ADR 0002 name rules', () => {
       { line: 7, column: 1, message: expect.stringMatching(/^Unknown element "Order Item"/) },
     ] });
   });
+
+  it('ignores names that appear only in an earlier label', () => {
+    const text = '@class-diagram "Test"\nclass A {\n}\nclass B {\n}\nA --> B : Missing\nA --> Missing\n';
+    expect(parseCheckedDSL(text)).toMatchObject({ success: false, errors: [{ line: 7, message: expect.stringMatching(/Unknown element "Missing"/) }] });
+  });
+
+  it('resolves an element named __proto__ like any other name', () => {
+    const text = '@class-diagram "Test"\nclass __proto__ {\n}\nclass B {\n}\nB --> __proto__\n';
+    const result = parseCheckedDSL(text);
+    if (!result.success) throw new Error(JSON.stringify(result.errors));
+    const ids = new Set(result.diagram.elements.map((element) => element.id));
+    expect(ids.has(result.diagram.connectors[0].targetId)).toBe(true);
+  });
 });
