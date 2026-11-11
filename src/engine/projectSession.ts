@@ -57,9 +57,10 @@ export class ProjectSession {
       open.sync.flushPendingText();
       return [...open.sync.getErrors()];
     }
-    const text = this.project.diagramTexts?.[id];
-    if (text === undefined) return [];
-    const parsed = parseDSL(text);
+    const model = this.project.diagrams[id];
+    if (!model) return [];
+    // An unopened diagram without stored text is saved as generated text, which must parse too.
+    const parsed = parseDSL(this.text(id));
     return parsed.success ? [] : parsed.errors;
   }
 
