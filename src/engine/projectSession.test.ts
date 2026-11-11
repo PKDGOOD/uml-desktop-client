@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectSession } from './projectSession';
 import { ProjectFileParser } from '../parser/project/projectFileParser';
 import { ProjectFileSerializer } from '../parser/project/projectFileSerializer';
+import { decodeProjectFile, encodeProjectFile } from '../parser/project/projectFileCodec';
 import type { DiagramData, ProjectData } from '../types';
 
 function project(): ProjectData {
@@ -182,5 +183,83 @@ describe('ProjectSession diagram rename', () => {
     const reopened = new ProjectSession(parsed.data, vi.fn());
     expect(reopened.getSession('one')!.sync.getErrors()).toEqual([]);
     expectRenamed(reopened, 'Orders');
+  });
+});
+
+describe('ProjectSession snapshot boundary (A02.05)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const invalid = '@class-diagram "one"\nclass {{{';
+
+  it('captures text, last valid model, status and a stable project ID', () => {
+    const session = new ProjectSession(project(), vi.fn(), { projectId: 'p-1' });
+    session.editText('one', draft);
+    const { document, diagnostics, revision } = session.documentSnapshot();
+    expect(document.project.id).toBe('p-1');
+    expect(document.diagrams.one).toMatchObject({ text: draft, textStatus: 'in-sync', model: { name: 'Edited' } });
+    expect(document.diagrams.two.textStatus).toBe('in-sync');
+    expect(document.diagrams.two.text).toBe(session.text('two'));
+    expect(diagnostics).toEqual({});
+    expect(revision).toBe(session.revision);
+    expect(session.documentSnapshot().document.project.id).toBe('p-1');
+  });
+
+  it('keeps an invalid draft with its last valid model and diagnostics, then turns in-sync when fixed', () => {
+    const session = new ProjectSession(project(), vi.fn());
+    session.editText('one', invalid);
+    const broken = session.documentSnapshot();
+    expect(broken.document.diagrams.one).toMatchObject({ text: invalid, textStatus: 'invalid' });
+    expect(broken.document.diagrams.one.model).toEqual(project().diagrams.one);
+    expect(broken.diagnostics.one.length).toBeGreaterThan(0);
+
+    session.editText('one', draft);
+    const fixed = session.documentSnapshot();
+    expect(fixed.document.diagrams.one).toMatchObject({ text: draft, textStatus: 'in-sync', model: { name: 'Edited' } });
+    expect(fixed.diagnostics).toEqual({});
+    expect(fixed.revision).toBeGreaterThan(broken.revision);
+  });
+
+  it('marks an invalid stored draft of an unopened diagram as invalid', () => {
+    const source = project();
+    source.diagramTexts = { two: invalid };
+    const session = new ProjectSession(source, vi.fn());
+    const { document, diagnostics } = session.documentSnapshot();
+    expect(document.diagrams.two).toMatchObject({ text: invalid, textStatus: 'invalid' });
+    expect(Object.keys(diagnostics)).toEqual(['two']);
+  });
+
+  it('is detached in both directions', () => {
+    const session = new ProjectSession(project(), vi.fn());
+    const snapshot = session.documentSnapshot();
+    snapshot.document.diagrams.one.model.elements[0].position.x = 999;
+    snapshot.document.tree[0].name = 'mutated';
+    expect(session.project.diagrams.one.elements[0].position.x).toBe(10);
+    expect(session.project.tree[0].name).toBe('one');
+
+    session.editText('one', draft);
+    session.editCanvas('two', { type: 'element-move', elementId: 'two-element', position: { x: 80, y: 90 } });
+    expect(snapshot.document.diagrams.one.text).not.toBe(draft);
+    expect(snapshot.document.diagrams.two.model.elements[0].position).toEqual({ x: 10, y: 20 });
+  });
+
+  it('acknowledges only the revision that was captured', () => {
+    const session = new ProjectSession(project(), vi.fn());
+    session.editText('one', draft);
+    const { revision } = session.documentSnapshot();
+    session.editCanvas('two', { type: 'element-move', elementId: 'two-element', position: { x: 80, y: 90 } });
+    session.markSaved(revision, '2026-11-11T00:00:00.000Z');
+    expect(session.dirty).toBe(true);
+    session.markSaved(session.documentSnapshot().revision, '2026-11-11T00:00:01.000Z');
+    expect(session.dirty).toBe(false);
+  });
+
+  it('produces a document the schema-2 codec writes and reads back', () => {
+    const session = new ProjectSession(project(), vi.fn(), { projectId: 'p-1' });
+    session.editText('one', invalid);
+    const { document } = session.documentSnapshot();
+    const decoded = decodeProjectFile(encodeProjectFile(document, { app: 'UML Studio', version: '0.1.0' }));
+    if (!decoded.success) throw new Error(JSON.stringify(decoded.errors));
+    expect(decoded.data.document).toEqual(document);
   });
 });
