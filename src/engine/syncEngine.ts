@@ -17,7 +17,9 @@ import { parseDSL } from '../parser/dsl';
 import { serializeDSL } from '../parser/dsl/serializer';
 import { UndoManager } from './undoManager';
 import { parseCheckedDSL, validateDiagramRules, type DiagramRuleError } from './diagramRules';
-import { patchConnectorInText, patchElementInText } from './textEdits';
+import {
+  patchAddConnectorInText, patchAddElementInText, patchConnectorInText, patchDeleteConnectorInText, patchDeleteElementInText, patchElementInText,
+} from './textEdits';
 
 export interface SyncEngineOptions {
   onDiagramUpdate: (diagram: DiagramData) => void;
@@ -299,7 +301,7 @@ export class SyncEngine {
   }
 
   /**
-   * A change to one element (rename, properties, members, move, resize) edits
+   * A change to one element or connector (rename, properties, members, move, resize, add, delete) edits
    * only the affected tokens of the current text (ADR 0002 §5), so comments and
    * spacing survive. Used only when the patched text means exactly what the new
    * model says; otherwise null, and the caller regenerates the text.
@@ -309,6 +311,16 @@ export class SyncEngine {
     if (change.type === 'element-update' || change.type === 'element-move' || change.type === 'element-resize') {
       const after = newDiagram.elements.find((element) => element.id === change.elementId);
       if (after) patched = patchElementInText(oldText, oldDiagram, after);
+    } else if (change.type === 'element-add') {
+      const added = newDiagram.elements.find((element) => element.id === change.element.id);
+      if (added) patched = patchAddElementInText(oldText, oldDiagram, added);
+    } else if (change.type === 'element-delete') {
+      patched = patchDeleteElementInText(oldText, oldDiagram, change.elementId);
+    } else if (change.type === 'connector-add') {
+      const added = newDiagram.connectors.find((connector) => connector.id === change.connector.id);
+      if (added) patched = patchAddConnectorInText(oldText, oldDiagram, added, newDiagram);
+    } else if (change.type === 'connector-delete') {
+      patched = patchDeleteConnectorInText(oldText, oldDiagram, change.connectorId);
     } else if (change.type === 'connector-update') {
       const after = newDiagram.connectors.find((connector) => connector.id === change.connectorId);
       if (after) patched = patchConnectorInText(oldText, oldDiagram, after, newDiagram);

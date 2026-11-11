@@ -326,3 +326,115 @@ Other ..> Item
     expect(update(ctx, dep.id, { sourceMultiplicity: '1' }).ok).toBe(false);
   });
 });
+
+describe('A04.06 in-place insertion and deletion', () => {
+  const SRC = `@class-diagram "D"
+// first things
+class Order @pos(40, 40) @size(200, 100) {   // root
+  - id: String
+}
+class Item @pos(300, 40) @size(200, 100) {
+}
+// relations
+Order --> Item : has   
+// trailing note
+`;
+  const NEW = (id: string, name: string) => ({
+    id, type: 'class' as const, position: { x: 9, y: 9 }, size: { width: 200, height: 100 },
+    properties: { name, attributes: [], methods: [] },
+  });
+
+  function setup() {
+    const ctx = engineWith(SRC);
+    ctx.engine.onTextChange(SRC);
+    ctx.engine.flushPendingText();
+    const d = ctx.state.diagram!;
+    return { ...ctx, order: idOf(d, 'Order'), item: idOf(d, 'Item') };
+  }
+
+  it('adds an element after the last declaration and leaves every comment alone', () => {
+    const ctx = setup();
+    expect(ctx.engine.applyCanvasChange({ type: 'element-add', element: NEW('n1', 'Invoice') })).toEqual({ ok: true });
+    expect(ctx.state.text).toBe(SRC.replace('// relations', 'class Invoice @pos(9, 9) @size(200, 100) {\n}\n// relations'));
+    expect(idOf(ctx.state.diagram, 'Invoice')).toBe('n1');
+  });
+
+  it('adds a connector after the last connector line', () => {
+    const ctx = setup();
+    ctx.engine.applyCanvasChange({ type: 'element-add', element: NEW('n1', 'Invoice') });
+    const invoice = idOf(ctx.state.diagram, 'Invoice');
+    expect(ctx.engine.applyCanvasChange({
+      type: 'connector-add',
+      connector: { id: 'c9', type: 'directed-association', sourceId: ctx.order, targetId: invoice, label: 'bills', properties: {} },
+    })).toEqual({ ok: true });
+    expect(ctx.state.text).toContain('Order --> Item : has   \nOrder "" --> Invoice : bills\n// trailing note');
+  });
+
+  it('deletes a connector with its line only', () => {
+    const ctx = setup();
+    const conn = ctx.state.diagram!.connectors[0];
+    expect(ctx.engine.applyCanvasChange({ type: 'connector-delete', connectorId: conn.id })).toEqual({ ok: true });
+    expect(ctx.state.text).toBe(SRC.replace('Order --> Item : has   \n', ''));
+  });
+
+  it('deletes an element with its lines and the connectors that name it', () => {
+    const ctx = setup();
+    expect(ctx.engine.applyCanvasChange({ type: 'element-delete', elementId: ctx.item })).toEqual({ ok: true });
+    expect(ctx.state.text).toBe(SRC.replace('class Item @pos(300, 40) @size(200, 100) {\n}\n', '').replace('Order --> Item : has   \n', ''));
+    expect(ctx.state.diagram!.elements.map((e) => e.properties.name)).toEqual(['Order']);
+  });
+
+  it('adds the first element to an empty diagram and survives a missing final newline', () => {
+    const ctx = engineWith('@class-diagram "E"');
+    ctx.engine.onTextChange('@class-diagram "E"');
+    ctx.engine.flushPendingText();
+    expect(ctx.engine.applyCanvasChange({ type: 'element-add', element: NEW('n1', 'A') })).toEqual({ ok: true });
+    expect(ctx.state.text).toBe('@class-diagram "E"\nclass A @pos(9, 9) @size(200, 100) {\n}\n');
+  });
+
+  it('undoes an insertion and a deletion to the exact previous text', () => {
+    const undo = new UndoManager();
+    const ctx = engineWith(SRC, undo);
+    ctx.engine.onTextChange(SRC);
+    ctx.engine.flushPendingText();
+    const before = ctx.state.text;
+    ctx.engine.applyCanvasChange({ type: 'element-add', element: NEW('n1', 'Invoice') });
+    undo.undo();
+    expect(ctx.state.text).toBe(before);
+    ctx.engine.applyCanvasChange({ type: 'element-delete', elementId: idOf(ctx.state.diagram, 'Item') });
+    undo.undo();
+    expect(ctx.state.text).toBe(before);
+  });
+
+  it('refuses a duplicate name on add without touching text or model', () => {
+    const ctx = setup();
+    const before = ctx.state.text;
+    expect(ctx.engine.applyCanvasChange({ type: 'element-add', element: NEW('n1', 'Order') }).ok).toBe(false);
+    expect(ctx.state.text).toBe(before);
+  });
+
+  it('deletes only the selected item when several share a line', () => {
+    const text = '@class-diagram "D"\nclass A {\n}\nclass B {\n}\nA ..> B   B ..> A // both\n';
+    const ctx = engineWith(text);
+    ctx.engine.onTextChange(text);
+    ctx.engine.flushPendingText();
+    const first = ctx.state.diagram!.connectors[0];
+    expect(ctx.engine.applyCanvasChange({ type: 'connector-delete', connectorId: first.id })).toEqual({ ok: true });
+    expect(ctx.state.text).toBe('@class-diagram "D"\nclass A {\n}\nclass B {\n}\nB ..> A // both\n');
+    expect(ctx.state.diagram!.connectors).toHaveLength(1);
+  });
+
+  it('writes a new transition after the last top-level declaration, not inside a composite state', () => {
+    const text = '@state-diagram "S"\ncomposite-state C {\n  state A\n  state B\n  A --> B\n}\nstate Z\n';
+    const ctx = engineWith(text);
+    ctx.engine.onTextChange(text);
+    ctx.engine.flushPendingText();
+    const d = ctx.state.diagram!;
+    const z = idOf(d, 'Z');
+    const c = idOf(d, 'C');
+    expect(ctx.engine.applyCanvasChange({
+      type: 'connector-add', connector: { id: 'cz', type: 'transition', sourceId: z, targetId: c, properties: {} },
+    })).toEqual({ ok: true });
+    expect(ctx.state.text).toBe(`${text}Z --> C\n`);
+  });
+});
