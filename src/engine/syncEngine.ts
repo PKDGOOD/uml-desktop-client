@@ -317,7 +317,7 @@ function deepClone<T>(obj: T): T {
  * Preserve element/connector IDs from the old diagram when names match,
  * so that canvas changes don't lose identity after a text edit round-trip.
  */
-function preserveIds(oldDiagram: DiagramData, newDiagram: DiagramData): void {
+export function preserveIds(oldDiagram: DiagramData, newDiagram: DiagramData): void {
   // Preserve diagram-level fields
   newDiagram.id = oldDiagram.id;
   newDiagram.viewport = oldDiagram.viewport;

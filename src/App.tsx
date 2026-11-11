@@ -17,6 +17,8 @@ import { downloadProject, downloadArtifact } from './engine/browserProjectFile';
 import { createExampleProject, createProject } from './engine/projectFactory';
 import { CreateDialog } from './components/project/CreateDialog';
 import { HistoryDialog } from './components/project/HistoryDialog';
+import { ConflictDialog } from './components/project/ConflictDialog';
+import { findTextModelConflicts, resolveTextModelConflicts, type ConflictChoice, type TextModelConflict } from './engine/textModelConflicts';
 import { ExportEngine } from './engine/exportEngine';
 import { checkProjectData, readProjectFile, writeProjectFile } from './parser/project/projectFileIO';
 import { version as appVersion } from '../package.json';
@@ -282,7 +284,18 @@ const App: React.FC = () => {
     }
   }, [projectFilePath]);
 
-  const loadProjectContent = useCallback((content: string, path: string | null): boolean => {
+  // A03.09: the open waits here while the user chooses between stored text and diagram.
+  const [conflictReview, setConflictReview] = useState<{
+    conflicts: TextModelConflict[];
+    decide: (choices: Record<string, ConflictChoice> | null) => void;
+  } | null>(null);
+  const askConflictChoices = useCallback((conflicts: TextModelConflict[]) => (
+    new Promise<Record<string, ConflictChoice> | null>((resolve) => {
+      setConflictReview({ conflicts, decide: (choices) => { setConflictReview(null); resolve(choices); } });
+    })
+  ), []);
+
+  const loadProjectContent = useCallback(async (content: string, path: string | null): Promise<boolean> => {
     const result = readProjectFile(content, { createId: () => crypto.randomUUID() });
     if (!result.success) {
       setFileNotice({ text: `Could not open project: ${result.errors.map((error) => error.message).join('; ')}`, error: true });
@@ -290,22 +303,34 @@ const App: React.FC = () => {
     }
     // Check after reading so edits made while the picker/read was pending are protected.
     if (!confirmUnsavedChanges()) return false;
-    const { project, projectId, migrated, invalidDrafts } = result.data;
+    const { projectId, migrated, invalidDrafts } = result.data;
+    let { project } = result.data;
+    const conflicts = findTextModelConflicts(project);
+    if (conflicts.length > 0) {
+      const choices = await askConflictChoices(conflicts);
+      if (!choices) {
+        setFileNotice({ text: 'Open cancelled. Your current project is unchanged.' });
+        return false;
+      }
+      project = resolveTextModelConflicts(project, conflicts, choices);
+    }
     const problem = replaceProject(project, path, projectId);
     if (problem) {
       setFileNotice({ text: `Could not open project: ${problem}`, error: true });
       return false;
     }
-    // A migrated file is not on disk in the new format yet (ADR 0001 §3).
-    if (migrated) workspaceRef.current?.markUnsaved();
+    // A migrated file is not on disk in the new format yet (ADR 0001 §3), and a
+    // resolved conflict is a choice the file does not hold yet.
+    if (migrated || conflicts.length > 0) workspaceRef.current?.markUnsaved();
     const drafts = invalidDrafts.length > 0
       ? ` ${invalidDrafts.length} diagram${invalidDrafts.length > 1 ? 's have' : ' has'} DSL errors; the canvas shows the last valid diagram.`
       : '';
+    const resolved = conflicts.length > 0 && !migrated ? ' Save to keep your text/diagram choice in the file.' : '';
     setFileNotice({ text: (migrated
       ? 'Opened a project saved by an older version. Save to upgrade the file.'
-      : 'Project opened.') + drafts });
+      : 'Project opened.') + resolved + drafts });
     return true;
-  }, [confirmUnsavedChanges, replaceProject]);
+  }, [askConflictChoices, confirmUnsavedChanges, replaceProject]);
 
   const handleOpenProject = useCallback(async () => {
     if (fileBusyRef.current) return;
@@ -322,7 +347,7 @@ const App: React.FC = () => {
         filters: [{ name: 'UML Project', extensions: ['uml.json'] }],
         properties: ['openFile'],
       });
-      if (path && loadProjectContent(await api.loadProject(path), path)) await rememberProject(path);
+      if (path && await loadProjectContent(await api.loadProject(path), path)) await rememberProject(path);
     } catch (error) {
       setFileNotice({ text: `Could not open project: ${(error as Error).message}`, error: true });
     } finally {
@@ -338,7 +363,7 @@ const App: React.FC = () => {
     fileBusyRef.current = true;
     setFileBusy(true);
     try {
-      loadProjectContent(await file.text(), null);
+      await loadProjectContent(await file.text(), null);
     } catch (error) {
       setFileNotice({ text: `Could not open project: ${(error as Error).message}`, error: true });
     } finally {
@@ -456,6 +481,8 @@ const App: React.FC = () => {
   return (
     <div className="app-shell">
       {createMode && <CreateDialog mode={createMode} tree={projectStore.tree} onCancel={() => setCreateMode(null)} onCreate={handleCreate} />}
+      {conflictReview && <ConflictDialog conflicts={conflictReview.conflicts}
+        onCancel={() => conflictReview.decide(null)} onOpen={(choices) => conflictReview.decide(choices)} />}
       {historyOpen && projectData && <HistoryDialog project={projectData}
         getSnapshot={() => workspaceRef.current!.snapshot().project}
         onClose={() => setHistoryOpen(false)}

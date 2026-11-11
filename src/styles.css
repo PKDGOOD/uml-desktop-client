@@ -86,6 +86,8 @@ button {
 .toolbar { flex-wrap: wrap; }
 .properties-toggle { display: none; }
 .history-dialog { width: min(600px, 90vw); }
+.conflict-choice { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+.conflict-choice legend { font-weight: 700; padding: 0 4px; }
 .history-help { font-size: 12px; line-height: 1.5; color: var(--text-muted); }
 .history-list { max-height: 300px; overflow: auto; margin: 16px 0; }
 .history-entry { display: flex; gap: 8px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
