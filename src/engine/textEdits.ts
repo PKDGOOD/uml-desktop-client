@@ -8,7 +8,7 @@
 
 import type { DiagramData } from '../types';
 import { parseDSLWithSpans } from '../parser/dsl';
-import { formatName, formatPosition, formatSize, formatStereotype, serializeAttribute, serializeMethod, visibilityMarker } from '../parser/dsl/serializer';
+import { formatName, formatPosition, serializeDSL, formatSize, formatStereotype, serializeAttribute, serializeMethod, visibilityMarker } from '../parser/dsl/serializer';
 import type { Connector, DiagramElement } from '../types';
 import type { SourceSpan } from '../parser/dsl/sourceSpans';
 import { preserveIds } from './syncEngine';
@@ -257,4 +257,101 @@ export function patchConnectorInText(text: string, model: DiagramData, after: Co
   multiplicity('target', before.targetMultiplicity, after.targetMultiplicity);
 
   return applyTextEdits(text, edits);
+}
+
+// ---- Insertion and deletion (A04.06) ----
+
+type Span = SourceSpan;
+
+/** Indexes of the elements that are not inside another element's block. */
+function topLevel(spans: Array<{ declaration: Span }>): number[] {
+  return spans.map((_, i) => i).filter((i) => !spans.some((other, j) => (
+    j !== i && other.declaration.start < spans[i].declaration.start && spans[i].declaration.end <= other.declaration.end
+  )));
+}
+
+/** Insert `block` as its own lines at `offset` (a line start, or the end of the text). */
+function insertLines(text: string, offset: number, block: string, eol: string): TextEdit {
+  const atEnd = offset >= text.length;
+  const needsBreak = atEnd && text.length > 0 && !/[\r\n]$/.test(text);
+  return { span: { start: offset, end: offset }, text: `${needsBreak ? eol : ''}${block}${eol}` };
+}
+
+const shell = (model: DiagramData): DiagramData => ({ ...model, elements: [], connectors: [] });
+
+/** The DSL lines a new element is written as, without header or blank lines. */
+function elementLines(model: DiagramData, element: DiagramElement, eol: string): string {
+  const lines = serializeDSL({ ...shell(model), elements: [element] }).split('\n').slice(2);
+  while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+  return lines.join(eol);
+}
+
+/**
+ * The text after adding a top-level element: its declaration goes on the lines
+ * after the last top-level declaration (or after the header when there is
+ * none). A nested element needs its parent's block, so it returns null.
+ */
+export function patchAddElementInText(text: string, model: DiagramData, element: DiagramElement): string | null {
+  if (element.parentId) return null;
+  const parsed = mapToModel(text, model);
+  if (!parsed) return null;
+  const { spans } = parsed;
+  const tops = topLevel(spans.elements);
+  const anchor = tops.length > 0
+    ? Math.max(...tops.map((i) => spans.elements[i].declaration.end))
+    : spans.header.end;
+  const at = lineEndWithBreak(text, anchor);
+  return applyTextEdits(text, [insertLines(text, at, elementLines(model, element, spans.lineEnding), spans.lineEnding)]);
+}
+
+/**
+ * The text after deleting an element: its declaration lines and every
+ * connector line that refers to it, comments on those lines included. An
+ * element that contains others returns null (the caller decides what happens to
+ * the children).
+ */
+export function patchDeleteElementInText(text: string, model: DiagramData, elementId: string): string | null {
+  const parsed = mapToModel(text, model);
+  if (!parsed) return null;
+  const { diagram, spans } = parsed;
+  const index = diagram.elements.findIndex((element) => element.id === elementId);
+  if (index < 0 || diagram.elements.some((element) => element.parentId === elementId)) return null;
+  const whole = (span: Span): TextEdit => ({ span: { start: lineStart(text, span.start), end: lineEndWithBreak(text, span.end - 1) }, text: '' });
+  const edits = [whole(spans.elements[index].declaration)];
+  diagram.connectors.forEach((connector, i) => {
+    if (connector.sourceId === elementId || connector.targetId === elementId) edits.push(whole(spans.connectors[i].line));
+  });
+  return applyTextEdits(text, edits);
+}
+
+/** The DSL line a new connector is written as. */
+function connectorLine(afterDiagram: DiagramData, connector: Connector): string | null {
+  const base = serializeDSL({ ...afterDiagram, connectors: [] });
+  const full = serializeDSL({ ...afterDiagram, connectors: [connector] });
+  if (!full.startsWith(base)) return null;
+  const tail = full.slice(base.length).trim();
+  return tail === '' || tail.includes('\n') ? null : tail;
+}
+
+/** The text after adding a connector: its line follows the last connector line, or the last declaration. */
+export function patchAddConnectorInText(text: string, model: DiagramData, connector: Connector, afterDiagram: DiagramData): string | null {
+  const parsed = mapToModel(text, model);
+  if (!parsed) return null;
+  const line = connectorLine(afterDiagram, connector);
+  if (line === null) return null;
+  const { spans } = parsed;
+  const anchor = spans.connectors.length > 0
+    ? Math.max(...spans.connectors.map((c) => c.line.end))
+    : Math.max(spans.header.end, ...spans.elements.map((e) => e.declaration.end));
+  return applyTextEdits(text, [insertLines(text, lineEndWithBreak(text, anchor), line, spans.lineEnding)]);
+}
+
+/** The text after deleting a connector: its line, comment included. */
+export function patchDeleteConnectorInText(text: string, model: DiagramData, connectorId: string): string | null {
+  const parsed = mapToModel(text, model);
+  if (!parsed) return null;
+  const index = parsed.diagram.connectors.findIndex((connector) => connector.id === connectorId);
+  if (index < 0) return null;
+  const { line } = parsed.spans.connectors[index];
+  return applyTextEdits(text, [{ span: { start: lineStart(text, line.start), end: lineEndWithBreak(text, line.end - 1) }, text: '' }]);
 }
