@@ -26,6 +26,7 @@ Changes are documented here before a tagged release. The package version `0.1.0`
 - When a file's stored text and diagram disagree, Open asks which to keep for each diagram instead of picking one; the project opens unsaved.
 
 ### Known issues
+- While the DSL text has errors, the canvas is labeled as the last valid version and the property panel is disabled with a note; the draft itself is kept and saved.
 - Sequence messages keep one order in the DSL and the model: the text order is the message order, and moving a message moves its line in place with its comment, label and identity.
 
 Model/DSL information loss, containment changes, invalid property inputs, reference validation and security hardening remain open. See [known limitations](docs/known-limitations.md). These are not claimed fixed by repository preparation.

@@ -12,12 +12,15 @@ export interface PropertyPanelProps {
   onPropertyChange: (elementId: string, properties: Partial<ElementProperties>) => void;
   /** For Shared_Element: list of diagram names referencing this element */
   referencingDiagrams?: { id: string; name: string }[];
+  /** Fields cannot be edited, for example while the DSL text has errors. */
+  disabled?: boolean;
 }
 
 export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   element,
   onPropertyChange,
   referencingDiagrams = [],
+  disabled = false,
 }) => {
   const [attributesExpanded, setAttributesExpanded] = useState(true);
   const [methodsExpanded, setMethodsExpanded] = useState(true);
@@ -145,7 +148,8 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
         <div className="panel-title">Properties</div>
         <div className="panel-title">{element.type}</div>
       </div>
-      <div className="property-body">
+      {disabled && <div className="panel-note" role="status">Fix the DSL errors to edit properties.</div>}
+      <fieldset className="property-body" disabled={disabled} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
 
       {/* Name */}
       <label className="field-label">Name</label>
@@ -284,7 +288,7 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
           </ul>
         </>
       )}
-      </div>
+      </fieldset>
     </div>
   );
 };
