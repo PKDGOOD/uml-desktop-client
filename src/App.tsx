@@ -601,6 +601,7 @@ const App: React.FC = () => {
                   </div>
                 )}
                 <UMLCanvas
+                  key={projectGeneration}
                   width={canvasSize.width}
                   height={canvasSize.height}
                   readOnly={dslErrors.length > 0 || !activeDiagram}
