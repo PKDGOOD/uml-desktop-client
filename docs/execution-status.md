@@ -48,7 +48,7 @@ Updated: **2026-11-11**. This is the live ledger for the [145-task backlog](atom
 | A04.08 | Done | Sequence message order is now one thing in text and model: the parser numbers messages 1..n in text order, the serializer writes them by `messageOrder` (array order no longer matters), and `connector-update` accepts `messageOrder` to move a message. A pure move relocates the whole line in place (comment and indentation kept, id and label untouched); other changes renumber 1..n, and an added message with an order is inserted there. Tests in `src/engine/messageOrder.test.ts`. Mixed order-plus-field updates and mid-list inserts fall back to regeneration. The reorder control is A05.06. |
 | A01.13 | Planned | Needs A01.12 and actual remote CI evidence. |
 
-Every task not named above remains **Planned**. **37 of 145 local tasks are Done**, including reproduction tasks, not 37 shipped features. G0 (local baseline) is satisfied; M0 is still incomplete until baseline commits and remote CI are verified. G1–G4 remain unmet. Current validation: **33 test files, 656 passing tests and no expected failures**; `npm run check` and `npm run build:app` passed after A04.08. Notices, package and the packaged smoke were last run at the A01 baseline.
+Every task not named above remains **Planned**. **37 of 145 local tasks are Done**, including reproduction tasks, not 37 shipped features. G0 (local baseline) is satisfied; M0 is still incomplete until baseline commits and remote CI are verified. G1–G4 remain unmet. Current validation: **33 test files, 657 passing tests and no expected failures**; `npm run check` and `npm run build:app` passed after A04.08. Notices, package and the packaged smoke were last run at the A01 baseline.
 
 ## Dependency correction
 

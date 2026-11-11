@@ -33,3 +33,8 @@ export function renumberMessages(diagram: DiagramData, moved?: { id: string; to:
   }
   messages.forEach((connector, index) => { connector.messageOrder = index + 1; });
 }
+
+/** Row of each connector in a sequence diagram (0-based, display order), for vertical placement. */
+export function messageRows(connectors: readonly Connector[]): Map<string, number> {
+  return new Map(inDisplayOrder(connectors).map((connector, row) => [connector.id, row]));
+}
