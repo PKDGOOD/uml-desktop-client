@@ -250,3 +250,19 @@ describe('A03.06 parseCheckedDSL', () => {
     expect(result).toMatchObject({ success: false, errors: [{ line: 4, message: expect.stringMatching(/Two elements/) }] });
   });
 });
+
+describe('ADR 0002 name rules', () => {
+  it('rejects element and diagram names with control characters', () => {
+    const model = { ...diagram('class', [el('a', 'class', { name: 'a\nb' }), el('b', 'class', { name: 'tab\there' })]), name: 'Line\rbreak' };
+    expect(paths(validateDiagramProperties(model))).toEqual(['name', 'elements[0].properties.name', 'elements[1].properties.name']);
+    expect(validateDiagramProperties(diagram('class', [el('a', 'class', { name: '구매 "주문"' })]))).toEqual([]);
+  });
+
+  it('reports a connector to an undeclared element on its line', () => {
+    const text = '@class-diagram "Test"\n\nclass Customer {\n}\n\nCustomer --> Order : places\n"Order Item" --* Customer\n';
+    expect(parseCheckedDSL(text)).toEqual({ success: false, errors: [
+      { line: 6, column: 1, message: expect.stringMatching(/^Unknown element "Order"; .*Rename in the inspector/) },
+      { line: 7, column: 1, message: expect.stringMatching(/^Unknown element "Order Item"/) },
+    ] });
+  });
+});
