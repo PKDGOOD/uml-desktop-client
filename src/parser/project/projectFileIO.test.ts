@@ -110,4 +110,35 @@ describe('A02.08 project file Save/Open', () => {
     expect(result.success).toBe(false);
     if (!result.success) expect(result.errors[0].message).toMatch(message);
   });
+
+  describe('A03.02 identity and tree rules', () => {
+    function file() {
+      const first = open(ProjectFileSerializer.serialize(legacyProject()));
+      return JSON.parse(save(first.project, first.projectId));
+    }
+    const firstId = (content: Record<string, any>) => content.tree[0].children[0].id as string;
+
+    it.each<[string, (content: Record<string, any>) => void, (content: Record<string, any>) => string]>([
+      ['a model named differently from its tree node', (content) => { content.diagrams[firstId(content)].model.name = 'Other'; },
+        (content) => `diagrams.${firstId(content)}.model.name`],
+      ['a diagram node without a diagram type', (content) => { delete content.tree[0].children[0].diagramType; },
+        () => 'tree[0].children[0].diagramType'],
+      ['a diagram node with children', (content) => { content.tree[0].children[0].children = []; },
+        () => 'tree[0].children[0].children'],
+      ['a folder with a diagram type', (content) => { content.tree[0].diagramType = 'class'; }, () => 'tree[0].diagramType'],
+    ])('refuses %s', (_name, mutate, path) => {
+      const content = file();
+      mutate(content);
+      const result = readProjectFile(JSON.stringify(content), { createId });
+      expect(result).toMatchObject({ success: false });
+      if (!result.success) expect(result.errors).toContainEqual(expect.objectContaining({ path: path(content) }));
+    });
+
+    it('still opens a legacy file whose tree rename left the old model name', () => {
+      const legacy = legacyProject();
+      legacy.tree[0].children![0].name = 'Renamed';
+      const opened = open(ProjectFileSerializer.serialize(legacy));
+      expect(opened.project.diagrams[legacy.tree[0].children![0].id].name).toBe('Renamed');
+    });
+  });
 });

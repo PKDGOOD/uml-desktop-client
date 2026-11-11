@@ -206,11 +206,21 @@ function validateReferences(project: ProjectData): ProjectFileParseError[] {
   return validateProjectReferences(project);
 }
 
+export interface ReferenceRuleOptions {
+  /**
+   * Also require what schema 2 guarantees (A03.02): a diagram's model name
+   * equals its tree name, diagram nodes carry a diagram type and no children,
+   * and folders carry no diagram type. Off for raw schema-1 input, whose names
+   * migration repairs first.
+   */
+  strict?: boolean;
+}
+
 /**
  * ADR 0001 §4 reference rules for an in-memory project, whichever file version
  * it came from. Error paths use the schema-1 layout.
  */
-export function validateProjectReferences(project: ProjectData): ProjectFileParseError[] {
+export function validateProjectReferences(project: ProjectData, options: ReferenceRuleOptions = {}): ProjectFileParseError[] {
   const errors: ProjectFileParseError[] = [];
   const treeIds = new Set<string>();
   const treeDiagrams = new Map<string, ProjectTreeNode>();
@@ -219,6 +229,17 @@ export function validateProjectReferences(project: ProjectData): ProjectFilePars
     if (treeIds.has(node.id)) errors.push({ message: `Duplicate tree node ID: ${node.id}`, path: `${nodePath}.id` });
     treeIds.add(node.id);
     if (node.type === 'diagram') treeDiagrams.set(node.id, node);
+    if (options.strict) {
+      if (node.type === 'diagram' && node.diagramType === undefined) {
+        errors.push({ message: `Diagram ${node.id} in the tree has no diagram type`, path: `${nodePath}.diagramType` });
+      }
+      if (node.type === 'diagram' && node.children !== undefined) {
+        errors.push({ message: `Diagram ${node.id} in the tree cannot have children`, path: `${nodePath}.children` });
+      }
+      if (node.type === 'folder' && node.diagramType !== undefined) {
+        errors.push({ message: `Folder ${node.id} cannot have a diagram type`, path: `${nodePath}.diagramType` });
+      }
+    }
     if (node.children) walk(node.children, `${nodePath}.children`);
   });
   walk(project.tree, 'tree');
@@ -229,6 +250,9 @@ export function validateProjectReferences(project: ProjectData): ProjectFilePars
     if (!diagram) errors.push({ message: `Diagram in the tree has no data: ${id}`, path: `diagrams.${id}` });
     else if (node.diagramType !== undefined && node.diagramType !== diagram.type) {
       errors.push({ message: `Tree says ${node.diagramType} but diagram ${id} is ${diagram.type}`, path: `diagrams.${id}.type` });
+    }
+    if (diagram && options.strict && diagram.name !== node.name) {
+      errors.push({ message: `Tree calls diagram ${id} ${JSON.stringify(node.name)} but its model is named ${JSON.stringify(diagram.name)}`, path: `diagrams.${id}.name` });
     }
     if (!index[id]) errors.push({ message: `Diagram ${id} is missing from metadata.diagramIndex`, path: `metadata.diagramIndex.${id}` });
     else if (diagram && index[id].type !== diagram.type) {
