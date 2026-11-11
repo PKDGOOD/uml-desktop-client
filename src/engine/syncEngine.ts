@@ -17,6 +17,7 @@ import { parseDSL } from '../parser/dsl';
 import { serializeDSL } from '../parser/dsl/serializer';
 import { UndoManager } from './undoManager';
 import { parseCheckedDSL, validateDiagramRules, type DiagramRuleError } from './diagramRules';
+import { renameElementInText } from './textEdits';
 
 export interface SyncEngineOptions {
   onDiagramUpdate: (diagram: DiagramData) => void;
@@ -264,7 +265,7 @@ export class SyncEngine {
       const added = validateDiagramRules(newDiagram).filter((error) => !before.has(error.message));
       if (added.length > 0) return refuse('rules', added);
       // Then anything else the DSL cannot write and read back.
-      const newText = serializeDSL(newDiagram);
+      const newText = this.renamedText(change, oldDiagram, oldText, newDiagram) ?? serializeDSL(newDiagram);
       if (!parseDSL(newText).success) return refuse('dsl');
 
       if (this.undoManager) {
@@ -283,6 +284,25 @@ export class SyncEngine {
     } finally {
       this.syncing = false;
     }
+  }
+
+  /**
+   * An inspector rename edits only the name tokens in the current text
+   * (ADR 0002 §3), so comments and spacing survive. Used only when the patched
+   * text means exactly what the new model says; otherwise null, and the caller
+   * regenerates the text.
+   */
+  private renamedText(change: CanvasChange, oldDiagram: DiagramData, oldText: string, newDiagram: DiagramData): string | null {
+    if (change.type !== 'element-update' || typeof change.properties.name !== 'string') return null;
+    const before = oldDiagram.elements.find((element) => element.id === change.elementId);
+    if (!before || before.properties.name === change.properties.name) return null;
+    const patched = renameElementInText(oldText, oldDiagram, change.elementId, change.properties.name);
+    if (patched === null) return null;
+    const check = parseCheckedDSL(patched);
+    if (!check.success) return null;
+    preserveIds(newDiagram, check.diagram);
+    check.diagram.name = newDiagram.name;
+    return serializeDSL(check.diagram) === serializeDSL(newDiagram) ? patched : null;
   }
 
   /**

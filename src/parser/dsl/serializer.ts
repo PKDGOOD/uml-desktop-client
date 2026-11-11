@@ -63,7 +63,7 @@ export function serializeDSL(diagram: DiagramData): string {
 // =============================================================================
 
 /** Format a name: quote it if it contains spaces or special chars, otherwise bare identifier */
-function formatName(name: string): string {
+export function formatName(name: string): string {
   if (/^[a-zA-Z_\u00C0-\u024F\uAC00-\uD7AF][a-zA-Z0-9_\u00C0-\u024F\uAC00-\uD7AF]*$/.test(name)) {
     return name;
   }
