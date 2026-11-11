@@ -1,4 +1,7 @@
-import type { DiagramData, DiagramType, ProjectData, ProjectTreeNode, CanvasChange } from '../types';
+import type {
+  CanvasChange, DSLError, DiagramData, DiagramDocument, DiagramType, ProjectData, ProjectDocument, ProjectTreeNode,
+} from '../types';
+import { parseDSL } from '../parser/dsl/peggyParser';
 import { SyncEngine } from './syncEngine';
 import { UndoManager } from './undoManager';
 import { serializeDSL } from '../parser/dsl/serializer';
@@ -7,6 +10,22 @@ import { renameDiagramHeader } from '../parser/dsl/diagramHeader';
 interface DiagramSession {
   sync: SyncEngine;
   history: UndoManager;
+}
+
+/**
+ * Everything a save needs, captured at one revision (A02.05): per diagram the raw
+ * editor text, the last valid model and whether the text parses, plus the parse
+ * diagnostics of every invalid draft. Fully detached from the live session.
+ */
+export interface SessionSnapshot {
+  document: ProjectDocument;
+  diagnostics: Record<string, DSLError[]>;
+  revision: number;
+}
+
+export interface ProjectSessionOptions {
+  /** The durable project ID (ADR 0001 §3). A new session gets a fresh one. */
+  projectId?: string;
 }
 
 
@@ -21,12 +40,27 @@ function collectNames(nodes: ProjectTreeNode[], result = new Map<string, string>
 /** Owns drafts and history independently of which tab is currently visible. */
 export class ProjectSession {
   project: ProjectData;
+  readonly projectId: string;
   revision = 0;
   private savedRevision = 0;
   private sessions = new Map<string, DiagramSession>();
 
-  constructor(project: ProjectData, private readonly onChange: () => void) {
+  constructor(project: ProjectData, private readonly onChange: () => void, options: ProjectSessionOptions = {}) {
     this.project = structuredClone(project);
+    this.projectId = options.projectId ?? crypto.randomUUID();
+  }
+
+  /** Parse errors of a diagram's current text; empty when the text is valid. */
+  diagnostics(id: string): DSLError[] {
+    const open = this.sessions.get(id);
+    if (open) {
+      open.sync.flushPendingText();
+      return [...open.sync.getErrors()];
+    }
+    const text = this.project.diagramTexts?.[id];
+    if (text === undefined) return [];
+    const parsed = parseDSL(text);
+    return parsed.success ? [] : parsed.errors;
   }
 
   get dirty(): boolean {
@@ -175,6 +209,40 @@ export class ProjectSession {
     const project = structuredClone(this.project);
     project.metadata.updatedAt = new Date().toISOString();
     return { project, revision: this.revision };
+  }
+
+  /**
+   * Schema-2 view of the session at the current revision. An invalid draft is
+   * kept verbatim next to its last valid model, so saving never loses either.
+   */
+  documentSnapshot(): SessionSnapshot {
+    const { project, revision } = this.snapshot();
+    const diagrams: Record<string, DiagramDocument> = {};
+    const diagnostics: Record<string, DSLError[]> = {};
+    for (const [id, model] of Object.entries(project.diagrams)) {
+      const errors = this.diagnostics(id);
+      if (errors.length > 0) diagnostics[id] = structuredClone(errors);
+      diagrams[id] = {
+        model,
+        text: project.diagramTexts?.[id] ?? serializeDSL(model),
+        textStatus: errors.length > 0 ? 'invalid' : 'in-sync',
+      };
+    }
+    return {
+      document: {
+        project: {
+          id: this.projectId,
+          name: project.metadata.name,
+          createdAt: project.metadata.createdAt,
+          updatedAt: project.metadata.updatedAt,
+        },
+        tree: project.tree,
+        diagrams,
+        sharedElements: project.sharedElements,
+      },
+      diagnostics,
+      revision,
+    };
   }
 
   markSaved(revision: number, updatedAt: string): void {
