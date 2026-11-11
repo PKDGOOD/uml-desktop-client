@@ -41,7 +41,7 @@ Updated: **2026-11-11**. This is the live ledger for the [145-task backlog](atom
 | A04.01 | Done | `parseDSLWithSpans` (`src/parser/dsl/peggyParser.ts`, types in `sourceSpans.ts`) returns the model plus a side table of UTF-16 `[start, end)` spans (ADR 0002 §5): header and name, each element's declaration, name, `@pos`/`@size` or their insertion points, members in source order and closing brace, and each connector's line, endpoint tokens, multiplicities and trimmed label. The model gains no fields and `parseDSL` is unchanged. Tests cover comments, quoted/escaped names, Unicode and emoji, CRLF, nesting and the example corpus. |
 | A01.13 | Planned | Needs A01.12 and actual remote CI evidence. |
 
-Every task not named above remains **Planned**. **30 of 145 local tasks are Done**, including reproduction tasks, not 30 shipped features. G0 (local baseline) is satisfied; M0 is still incomplete until baseline commits and remote CI are verified. G1–G4 remain unmet. Current validation: **29 test files, 493 passing tests and no expected failures**; `npm run check` and `npm run build:app` passed after A04.01. Notices, package and the packaged smoke were last run at the A01 baseline.
+Every task not named above remains **Planned**. **30 of 145 local tasks are Done**, including reproduction tasks, not 30 shipped features. G0 (local baseline) is satisfied; M0 is still incomplete until baseline commits and remote CI are verified. G1–G4 remain unmet. Current validation: **29 test files, 494 passing tests and no expected failures**; `npm run check` and `npm run build:app` passed after A04.01. Notices, package and the packaged smoke were last run at the A01 baseline.
 
 ## Dependency correction
 

@@ -69,6 +69,12 @@ describe('A04.01 source spans', () => {
     expect(at(text, s.connectors[0].target)).toBe('주문하기');
   });
 
+  it('reports the first line ending in source order, even when the text mixes styles', () => {
+    expect(spans('@class-diagram "D"\rclass A {\r\n}\r\n').spans.lineEnding).toBe('\r');
+    expect(spans('@class-diagram "D"\nclass A {\r\n}\r\n').spans.lineEnding).toBe('\n');
+    expect(spans('@class-diagram "D"').spans.lineEnding).toBe('\n');
+  });
+
   it('locates enum values and state/sequence nodes', () => {
     const e = '@class-diagram "D"\nenum S {\n  A\n  B // x\n}\n';
     const es = spans(e).spans.elements[0];

@@ -193,7 +193,7 @@ Diagram
         spans: {
           header: header.span,
           headerName: header.nameSpan,
-          lineEnding: /\r\n/.test(input) ? '\r\n' : /\r/.test(input) ? '\r' : '\n',
+          lineEnding: (/\r\n|\r|\n/.exec(input) || ['\n'])[0],
           elements: elementSpans,
           connectors: connectorSpans,
         },
