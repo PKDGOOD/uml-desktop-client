@@ -12,7 +12,7 @@ Changes are documented here before a tagged release. The package version `0.1.0`
 - Open-source contribution, security, governance, issue/PR, and release guidance.
 - CI configuration, dependency update configuration, and reproducible third-party notices.
 - `parseDSLWithSpans` reports where each element, member and connector sits in the DSL text (UTF-16 offsets), the groundwork for edits that change only the affected text.
-- Renaming an element in the inspector edits only its name in the text (declaration and connector ends), so comments and spacing around it stay.
+- Inspector and canvas edits to one element (rename, stereotype, visibility, members, move, resize) change only the affected part of the DSL text, so comments, spacing and untouched members stay.
 - Synthetic five-type fixtures, explicit known-failure regressions, reference engine measurements and a macOS packaged save/restart/open smoke harness.
 
 ### Changed

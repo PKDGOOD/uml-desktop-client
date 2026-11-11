@@ -15,7 +15,7 @@ import { formatName, quoteString } from './escaping';
 export { formatName };
 
 // Visibility → DSL marker
-const visibilityMarker: Record<string, string> = {
+export const visibilityMarker: Record<string, string> = {
   public: '+',
   private: '-',
   protected: '#',
@@ -66,32 +66,40 @@ export function serializeDSL(diagram: DiagramData): string {
 // =============================================================================
 
 /** Format a stereotype as ` <<name>>`; empty or unrepresentable values are omitted */
-function formatStereotype(stereotype: string | undefined): string {
+export function formatStereotype(stereotype: string | undefined): string {
   const value = stereotype?.trim();
   if (!value || /[<>\r\n]/.test(value)) return '';
   return ` <<${value}>>`;
+}
+
+export function formatPosition(position: { x: number; y: number }): string {
+  return `@pos(${position.x}, ${position.y})`;
+}
+
+export function formatSize(size: { width: number; height: number }): string {
+  return `@size(${size.width}, ${size.height})`;
 }
 
 /** Format @pos and @size annotations */
 function formatAnnotations(el: DiagramElement): string {
   const parts: string[] = [];
   if (el.position) {
-    parts.push(`@pos(${el.position.x}, ${el.position.y})`);
+    parts.push(formatPosition(el.position));
   }
   if (el.size) {
-    parts.push(`@size(${el.size.width}, ${el.size.height})`);
+    parts.push(formatSize(el.size));
   }
   return parts.length > 0 ? ' ' + parts.join(' ') : '';
 }
 
 /** Serialize a single attribute line */
-function serializeAttribute(attr: Attribute): string {
+export function serializeAttribute(attr: Attribute): string {
   const vis = visibilityMarker[attr.visibility] || '+';
   return `  ${vis} ${attr.name}: ${attr.type}`;
 }
 
 /** Serialize a single method line */
-function serializeMethod(method: Method): string {
+export function serializeMethod(method: Method): string {
   const vis = visibilityMarker[method.visibility] || '+';
   const params = method.parameters.map(p => `${p.name}: ${p.type}`).join(', ');
   return `  ${vis} ${method.name}(${params}): ${method.returnType}`;
