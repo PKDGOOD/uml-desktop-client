@@ -14,11 +14,12 @@ import type {
   ElementProperties,
 } from '../types';
 import { parseDSL } from '../parser/dsl';
+import { isMessage, renumberMessages } from '../parser/dsl/messageOrder';
 import { serializeDSL } from '../parser/dsl/serializer';
 import { UndoManager } from './undoManager';
 import { parseCheckedDSL, validateDiagramRules, type DiagramRuleError } from './diagramRules';
 import {
-  patchAddConnectorInText, patchAddElementInText, patchConnectorInText, patchDeleteConnectorInText, patchDeleteElementInText, patchElementInText,
+  patchAddConnectorInText, patchAddElementInText, patchConnectorInText, patchDeleteConnectorInText, patchDeleteElementInText, patchElementInText, patchMessageOrderInText,
 } from './textEdits';
 
 export interface SyncEngineOptions {
@@ -245,9 +246,12 @@ export class SyncEngine {
             }
             break;
           }
-          case 'connector-add':
-            d.connectors.push(deepClone(ch.connector));
+          case 'connector-add': {
+            const added = deepClone(ch.connector);
+            d.connectors.push(added);
+            if (isMessage(added) && added.messageOrder !== undefined) renumberMessages(d, { id: added.id, to: added.messageOrder });
             break;
+          }
           case 'connector-delete':
             d.connectors = d.connectors.filter(c => c.id !== ch.connectorId);
             break;
@@ -255,11 +259,13 @@ export class SyncEngine {
             const conn = d.connectors.find(c => c.id === ch.connectorId);
             if (conn) {
               // A key present with `undefined` clears the value; an absent key keeps it.
-              for (const key of Object.keys(ch.changes) as Array<keyof typeof ch.changes>) {
-                const value = ch.changes[key];
+              const { messageOrder, ...fields } = ch.changes;
+              for (const key of Object.keys(fields) as Array<keyof typeof fields>) {
+                const value = fields[key];
                 if (value === undefined) delete conn[key];
                 else conn[key] = value;
               }
+              if (messageOrder !== undefined && isMessage(conn)) renumberMessages(d, { id: conn.id, to: messageOrder });
             }
             break;
           }
@@ -273,6 +279,7 @@ export class SyncEngine {
       };
 
       const newDiagram = applyChange(this.currentDiagram, change);
+      renumberMessages(newDiagram);
       // Reject commands that break a diagram rule the model did not already break,
       // before touching state or history (A03.07).
       const before = new Set(validateDiagramRules(oldDiagram).map((error) => error.message));
@@ -326,7 +333,12 @@ export class SyncEngine {
       patched = patchDeleteConnectorInText(oldText, oldDiagram, change.connectorId);
     } else if (change.type === 'connector-update') {
       const after = newDiagram.connectors.find((connector) => connector.id === change.connectorId);
-      if (after) patched = patchConnectorInText(oldText, oldDiagram, after, newDiagram);
+      if (after) {
+        const keys = Object.keys(change.changes);
+        patched = keys.length === 1 && keys[0] === 'messageOrder'
+          ? patchMessageOrderInText(oldText, oldDiagram, after, newDiagram)
+          : keys.includes('messageOrder') ? null : patchConnectorInText(oldText, oldDiagram, after, newDiagram);
+      }
     }
     if (patched === null) return null;
     const check = parseCheckedDSL(patched);

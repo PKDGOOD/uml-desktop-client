@@ -11,6 +11,7 @@ import { parseDSLWithSpans } from '../parser/dsl';
 import { formatName, formatPosition, serializeDSL, formatSize, formatStereotype, serializeAttribute, serializeMethod, visibilityMarker } from '../parser/dsl/serializer';
 import type { Connector, DiagramElement } from '../types';
 import type { SourceSpan } from '../parser/dsl/sourceSpans';
+import { inDisplayOrder } from '../parser/dsl/messageOrder';
 import { preserveIds } from './syncEngine';
 
 export interface TextEdit {
@@ -381,4 +382,28 @@ export function patchDeleteConnectorInText(text: string, model: DiagramData, con
   const index = parsed.diagram.connectors.findIndex((connector) => connector.id === connectorId);
   if (index < 0) return null;
   return applyTextEdits(text, [removeItem(text, parsed.spans.connectors[index].line)]);
+}
+
+/**
+ * The text after moving one sequence message to its new position (A04.08): its
+ * line moves whole, comment and indentation included, so identity and label
+ * are untouched. `afterDiagram` holds the new order.
+ */
+export function patchMessageOrderInText(text: string, model: DiagramData, after: Connector, afterDiagram: DiagramData): string | null {
+  const parsed = mapToModel(text, model);
+  if (!parsed || after.messageOrder === undefined) return null;
+  const { diagram, spans } = parsed;
+  const from = diagram.connectors.findIndex((connector) => connector.id === after.id);
+  if (from < 0) return null;
+  // Text order of the messages once the new numbering applies.
+  const wanted = inDisplayOrder(afterDiagram.connectors).map((connector) => connector.id);
+  const to = wanted.indexOf(after.id);
+  if (to < 0 || to === from) return null;
+  const rest = spans.connectors.filter((_, i) => i !== from);
+  const line = spans.connectors[from].line;
+  const block = text.slice(line.start, line.end);
+  const anchor = to < rest.length
+    ? lineStart(text, rest[to].line.start)
+    : lineEndWithBreak(text, rest[rest.length - 1].line.end);
+  return applyTextEdits(text, [removeItem(text, line), insertLines(text, anchor, block, spans.lineEnding)]);
 }
