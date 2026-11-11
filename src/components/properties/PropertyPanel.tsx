@@ -2,7 +2,7 @@
 // PropertyPanel - Editable properties for selected diagram element
 // =============================================================================
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type { DiagramElement, Attribute, Method, ElementProperties } from '../../types';
 
 export interface PropertyPanelProps {
@@ -30,13 +30,22 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
     [element, onPropertyChange],
   );
 
-  const handleStereotypeChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!element) return;
-      onPropertyChange(element.id, { stereotype: e.target.value });
-    },
-    [element, onPropertyChange],
-  );
+  // A stereotype is committed on blur or Enter, without surrounding spaces; an empty
+  // field removes it. Committing per keystroke would refuse "my " while typing "my entity".
+  const [stereotypeDraft, setStereotypeDraft] = useState(element?.properties.stereotype ?? '');
+  useEffect(() => {
+    setStereotypeDraft(element?.properties.stereotype ?? '');
+  }, [element?.id, element?.properties.stereotype]);
+
+  const commitStereotype = useCallback(() => {
+    if (!element) return;
+    const value = stereotypeDraft.trim();
+    if (value === (element.properties.stereotype ?? '')) {
+      setStereotypeDraft(value);
+      return;
+    }
+    onPropertyChange(element.id, { stereotype: value === '' ? undefined : value });
+  }, [element, onPropertyChange, stereotypeDraft]);
 
   const handleVisibilityChange = useCallback(
     (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -63,7 +72,10 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const handleAddAttribute = useCallback(() => {
     if (!element) return;
     const attrs = [...(element.properties.attributes ?? [])];
-    attrs.push({ name: 'newAttr', type: 'string', visibility: 'private' });
+    // An enum value is only a name in the DSL.
+    attrs.push(element.type === 'enum'
+      ? { name: `VALUE${attrs.length + 1}`, type: '', visibility: 'public' }
+      : { name: 'newAttr', type: 'string', visibility: 'private' });
     onPropertyChange(element.id, { attributes: attrs });
   }, [element, onPropertyChange]);
 
@@ -152,8 +164,10 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
       {/* Stereotype */}
       <label className="field-label">Stereotype</label>
       <input
-        value={properties.stereotype ?? ''}
-        onChange={handleStereotypeChange}
+        value={stereotypeDraft}
+        onChange={(e) => setStereotypeDraft(e.target.value)}
+        onBlur={commitStereotype}
+        onKeyDown={(e) => { if (e.key === 'Enter') commitStereotype(); }}
         placeholder="e.g. «entity»"
         className="field-input"
       />
@@ -192,13 +206,15 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
                     style={{ flex: 1 }}
                     placeholder="name"
                   />
-                  <input
-                    value={attr.type}
-                    onChange={(e) => handleAttributeChange(i, 'type', e.target.value)}
-                    className="field-input"
-                    style={{ flex: 1 }}
-                    placeholder="type"
-                  />
+                  {element.type !== 'enum' && (
+                    <input
+                      value={attr.type}
+                      onChange={(e) => handleAttributeChange(i, 'type', e.target.value)}
+                      className="field-input"
+                      style={{ flex: 1 }}
+                      placeholder="type"
+                    />
+                  )}
                   <button onClick={() => handleRemoveAttribute(i)} className="panel-button danger">
                     ×
                   </button>

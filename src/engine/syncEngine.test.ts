@@ -77,6 +77,78 @@ class Order {
 
 const INVALID_DSL = `@class-diagram "Test"\n\nclass {{{ invalid`;
 
+describe('A03.06 diagram rules after DSL parsing', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const SELF_LINK = '@class-diagram "Test"\n\nclass A {\n}\n\nclass B {\n}\n\nA --> A\n';
+
+  it('keeps the raw text and the last valid model when a parsed draft breaks a rule', () => {
+    const history = new UndoManager();
+    const { engine, onErrors, onDiagramUpdate } = createEngine({ undoManager: history });
+    engine.setDiagram(makeDiagram({ elements: [makeElement('a', 'A'), makeElement('b', 'B')] }));
+    const before = engine.getDiagram();
+
+    engine.onTextChange(SELF_LINK);
+    engine.flushPendingText();
+
+    expect(engine.getText()).toBe(SELF_LINK);
+    expect(engine.getDiagram()).toEqual(before);
+    expect(onDiagramUpdate).not.toHaveBeenCalled();
+    expect(history.canUndo()).toBe(false);
+    expect(onErrors).toHaveBeenLastCalledWith([
+      { line: 9, column: 1, message: expect.stringMatching(/self-links are not supported/) },
+    ]);
+  });
+
+  it('reports a rule error on the declaring line and clears it once fixed', () => {
+    const { engine, onErrors } = createEngine();
+    engine.setDiagram(makeDiagram());
+    engine.onTextChange('@class-diagram "Test"\n\nclass A {\n}\n\ninterface I {\n}\n\nA --|> I\n');
+    engine.flushPendingText();
+    expect(onErrors).toHaveBeenLastCalledWith([expect.objectContaining({ line: 9, message: expect.stringMatching(/class extends a class/) })]);
+
+    engine.onTextChange('@class-diagram "Test"\n\nclass A {\n}\n\ninterface I {\n}\n\nA ..|> I\n');
+    engine.flushPendingText();
+    expect(onErrors).toHaveBeenLastCalledWith([]);
+    expect(engine.getDiagram()?.connectors).toMatchObject([{ type: 'realization' }]);
+  });
+
+  it('marks stored text that breaks a rule as invalid when a diagram is set', () => {
+    const { engine } = createEngine();
+    engine.setDiagram(makeDiagram({ elements: [makeElement('a', 'A'), makeElement('b', 'B')] }), SELF_LINK);
+    expect(engine.getErrors()).toHaveLength(1);
+  });
+
+  it('rejects a canvas connector that breaks a rule without changing state or history', () => {
+    const history = new UndoManager();
+    const { engine, onTextUpdate } = createEngine({ undoManager: history });
+    engine.setDiagram(makeDiagram({ elements: [makeElement('a', 'A'), { ...makeElement('i', 'I'), type: 'interface' }] }));
+    const before = { diagram: engine.getDiagram(), text: engine.getText() };
+
+    for (const connector of [
+      { ...makeConnector('self', 'a', 'a') },
+      { ...makeConnector('wrong', 'a', 'i'), type: 'inheritance' as const },
+      { ...makeConnector('range', 'a', 'i'), targetMultiplicity: '2..1' },
+    ]) {
+      expect(engine.onCanvasChange({ type: 'connector-add', connector })).toBe(false);
+    }
+    expect(engine.getDiagram()).toEqual(before.diagram);
+    expect(engine.getText()).toBe(before.text);
+    expect(history.canUndo()).toBe(false);
+    expect(onTextUpdate).not.toHaveBeenCalled();
+
+    expect(engine.onCanvasChange({ type: 'connector-add', connector: { ...makeConnector('ok', 'a', 'i'), type: 'realization' } })).toBe(true);
+  });
+
+  it('lets the inspector remove a stereotype', () => {
+    const { engine } = createEngine();
+    engine.setDiagram(makeDiagram({ elements: [{ ...makeElement('a', 'A'), properties: { name: 'A', stereotype: 'entity' } }] }));
+    expect(engine.onCanvasChange({ type: 'element-update', elementId: 'a', properties: { stereotype: undefined } })).toBe(true);
+    expect(engine.getText()).not.toContain('<<');
+  });
+});
+
 describe('SyncEngine draft safety', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
