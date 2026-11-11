@@ -187,6 +187,18 @@ function validateMetadata(
   return errors;
 }
 
+/**
+ * Which element may own which (A03.05, `DiagramElement.parentId`): a composite
+ * state owns states, pseudostates and composite states; a system boundary owns
+ * use cases. Composite chains are acyclic and at most 8 levels deep (A01.10).
+ */
+const MAX_CONTAINMENT_DEPTH = 8;
+
+const CONTAINMENT: Partial<Record<string, readonly string[]>> = {
+  'composite-state': ['state', 'initial-state', 'final-state', 'composite-state'],
+  'system-boundary': ['usecase'],
+};
+
 /** Schema-1 files carry a semver `metadata.version`; only major version 1 is understood. */
 const SUPPORTED_MAJOR_VERSION = 1;
 
@@ -269,6 +281,7 @@ export function validateProjectReferences(project: ProjectData, options: Referen
   for (const [id, diagram] of Object.entries(project.diagrams)) {
     const ids = new Set<string>();
     const elementIds = new Set(diagram.elements.map((element) => element.id));
+    const elementsById = new Map(diagram.elements.map((element) => [element.id, element]));
     const claim = (itemId: string, path: string) => {
       if (ids.has(itemId)) errors.push({ message: `Duplicate ID ${itemId} in diagram ${id}`, path });
       ids.add(itemId);
@@ -276,8 +289,31 @@ export function validateProjectReferences(project: ProjectData, options: Referen
     diagram.elements.forEach((element, i) => {
       const path = `diagrams.${id}.elements[${i}]`;
       claim(element.id, `${path}.id`);
-      if (element.parentId !== undefined && (element.parentId === element.id || !elementIds.has(element.parentId))) {
+      if (element.parentId === undefined) return;
+      const parent = elementsById.get(element.parentId);
+      if (element.parentId === element.id || !parent) {
         errors.push({ message: `Element ${element.id} has an unknown parent ${element.parentId}`, path: `${path}.parentId` });
+      } else if (!Object.prototype.hasOwnProperty.call(CONTAINMENT, parent.type) || !CONTAINMENT[parent.type]!.includes(element.type)) {
+        errors.push({ message: `A ${parent.type} cannot contain a ${element.type} (element ${element.id})`, path: `${path}.parentId` });
+      }
+    });
+    diagram.elements.forEach((element, i) => {
+      // Follow the parent chain; a revisit is a cycle, a long chain is too deep.
+      const seen = new Set<string>([element.id]);
+      let current = element;
+      while (current.parentId !== undefined) {
+        const parent = elementsById.get(current.parentId);
+        if (!parent || parent.id === current.id) break;
+        if (seen.has(parent.id)) {
+          errors.push({ message: `Element ${element.id} is inside itself through its parents`, path: `diagrams.${id}.elements[${i}].parentId` });
+          break;
+        }
+        seen.add(parent.id);
+        if (seen.size - 1 > MAX_CONTAINMENT_DEPTH) {
+          errors.push({ message: `Element ${element.id} is nested more than ${MAX_CONTAINMENT_DEPTH} levels deep`, path: `diagrams.${id}.elements[${i}].parentId` });
+          break;
+        }
+        current = parent;
       }
     });
     diagram.connectors.forEach((connector, i) => {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { ProjectFileParser } from './projectFileParser';
+import { ProjectFileParser, validateProjectReferences } from './projectFileParser';
+import { nestedStateDiagram } from '@/types/structureFixtures';
 import { ProjectFileSerializer } from './projectFileSerializer';
 import type {
   ProjectData,
@@ -391,5 +392,58 @@ describe('ProjectFileSerializer', () => {
     );
     expect(d2El).toBeDefined();
     expect(d2El!.sharedRefId).toBe('shared-user-class');
+  });
+});
+
+describe('A03.05 ownership and containment', () => {
+  function project(mutate: (diagram: DiagramData) => void): ProjectData {
+    const diagram = structuredClone(nestedStateDiagram);
+    mutate(diagram);
+    return {
+      metadata: { name: 'P', version: '1.0.0', createdAt: '', updatedAt: '', diagramIndex: {
+        [diagram.id]: { id: diagram.id, name: diagram.name, type: diagram.type, parentFolderId: '' },
+      } },
+      tree: [{ id: diagram.id, type: 'diagram', name: diagram.name, diagramType: diagram.type }],
+      diagrams: { [diagram.id]: diagram }, sharedElements: {},
+    };
+  }
+  const byId = (diagram: DiagramData, id: string) => diagram.elements.find((element) => element.id === id)!;
+
+  it('accepts the nested-state fixture, including a composite inside a composite', () => {
+    expect(validateProjectReferences(project(() => {}))).toEqual([]);
+  });
+
+  it.each<[string, (diagram: DiagramData) => void, RegExp]>([
+    ['a state owning a state', (d) => { byId(d, 's-outside').parentId = 's-inside'; }, /state cannot contain a state/],
+    ['a composite owning a use case', (d) => {
+      d.elements.push({ ...byId(d, 's-inside'), id: 'u', type: 'usecase', parentId: 's-active' });
+    }, /composite-state cannot contain a usecase/],
+    ['a cycle', (d) => { byId(d, 's-active').parentId = 's-review'; }, /inside itself/],
+    ['self-parenting', (d) => { byId(d, 's-inside').parentId = 's-inside'; }, /unknown parent/],
+    ['a parent typed like an Object.prototype key', (d) => {
+      (byId(d, 's-outside') as { type: string }).type = 'constructor';
+      byId(d, 's-end').parentId = 's-outside';
+    }, /constructor cannot contain a final-state/],
+  ])('refuses %s', (_name, mutate, message) => {
+    expect(validateProjectReferences(project(mutate))).toContainEqual(expect.objectContaining({ message: expect.stringMatching(message) }));
+  });
+
+  it('refuses composite chains deeper than 8 levels and accepts 8', () => {
+    const chain = (levels: number) => project((d) => {
+      let parent = 's-active';
+      for (let level = 2; level <= levels; level++) {
+        const id = `deep-${level}`;
+        d.elements.push({ ...byId(d, 's-active'), id, properties: { name: id }, parentId: parent });
+        parent = id;
+      }
+    });
+    expect(validateProjectReferences(chain(9))).toEqual([]);
+    expect(validateProjectReferences(chain(10))).toContainEqual(expect.objectContaining({ message: expect.stringMatching(/more than 8 levels/) }));
+  });
+
+  it('leaves siblings outside a composite independent', () => {
+    const errors = validateProjectReferences(project((d) => { byId(d, 's-inside').parentId = 'missing'; }));
+    expect(errors).toHaveLength(1);
+    expect(errors[0].path).toMatch(/elements\[2\]\.parentId$/);
   });
 });
