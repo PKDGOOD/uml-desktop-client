@@ -3,9 +3,16 @@
 // =============================================================================
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { changesFrom, draftFrom, isDirty, localProblem, type FormDraft } from './formDraft';
+import { changesFrom, draftFrom, isDirty, localProblem, moveItem, unusedName, type FormDraft } from './formDraft';
 import type { PendingFormGuard } from './pendingForm';
-import type { DiagramElement, Attribute, Method, ElementProperties } from '../../types';
+import type { DiagramElement, Attribute, Method, Parameter, ElementProperties } from '../../types';
+
+const VISIBILITIES = [
+  { value: 'public', mark: '+' },
+  { value: 'private', mark: '-' },
+  { value: 'protected', mark: '#' },
+  { value: 'package', mark: '~' },
+] as const;
 
 export interface PropertyPanelProps {
   /** Currently selected element (null if nothing selected) */
@@ -141,6 +148,16 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
     update({ methods: draft.methods.filter((_, i) => i !== index) });
   };
 
+  const moveAttribute = (index: number, delta: number) => { if (draft) update({ attributes: moveItem(draft.attributes, index, delta) }); };
+  const moveMethod = (index: number, delta: number) => { if (draft) update({ methods: moveItem(draft.methods, index, delta) }); };
+
+  const setParameters = (index: number, change: (parameters: Parameter[]) => Parameter[]) => {
+    if (!draft) return;
+    const updated = [...draft.methods];
+    updated[index] = { ...updated[index], parameters: change(updated[index].parameters) };
+    update({ methods: updated });
+  };
+
   if (!element || !draft) {
     return (
       <div className="property-panel">
@@ -218,13 +235,24 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
           {attributesExpanded && (
             <div>
               {draft.attributes.map((attr, i) => (
-                <div key={i} className="property-row">
+                <div key={i} className="property-row" role="group" aria-label={`Attribute ${i + 1}`}>
+                  {element.type !== 'enum' && (
+                    <select
+                      value={attr.visibility}
+                      onChange={(e) => handleAttributeChange(i, 'visibility', e.target.value)}
+                      className="field-select member-visibility"
+                      aria-label="Attribute visibility"
+                    >
+                      {VISIBILITIES.map((v) => <option key={v.value} value={v.value}>{v.mark}</option>)}
+                    </select>
+                  )}
                   <input
                     value={attr.name}
                     onChange={(e) => handleAttributeChange(i, 'name', e.target.value)}
                     className="field-input"
                     style={{ flex: 1 }}
                     placeholder="name"
+                    aria-label="Attribute name"
                   />
                   {element.type !== 'enum' && (
                     <input
@@ -233,9 +261,12 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
                       className="field-input"
                       style={{ flex: 1 }}
                       placeholder="type"
+                      aria-label="Attribute type"
                     />
                   )}
-                  <button onClick={() => handleRemoveAttribute(i)} className="panel-button danger">
+                  <button onClick={() => moveAttribute(i, -1)} disabled={i === 0} className="panel-button" aria-label="Move attribute up">↑</button>
+                  <button onClick={() => moveAttribute(i, 1)} disabled={i === draft.attributes.length - 1} className="panel-button" aria-label="Move attribute down">↓</button>
+                  <button onClick={() => handleRemoveAttribute(i)} className="panel-button danger" aria-label="Remove attribute">
                     ×
                   </button>
                 </div>
@@ -261,23 +292,63 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
           {methodsExpanded && (
             <div>
               {draft.methods.map((method, i) => (
-                <div key={i} className="property-row">
-                  <input
-                    value={method.name}
-                    onChange={(e) => handleMethodChange(i, 'name', e.target.value)}
-                    className="field-input"
-                    style={{ flex: 1 }}
-                    placeholder="name"
-                  />
-                  <input
-                    value={method.returnType}
-                    onChange={(e) => handleMethodChange(i, 'returnType', e.target.value)}
-                    className="field-input"
-                    style={{ width: 70 }}
-                    placeholder="return"
-                  />
-                  <button onClick={() => handleRemoveMethod(i)} className="panel-button danger">
-                    ×
+                <div key={i} className="method-block" role="group" aria-label={`Method ${i + 1}`}>
+                  <div className="property-row">
+                    <select
+                      value={method.visibility}
+                      onChange={(e) => handleMethodChange(i, 'visibility', e.target.value)}
+                      className="field-select member-visibility"
+                      aria-label="Method visibility"
+                    >
+                      {VISIBILITIES.map((v) => <option key={v.value} value={v.value}>{v.mark}</option>)}
+                    </select>
+                    <input
+                      value={method.name}
+                      onChange={(e) => handleMethodChange(i, 'name', e.target.value)}
+                      className="field-input"
+                      style={{ flex: 1 }}
+                      placeholder="name"
+                      aria-label="Method name"
+                    />
+                    <input
+                      value={method.returnType}
+                      onChange={(e) => handleMethodChange(i, 'returnType', e.target.value)}
+                      className="field-input"
+                      style={{ width: 70 }}
+                      placeholder="return"
+                      aria-label="Return type"
+                    />
+                    <button onClick={() => moveMethod(i, -1)} disabled={i === 0} className="panel-button" aria-label="Move method up">↑</button>
+                    <button onClick={() => moveMethod(i, 1)} disabled={i === draft.methods.length - 1} className="panel-button" aria-label="Move method down">↓</button>
+                    <button onClick={() => handleRemoveMethod(i)} className="panel-button danger" aria-label="Remove method">
+                      ×
+                    </button>
+                  </div>
+                  {method.parameters.map((parameter, pi) => (
+                    <div key={pi} className="property-row parameter-row" role="group" aria-label={`Parameter ${pi + 1}`}>
+                      <input
+                        value={parameter.name}
+                        onChange={(e) => setParameters(i, (list) => list.map((p, k) => (k === pi ? { ...p, name: e.target.value } : p)))}
+                        className="field-input"
+                        style={{ flex: 1 }}
+                        placeholder="parameter"
+                        aria-label="Parameter name"
+                      />
+                      <input
+                        value={parameter.type}
+                        onChange={(e) => setParameters(i, (list) => list.map((p, k) => (k === pi ? { ...p, type: e.target.value } : p)))}
+                        className="field-input"
+                        style={{ flex: 1 }}
+                        placeholder="type"
+                        aria-label="Parameter type"
+                      />
+                      <button onClick={() => setParameters(i, (list) => moveItem(list, pi, -1))} disabled={pi === 0} className="panel-button" aria-label="Move parameter up">↑</button>
+                      <button onClick={() => setParameters(i, (list) => moveItem(list, pi, 1))} disabled={pi === method.parameters.length - 1} className="panel-button" aria-label="Move parameter down">↓</button>
+                      <button onClick={() => setParameters(i, (list) => list.filter((_, k) => k !== pi))} className="panel-button danger" aria-label="Remove parameter">×</button>
+                    </div>
+                  ))}
+                  <button onClick={() => setParameters(i, (list) => [...list, { name: unusedName(list.map((p) => p.name), 'arg'), type: 'string' }])} className="panel-button">
+                    + Add Parameter
                   </button>
                 </div>
               ))}

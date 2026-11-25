@@ -326,11 +326,21 @@ Parameter
       return { name, type };
     }
 
+// A type may contain commas only inside <...> (Map<String, int>), so that a comma
+// between parameters ends the parameter's type.
 TypeExpr
-  = chars:TypeChar+ { return chars.join('').trim(); }
+  = parts:TypePart+ { return parts.join('').trim(); }
+
+TypePart
+  = "<" inner:TypeArgument* ">" { return '<' + inner.join('') + '>'; }
+  / TypeChar
+
+TypeArgument
+  = TypePart
+  / ","
 
 TypeChar
-  = [a-zA-Z0-9_\[\]<>,.\u00C0-\u024F\uAC00-\uD7AF ]
+  = [a-zA-Z0-9_\[\].\u00C0-\u024F\uAC00-\uD7AF ]
 
 EnumLine
   = _ name:EnumValue _ NL { return name; }

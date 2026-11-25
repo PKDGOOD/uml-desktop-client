@@ -45,3 +45,18 @@ export const isDirty = (original: ElementProperties, draft: FormDraft): boolean 
 export function localProblem(draft: FormDraft): { field: 'name'; message: string } | null {
   return draft.name.trim() === '' ? { field: 'name', message: 'Name cannot be empty.' } : null;
 }
+
+/** A copy of `items` with the one at `index` moved by `delta` places (clamped to the list). */
+export function moveItem<T>(items: readonly T[], index: number, delta: number): T[] {
+  const to = Math.min(Math.max(index + delta, 0), items.length - 1);
+  const copy = [...items];
+  if (index < 0 || index >= copy.length || to === index) return copy;
+  const [item] = copy.splice(index, 1);
+  copy.splice(to, 0, item);
+  return copy;
+}
+
+/** `prefix1`, `prefix2`, ... the first one not in `taken`. */
+export function unusedName(taken: readonly string[], prefix: string): string {
+  for (let n = 1; ; n++) if (!taken.includes(`${prefix}${n}`)) return `${prefix}${n}`;
+}

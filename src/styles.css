@@ -775,3 +775,18 @@ button {
 .field-input[aria-invalid='true'] {
   border-color: #c62828;
 }
+
+.member-visibility {
+  width: 44px;
+  flex: none;
+}
+
+.method-block {
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.parameter-row {
+  margin-left: 16px;
+}
