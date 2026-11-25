@@ -754,3 +754,24 @@ button {
   font-weight: 700;
   box-shadow: var(--shadow-soft);
 }
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.form-error {
+  flex-basis: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #fdecea;
+  color: #8a1c14;
+  font-size: 12px;
+}
+
+.field-input[aria-invalid='true'] {
+  border-color: #c62828;
+}
