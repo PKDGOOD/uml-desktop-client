@@ -22,6 +22,8 @@ export interface UMLCanvasProps {
   onElementDoubleClick?: (elementId: string) => void;
   /** Called when selection changes */
   onSelectionChange?: (selectedIds: string[]) => void;
+  /** Puts the selection back after the app refused a change (new `token` each time). */
+  restoreSelection?: { ids: string[]; token: number };
   /** Active element placement tool */
   activeTool?: CanvasTool | null;
   readOnly?: boolean;
@@ -33,6 +35,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
   onCanvasChange,
   onElementDoubleClick,
   onSelectionChange,
+  restoreSelection,
   activeTool = null,
   readOnly = false,
 }) => {
@@ -157,6 +160,14 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
     setSelectedElementIds(new Set());
     setSelectedConnectorIds(new Set());
   }, []);
+
+  const restoredToken = useRef(restoreSelection?.token);
+  useEffect(() => {
+    if (!restoreSelection || restoreSelection.token === restoredToken.current) return;
+    restoredToken.current = restoreSelection.token;
+    setSelectedElementIds(new Set(restoreSelection.ids));
+    setSelectedConnectorIds(new Set());
+  }, [restoreSelection]);
 
   // Selection belongs to one diagram: never carry it over to another (A04.11).
   const diagramId = diagram?.id;
