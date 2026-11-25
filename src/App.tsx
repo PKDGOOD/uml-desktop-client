@@ -93,10 +93,17 @@ const App: React.FC = () => {
   const formGuardRef = useRef<PendingFormGuard | null>(null);
   const registerFormGuard = useCallback((guard: PendingFormGuard | null) => { formGuardRef.current = guard; }, []);
   const [formPrompt, setFormPrompt] = useState<{ label: string; resolve: (choice: PendingChoice) => void } | null>(null);
-  const resolvePendingForm = useCallback(() => resolvePending(
-    formGuardRef.current,
-    (label) => new Promise<PendingChoice>((resolve) => setFormPrompt({ label, resolve })),
-  ), []);
+  const formDecision = useRef<Promise<boolean> | null>(null);
+  const resolvePendingForm = useCallback((): Promise<boolean> => {
+    // A second operation while the question is open waits for the same answer instead of replacing it.
+    if (formDecision.current) return formDecision.current;
+    const decision = resolvePending(
+      formGuardRef.current,
+      (label) => new Promise<PendingChoice>((resolve) => setFormPrompt({ label, resolve })),
+    ).finally(() => { formDecision.current = null; });
+    formDecision.current = decision;
+    return decision;
+  }, []);
   const [restoreSelection, setRestoreSelection] = useState<{ ids: string[]; token: number } | undefined>();
   const canvasObserverRef = useRef<ResizeObserver | null>(null);
 
@@ -188,8 +195,9 @@ const App: React.FC = () => {
     if (!fileBusyRef.current) setCreateMode('project');
   }, []);
 
-  const handleCreate = useCallback((name: string, type: DiagramType, folder: string) => {
+  const handleCreate = useCallback(async (name: string, type: DiagramType, folder: string) => {
     if (fileBusyRef.current) return;
+    if (!(await resolvePendingForm())) return;
     if (createMode === 'project') {
       if (!confirmUnsavedChanges()) return;
       const problem = replaceProject(createProject(name), null);
@@ -208,13 +216,13 @@ const App: React.FC = () => {
     }
     setCreateMode(null);
     setFileNotice(null);
-  }, [createMode, confirmUnsavedChanges, replaceProject, refreshWorkspace]);
+  }, [createMode, confirmUnsavedChanges, replaceProject, refreshWorkspace, resolvePendingForm]);
 
-  const handleExamples = useCallback(() => {
-    if (fileBusyRef.current || !confirmUnsavedChanges()) return;
+  const handleExamples = useCallback(async () => {
+    if (fileBusyRef.current || !(await resolvePendingForm()) || !confirmUnsavedChanges()) return;
     const problem = replaceProject(createExampleProject('Example Project'), null);
     setFileNotice(problem ? { text: `Could not load the examples: ${problem}`, error: true } : null);
-  }, [confirmUnsavedChanges, replaceProject]);
+  }, [confirmUnsavedChanges, replaceProject, resolvePendingForm]);
 
   const handleExport = useCallback(async (format: 'svg' | 'png') => {
     const id = useProjectStore.getState().activeDiagramId;
@@ -347,6 +355,7 @@ const App: React.FC = () => {
 
   const handleOpenProject = useCallback(async () => {
     if (fileBusyRef.current) return;
+    if (!(await resolvePendingForm())) return;
     const api = window.electronAPI;
     if (!api) {
       fileInputRef.current?.click();
@@ -367,12 +376,13 @@ const App: React.FC = () => {
       fileBusyRef.current = false;
       setFileBusy(false);
     }
-  }, [loadProjectContent]);
+  }, [loadProjectContent, resolvePendingForm]);
 
   const handleBrowserFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file || fileBusyRef.current) return;
+    if (!(await resolvePendingForm())) return;
     fileBusyRef.current = true;
     setFileBusy(true);
     try {
@@ -383,7 +393,7 @@ const App: React.FC = () => {
       fileBusyRef.current = false;
       setFileBusy(false);
     }
-  }, [loadProjectContent]);
+  }, [loadProjectContent, resolvePendingForm]);
 
   const handleDslChange = useCallback((text: string) => {
     const id = useProjectStore.getState().activeDiagramId;
@@ -564,7 +574,7 @@ const App: React.FC = () => {
         >
           Redo
         </button>
-        <button className="menu-button" disabled={fileBusy} onClick={() => setHistoryOpen(true)}>History</button>
+        <button className="menu-button" disabled={fileBusy} onClick={() => { void resolvePendingForm().then((proceed) => { if (proceed) setHistoryOpen(true); }); }}>History</button>
         <button className="menu-button properties-toggle" aria-expanded={propertiesOpen} onClick={() => setPropertiesOpen((open) => !open)}>Properties</button>
         <button onClick={() => handleExport('svg')} disabled={fileBusy || !activeDiagram?.elements.length || dslErrors.length > 0} className="menu-button">Export SVG</button>
         <button onClick={() => handleExport('png')} disabled={fileBusy || !activeDiagram?.elements.length || dslErrors.length > 0} className="menu-button">Export PNG</button>
