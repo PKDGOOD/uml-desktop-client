@@ -66,3 +66,25 @@ describe('A05.04 connector endpoints and label', () => {
     expect(state.text).toBe(SRC);
   });
 });
+
+describe('A05.05 multiplicity through the engine', () => {
+  it('writes both ends, reads them back, and undo clears them', () => {
+    const { engine, state, history, conn } = setup();
+    const owns = conn('directed-association');
+    expect(engine.applyCanvasChange({ type: 'connector-update', connectorId: owns.id, changes: { sourceMultiplicity: '1', targetMultiplicity: '0..*' } })).toEqual({ ok: true });
+    expect(state.text).toContain('Dog "1" --> "0..*" Pet : owns');
+    const reread = parseDSL(state.text);
+    if (!reread.success) throw new Error('reread');
+    const back = reread.diagram.connectors.find((c) => c.type === 'directed-association')!;
+    expect([back.sourceMultiplicity, back.targetMultiplicity]).toEqual(['1', '0..*']);
+    history.undo();
+    expect(state.text).toBe(SRC);
+  });
+
+  it('does not commit an invalid range or a multiplicity on a relationship that cannot count', () => {
+    const { engine, state, conn } = setup();
+    expect(engine.applyCanvasChange({ type: 'connector-update', connectorId: conn('directed-association').id, changes: { targetMultiplicity: '3..1' } }).ok).toBe(false);
+    expect(engine.applyCanvasChange({ type: 'connector-update', connectorId: conn('inheritance').id, changes: { sourceMultiplicity: '1' } }).ok).toBe(false);
+    expect(state.text).toBe(SRC);
+  });
+});

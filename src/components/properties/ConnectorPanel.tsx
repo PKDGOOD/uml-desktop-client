@@ -3,9 +3,10 @@
 // =============================================================================
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { Connector, ConnectorUpdate, DiagramElement } from '../../types';
+import type { Connector, ConnectorUpdate, DiagramElement, DiagramType } from '../../types';
+import { multiplicityApplies } from '../../engine/diagramRules';
 import {
-  connectorChanges, connectorDraftFrom, describeConnector, isConnectorDirty, swapEnds, type ConnectorDraft,
+  connectorChanges, connectorDraftFrom, describeConnector, isConnectorDirty, multiplicityProblems, swapEnds, type ConnectorDraft,
 } from './connectorDraft';
 import type { PendingFormGuard } from './pendingForm';
 
@@ -13,6 +14,8 @@ export interface ConnectorPanelProps {
   connector: Connector;
   /** Every element of the diagram, for the endpoint choices and names. */
   elements: DiagramElement[];
+  /** Decides whether multiplicity fields are offered. */
+  diagramType: DiagramType;
   /** Applies the edit; returns why it was refused, or null. */
   onConnectorChange: (connectorId: string, changes: ConnectorUpdate) => string | null | void;
   disabled?: boolean;
@@ -20,7 +23,7 @@ export interface ConnectorPanelProps {
 }
 
 export const ConnectorPanel: React.FC<ConnectorPanelProps> = ({
-  connector, elements, onConnectorChange, disabled = false, registerGuard,
+  connector, elements, diagramType, onConnectorChange, disabled = false, registerGuard,
 }) => {
   const nameOf = useCallback(
     (id: string) => elements.find((element) => element.id === id)?.properties.name ?? id,
@@ -32,7 +35,7 @@ export const ConnectorPanel: React.FC<ConnectorPanelProps> = ({
   const dirty = isConnectorDirty(connector, draft);
 
   // The saved connector changing (Apply, undo, a text edit, another selection) reloads the draft.
-  const savedKey = JSON.stringify([connector.id, connector.sourceId, connector.targetId, connector.label ?? '']);
+  const savedKey = JSON.stringify([connector.id, connector.sourceId, connector.targetId, connector.label ?? '', connector.sourceMultiplicity ?? '', connector.targetMultiplicity ?? '']);
   useEffect(() => {
     setDraft(connectorDraftFrom(connector));
     setProblem(null);
@@ -44,6 +47,10 @@ export const ConnectorPanel: React.FC<ConnectorPanelProps> = ({
   const apply = useCallback((): string | null => {
     const changes = connectorChanges(connector, draft);
     if (Object.keys(changes).length === 0) return null;
+    // An invalid range never reaches the model.
+    const invalid = multiplicityProblems(draft);
+    const local = invalid.sourceMultiplicity ?? invalid.targetMultiplicity;
+    if (local) { setProblem(local); return local; }
     const refusal = onConnectorChange(connector.id, changes) ?? null;
     // A refusal leaves the connector as it was; the form keeps the draft and says why.
     setProblem(refusal);
@@ -65,6 +72,8 @@ export const ConnectorPanel: React.FC<ConnectorPanelProps> = ({
 
   useEffect(() => { if (problem) alertRef.current?.focus(); }, [problem]);
 
+  const withMultiplicity = multiplicityApplies(diagramType, connector.type);
+  const invalid = multiplicityProblems(draft);
   const options = elements.map((element) => <option key={element.id} value={element.id}>{element.properties.name}</option>);
 
   return (
@@ -91,6 +100,19 @@ export const ConnectorPanel: React.FC<ConnectorPanelProps> = ({
 
         <label className="field-label" htmlFor="connector-label">Label</label>
         <input id="connector-label" className="field-input" value={draft.label} onChange={(e) => update({ label: e.target.value })} />
+
+        {withMultiplicity && (
+          <>
+            <label className="field-label" htmlFor="connector-source-multiplicity">From multiplicity</label>
+            <input id="connector-source-multiplicity" className="field-input" placeholder="e.g. 1, 0..1, 1..*, *"
+              value={draft.sourceMultiplicity} onChange={(e) => update({ sourceMultiplicity: e.target.value })}
+              aria-invalid={!!invalid.sourceMultiplicity || undefined} />
+            <label className="field-label" htmlFor="connector-target-multiplicity">To multiplicity</label>
+            <input id="connector-target-multiplicity" className="field-input" placeholder="e.g. 1, 0..1, 1..*, *"
+              value={draft.targetMultiplicity} onChange={(e) => update({ targetMultiplicity: e.target.value })}
+              aria-invalid={!!invalid.targetMultiplicity || undefined} />
+          </>
+        )}
 
         <div className="form-actions">
           {problem && <div className="form-error" role="alert" tabIndex={-1} ref={alertRef}>{problem}</div>}
