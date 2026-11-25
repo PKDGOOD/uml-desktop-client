@@ -9,6 +9,7 @@ import { ProjectTree } from './components/project/ProjectTree';
 import { DiagramTabs, type DiagramTabInfo } from './components/tabs/DiagramTabs';
 import { SplitView } from './components/layout/SplitView';
 import { PropertyPanel } from './components/properties/PropertyPanel';
+import { ConnectorPanel } from './components/properties/ConnectorPanel';
 import { PendingFormDialog } from './components/properties/PendingFormDialog';
 import { resolvePending, type PendingChoice, type PendingFormGuard } from './components/properties/pendingForm';
 import { Toolbar } from './components/toolbar/Toolbar';
@@ -33,6 +34,7 @@ import type {
   ElementProperties,
   DiagramData,
   CanvasChange,
+  ConnectorUpdate,
   DSLError,
 } from './types';
 
@@ -75,6 +77,7 @@ const App: React.FC = () => {
   const [projectFilePath, setProjectFilePath] = useState<string | null>(null);
   const [projectData, setProjectData] = useState<ProjectData | null>(null);
   const [selectedElement, setSelectedElement] = useState<DiagramElement | null>(null);
+  const [selectedConnectorId, setSelectedConnectorId] = useState<string | null>(null);
   const [activeTool, setActiveTool] = useState<CanvasTool | null>(null);
   const [diagramType, setDiagramType] = useState<DiagramType>('class');
   const [dslText, setDslText] = useState('');
@@ -133,6 +136,7 @@ const App: React.FC = () => {
       setDslText('');
       setDslErrors([]);
       setSelectedElement(null);
+      setSelectedConnectorId(null);
     }
   }, []);
 
@@ -157,6 +161,7 @@ const App: React.FC = () => {
     if (firstId) store.openDiagram(firstId);
     setProjectFilePath(filePath);
     setSelectedElement(null);
+    setSelectedConnectorId(null);
     setActiveTool(null);
     refreshWorkspace();
     return null;
@@ -210,6 +215,7 @@ const App: React.FC = () => {
       if (id) {
         useProjectStore.getState().openDiagram(id);
         setSelectedElement(null);
+        setSelectedConnectorId(null);
         setActiveTool(null);
         refreshWorkspace();
       }
@@ -457,23 +463,32 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [handleSaveProject, handleOpenProject, handleUndo, handleRedo]);
 
-  const selectedIdRef = useRef<string | null>(null);
-  selectedIdRef.current = selectedElement?.id ?? null;
-  const handleSelectionChange = useCallback((ids: string[]) => {
+  const selectedIdRef = useRef<{ element: string | null; connector: string | null }>({ element: null, connector: null });
+  selectedIdRef.current = { element: selectedElement?.id ?? null, connector: selectedConnectorId };
+  const handleSelectionChange = useCallback((ids: string[], connectorIds: string[] = []) => {
     const next = ids.length === 1
       ? useDiagramStore.getState().diagram?.elements.find((element) => element.id === ids[0]) ?? null
       : null;
-    const previousId = selectedIdRef.current;
-    if ((next?.id ?? null) === previousId || !formGuardRef.current?.isDirty()) {
-      setSelectedElement(next);
+    const nextConnector = ids.length === 0 && connectorIds.length === 1 ? connectorIds[0] : null;
+    const previous = selectedIdRef.current;
+    const show = () => { setSelectedElement(next); setSelectedConnectorId(nextConnector); };
+    if (((next?.id ?? null) === previous.element && nextConnector === previous.connector) || !formGuardRef.current?.isDirty()) {
+      show();
       return;
     }
     // The form has unapplied input: ask first, and put the canvas selection back unless the user lets go of it.
     void resolvePendingForm().then((proceed) => {
-      if (proceed) setSelectedElement(next);
-      else setRestoreSelection((current) => ({ ids: previousId ? [previousId] : [], token: (current?.token ?? 0) + 1 }));
+      if (proceed) show();
+      else setRestoreSelection((current) => ({
+        ids: previous.element ? [previous.element] : [],
+        connectorIds: previous.connector ? [previous.connector] : [],
+        token: (current?.token ?? 0) + 1,
+      }));
     });
   }, [resolvePendingForm]);
+
+  const handleConnectorChange = useCallback((connectorId: string, changes: ConnectorUpdate): string | null =>
+    applyCanvasChange({ type: 'connector-update', connectorId, changes }), [applyCanvasChange]);
 
   const handleDiagramOpen = useCallback((id: string) => {
     void (async () => {
@@ -484,6 +499,7 @@ const App: React.FC = () => {
       if (store.activeDiagramId) workspace.getSession(store.activeDiagramId)?.sync.flushPendingText();
       store.openDiagram(id);
       setSelectedElement(null);
+      setSelectedConnectorId(null);
       setActiveTool(null);
       refreshWorkspace();
     })();
@@ -498,6 +514,7 @@ const App: React.FC = () => {
       store.closeDiagram(id);
       if (wasActive) {
         setSelectedElement(null);
+        setSelectedConnectorId(null);
         setActiveTool(null);
         refreshWorkspace();
       }
@@ -518,6 +535,7 @@ const App: React.FC = () => {
     dirty: projectStore.dirty,
   }));
   const activeDiagram = diagramStore.diagram;
+  const selectedConnector = activeDiagram?.connectors.find((connector) => connector.id === selectedConnectorId) ?? null;
   const activeSession = projectStore.activeDiagramId
     ? workspaceRef.current?.getSession(projectStore.activeDiagramId) : undefined;
   const diagramElements = Object.fromEntries(Object.entries(projectData?.diagrams ?? {}).map(([id, diagram]) => [
@@ -671,12 +689,23 @@ const App: React.FC = () => {
 
         {/* Right sidebar: Property Panel */}
         <div className={`sidebar sidebar-right${propertiesOpen ? ' is-open' : ''}`}>
-          <PropertyPanel
-            element={selectedElement}
-            onPropertyChange={handlePropertyChange}
-            disabled={dslErrors.length > 0}
-            registerGuard={registerFormGuard}
-          />
+          {selectedConnector ? (
+            <ConnectorPanel
+              key={selectedConnector.id}
+              connector={selectedConnector}
+              elements={activeDiagram?.elements ?? []}
+              onConnectorChange={handleConnectorChange}
+              disabled={dslErrors.length > 0}
+              registerGuard={registerFormGuard}
+            />
+          ) : (
+            <PropertyPanel
+              element={selectedElement}
+              onPropertyChange={handlePropertyChange}
+              disabled={dslErrors.length > 0}
+              registerGuard={registerFormGuard}
+            />
+          )}
         </div>
       </div>
       <div className="status-bar">

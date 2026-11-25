@@ -21,9 +21,10 @@ export interface UMLCanvasProps {
   /** Called when an element is double-clicked (for Property Panel) */
   onElementDoubleClick?: (elementId: string) => void;
   /** Called when selection changes */
-  onSelectionChange?: (selectedIds: string[]) => void;
+  /** The selected element ids and, second, the selected connector ids. */
+  onSelectionChange?: (selectedIds: string[], selectedConnectorIds: string[]) => void;
   /** Puts the selection back after the app refused a change (new `token` each time). */
-  restoreSelection?: { ids: string[]; token: number };
+  restoreSelection?: { ids: string[]; connectorIds?: string[]; token: number };
   /** Active element placement tool */
   activeTool?: CanvasTool | null;
   readOnly?: boolean;
@@ -81,8 +82,8 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
 
   // Notify parent of selection changes
   useEffect(() => {
-    onSelectionChange?.(Array.from(selectedElementIds));
-  }, [selectedElementIds, onSelectionChange]);
+    onSelectionChange?.(Array.from(selectedElementIds), Array.from(selectedConnectorIds));
+  }, [selectedElementIds, selectedConnectorIds, onSelectionChange]);
 
   // Sync viewport from diagram store
   useEffect(() => {
@@ -166,7 +167,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
     if (!restoreSelection || restoreSelection.token === restoredToken.current) return;
     restoredToken.current = restoreSelection.token;
     setSelectedElementIds(new Set(restoreSelection.ids));
-    setSelectedConnectorIds(new Set());
+    setSelectedConnectorIds(new Set(restoreSelection.connectorIds ?? []));
   }, [restoreSelection]);
 
   // Selection belongs to one diagram: never carry it over to another (A04.11).
