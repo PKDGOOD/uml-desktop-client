@@ -377,7 +377,8 @@ const App: React.FC = () => {
     if (id) workspaceRef.current?.editText(id, text);
   }, []);
 
-  const handleCanvasChange = useCallback((change: CanvasChange) => {
+  /** Applies a command; returns why it was refused, or null. */
+  const applyCanvasChange = useCallback((change: CanvasChange): string | null => {
     const id = useProjectStore.getState().activeDiagramId;
     const result = id ? workspaceRef.current?.tryEditCanvas(id, change) : undefined;
     if (result && !result.ok) {
@@ -388,8 +389,12 @@ const App: React.FC = () => {
           : 'This change cannot be written as valid DSL, so it was not applied.';
       if (result.reason !== 'busy') setFileNotice({ text, error: true });
       refreshWorkspace();
+      return text;
     }
+    return null;
   }, [refreshWorkspace]);
+
+  const handleCanvasChange = useCallback((change: CanvasChange) => { applyCanvasChange(change); }, [applyCanvasChange]);
 
   const handleUndo = useCallback(() => {
     const id = useProjectStore.getState().activeDiagramId;
@@ -458,8 +463,8 @@ const App: React.FC = () => {
   }, []);
 
   const handlePropertyChange = useCallback((elementId: string, properties: Partial<ElementProperties>) => {
-    handleCanvasChange({ type: 'element-update', elementId, properties });
-  }, [handleCanvasChange]);
+    return applyCanvasChange({ type: 'element-update', elementId, properties });
+  }, [applyCanvasChange]);
 
   const tabs: DiagramTabInfo[] = projectStore.openDiagramIds.map((id) => ({
     id,

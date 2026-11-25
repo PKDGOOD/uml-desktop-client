@@ -2,14 +2,18 @@
 // PropertyPanel - Editable properties for selected diagram element
 // =============================================================================
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { changesFrom, draftFrom, isDirty, localProblem, type FormDraft } from './formDraft';
 import type { DiagramElement, Attribute, Method, ElementProperties } from '../../types';
 
 export interface PropertyPanelProps {
   /** Currently selected element (null if nothing selected) */
   element: DiagramElement | null;
-  /** Called when a property is changed */
-  onPropertyChange: (elementId: string, properties: Partial<ElementProperties>) => void;
+  /**
+   * Called once when the user applies the form. Returns why it was refused, or
+   * null when it was applied.
+   */
+  onPropertyChange: (elementId: string, properties: Partial<ElementProperties>) => string | null | void;
   /** For Shared_Element: list of diagram names referencing this element */
   referencingDiagrams?: { id: string; name: string }[];
   /** Fields cannot be edited, for example while the DSL text has errors. */
@@ -25,106 +29,97 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const [attributesExpanded, setAttributesExpanded] = useState(true);
   const [methodsExpanded, setMethodsExpanded] = useState(true);
 
-  const handleNameChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!element) return;
-      onPropertyChange(element.id, { name: e.target.value });
-    },
-    [element, onPropertyChange],
-  );
+  // Typing edits a draft; nothing reaches the model until Apply (A05.01).
+  const [draft, setDraft] = useState<FormDraft | null>(element ? draftFrom(element.properties) : null);
+  const [problem, setProblem] = useState<{ field?: 'name'; message: string } | null>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const alertRef = useRef<HTMLDivElement>(null);
+  const dirty = !!element && !!draft && isDirty(element.properties, draft);
 
-  // A stereotype is committed on blur or Enter, without surrounding spaces; an empty
-  // field removes it. Committing per keystroke would refuse "my " while typing "my entity".
-  const [stereotypeDraft, setStereotypeDraft] = useState(element?.properties.stereotype ?? '');
+  // Whenever the saved element changes (another selection, Apply, undo, a text edit) the draft is
+  // reloaded from it, so a stale draft can never be applied over a newer model.
+  const savedKey = element ? `${element.id}:${JSON.stringify(element.properties)}` : '';
   useEffect(() => {
-    setStereotypeDraft(element?.properties.stereotype ?? '');
-  }, [element?.id, element?.properties.stereotype]);
+    setDraft(element ? draftFrom(element.properties) : null);
+    setProblem(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedKey]);
 
-  const commitStereotype = useCallback(() => {
-    if (!element) return;
-    const value = stereotypeDraft.trim();
-    if (value === (element.properties.stereotype ?? '')) {
-      setStereotypeDraft(value);
+  const update = useCallback((change: Partial<FormDraft>) => {
+    setDraft((current) => (current ? { ...current, ...change } : current));
+    setProblem(null);
+  }, []);
+
+  const apply = useCallback(() => {
+    if (!element || !draft) return;
+    const local = localProblem(draft);
+    const refusal = local ? local.message : (() => {
+      const changes = changesFrom(element.properties, draft);
+      return Object.keys(changes).length === 0 ? null : onPropertyChange(element.id, changes) ?? null;
+    })();
+    if (refusal) {
+      setProblem({ field: local?.field ?? (/name/i.test(refusal) ? 'name' : undefined), message: refusal });
       return;
     }
-    onPropertyChange(element.id, { stereotype: value === '' ? undefined : value });
-  }, [element, onPropertyChange, stereotypeDraft]);
+    setProblem(null);
+  }, [element, draft, onPropertyChange]);
 
-  const handleVisibilityChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      if (!element) return;
-      onPropertyChange(element.id, {
-        visibility: e.target.value as ElementProperties['visibility'],
-      });
-    },
-    [element, onPropertyChange],
-  );
+  const cancel = useCallback(() => {
+    if (!element) return;
+    setDraft(draftFrom(element.properties));
+    setProblem(null);
+  }, [element]);
+
+  // An invalid Apply moves focus to the field at fault, or to the message.
+  useEffect(() => {
+    if (!problem) return;
+    (problem.field === 'name' ? nameRef.current : alertRef.current)?.focus();
+  }, [problem]);
 
   // --- Attribute editing ---
 
-  const handleAttributeChange = useCallback(
-    (index: number, field: keyof Attribute, value: string) => {
-      if (!element?.properties.attributes) return;
-      const updated = [...element.properties.attributes];
-      updated[index] = { ...updated[index], [field]: value };
-      onPropertyChange(element.id, { attributes: updated });
-    },
-    [element, onPropertyChange],
-  );
+  const handleAttributeChange = (index: number, field: keyof Attribute, value: string) => {
+    if (!draft) return;
+    const updated = [...draft.attributes];
+    updated[index] = { ...updated[index], [field]: value };
+    update({ attributes: updated });
+  };
 
-  const handleAddAttribute = useCallback(() => {
-    if (!element) return;
-    const attrs = [...(element.properties.attributes ?? [])];
+  const handleAddAttribute = () => {
+    if (!draft || !element) return;
+    const attrs = [...draft.attributes];
     // An enum value is only a name in the DSL.
     attrs.push(element.type === 'enum'
       ? { name: `VALUE${attrs.length + 1}`, type: '', visibility: 'public' }
       : { name: 'newAttr', type: 'string', visibility: 'private' });
-    onPropertyChange(element.id, { attributes: attrs });
-  }, [element, onPropertyChange]);
+    update({ attributes: attrs });
+  };
 
-  const handleRemoveAttribute = useCallback(
-    (index: number) => {
-      if (!element?.properties.attributes) return;
-      const updated = element.properties.attributes.filter((_, i) => i !== index);
-      onPropertyChange(element.id, { attributes: updated });
-    },
-    [element, onPropertyChange],
-  );
+  const handleRemoveAttribute = (index: number) => {
+    if (!draft) return;
+    update({ attributes: draft.attributes.filter((_, i) => i !== index) });
+  };
 
   // --- Method editing ---
 
-  const handleMethodChange = useCallback(
-    (index: number, field: keyof Method, value: string) => {
-      if (!element?.properties.methods) return;
-      const updated = [...element.properties.methods];
-      updated[index] = { ...updated[index], [field]: value } as Method;
-      onPropertyChange(element.id, { methods: updated });
-    },
-    [element, onPropertyChange],
-  );
+  const handleMethodChange = (index: number, field: keyof Method, value: string) => {
+    if (!draft) return;
+    const updated = [...draft.methods];
+    updated[index] = { ...updated[index], [field]: value } as Method;
+    update({ methods: updated });
+  };
 
-  const handleAddMethod = useCallback(() => {
-    if (!element) return;
-    const methods = [...(element.properties.methods ?? [])];
-    methods.push({
-      name: 'newMethod',
-      returnType: 'void',
-      parameters: [],
-      visibility: 'public',
-    });
-    onPropertyChange(element.id, { methods });
-  }, [element, onPropertyChange]);
+  const handleAddMethod = () => {
+    if (!draft) return;
+    update({ methods: [...draft.methods, { name: 'newMethod', returnType: 'void', parameters: [], visibility: 'public' }] });
+  };
 
-  const handleRemoveMethod = useCallback(
-    (index: number) => {
-      if (!element?.properties.methods) return;
-      const updated = element.properties.methods.filter((_, i) => i !== index);
-      onPropertyChange(element.id, { methods: updated });
-    },
-    [element, onPropertyChange],
-  );
+  const handleRemoveMethod = (index: number) => {
+    if (!draft) return;
+    update({ methods: draft.methods.filter((_, i) => i !== index) });
+  };
 
-  if (!element) {
+  if (!element || !draft) {
     return (
       <div className="property-panel">
         <div className="panel-header">
@@ -138,7 +133,6 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
     );
   }
 
-  const { properties } = element;
   const hasAttributes = ['class', 'interface', 'abstract-class', 'enum'].includes(element.type);
   const hasMethods = ['class', 'interface', 'abstract-class'].includes(element.type);
 
@@ -154,8 +148,10 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
       {/* Name */}
       <label className="field-label">Name</label>
       <input
-        value={properties.name}
-        onChange={handleNameChange}
+        ref={nameRef}
+        value={draft.name}
+        onChange={(e) => update({ name: e.target.value })}
+        aria-invalid={problem?.field === 'name' || undefined}
         className="field-input"
       />
 
@@ -168,10 +164,8 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
       {/* Stereotype */}
       <label className="field-label">Stereotype</label>
       <input
-        value={stereotypeDraft}
-        onChange={(e) => setStereotypeDraft(e.target.value)}
-        onBlur={commitStereotype}
-        onKeyDown={(e) => { if (e.key === 'Enter') commitStereotype(); }}
+        value={draft.stereotype}
+        onChange={(e) => update({ stereotype: e.target.value })}
         placeholder="e.g. «entity»"
         className="field-input"
       />
@@ -179,8 +173,8 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
       {/* Visibility */}
       <label className="field-label">Visibility</label>
       <select
-        value={properties.visibility ?? 'public'}
-        onChange={handleVisibilityChange}
+        value={draft.visibility}
+        onChange={(e) => update({ visibility: e.target.value as FormDraft['visibility'] })}
         className="field-select"
       >
         <option value="public">public (+)</option>
@@ -197,11 +191,11 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
             className="section-header"
           >
             <span>{attributesExpanded ? 'v' : '>'} Attributes</span>
-            <span>{properties.attributes?.length ?? 0}</span>
+            <span>{draft.attributes.length}</span>
           </div>
           {attributesExpanded && (
             <div>
-              {(properties.attributes ?? []).map((attr, i) => (
+              {draft.attributes.map((attr, i) => (
                 <div key={i} className="property-row">
                   <input
                     value={attr.name}
@@ -240,11 +234,11 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
             className="section-header"
           >
             <span>{methodsExpanded ? 'v' : '>'} Methods</span>
-            <span>{properties.methods?.length ?? 0}</span>
+            <span>{draft.methods.length}</span>
           </div>
           {methodsExpanded && (
             <div>
-              {(properties.methods ?? []).map((method, i) => (
+              {draft.methods.map((method, i) => (
                 <div key={i} className="property-row">
                   <input
                     value={method.name}
@@ -288,6 +282,13 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
           </ul>
         </>
       )}
+      <div className="form-actions">
+        {problem && (
+          <div className="form-error" role="alert" tabIndex={-1} ref={alertRef}>{problem.message}</div>
+        )}
+        <button className="panel-button" onClick={apply} disabled={!dirty}>Apply</button>
+        <button className="panel-button" onClick={cancel} disabled={!dirty}>Cancel</button>
+      </div>
       </fieldset>
     </div>
   );

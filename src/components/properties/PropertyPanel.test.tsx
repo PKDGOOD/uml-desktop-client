@@ -18,7 +18,13 @@ describe('A04.09 property panel while the DSL has errors', () => {
 
   it('leaves fields editable otherwise', () => {
     const html = renderToStaticMarkup(createElement(PropertyPanel, { element, onPropertyChange: () => {} }));
-    expect(html).not.toContain('disabled=""');
+    expect(html).not.toContain('<fieldset class="property-body" disabled');
     expect(html).not.toContain('Fix the DSL errors');
+  });
+
+  it('starts clean: Apply and Cancel are disabled until something is typed', () => {
+    const html = renderToStaticMarkup(createElement(PropertyPanel, { element, onPropertyChange: () => {} }));
+    expect(html).toMatch(/<button class="panel-button" disabled="">Apply<\/button>/);
+    expect(html).toMatch(/<button class="panel-button" disabled="">Cancel<\/button>/);
   });
 });
