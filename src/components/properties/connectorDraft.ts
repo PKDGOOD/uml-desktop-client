@@ -45,8 +45,14 @@ export function multiplicityProblems(draft: ConnectorDraft): Partial<Record<'sou
 export const isConnectorDirty = (original: Connector, draft: ConnectorDraft): boolean =>
   Object.keys(connectorChanges(original, draft)).length > 0;
 
-/** Swap the two ends in the draft. */
-export const swapEnds = (draft: ConnectorDraft): ConnectorDraft => ({ ...draft, sourceId: draft.targetId, targetId: draft.sourceId });
+/** Swap the two ends in the draft; each multiplicity stays with its element. */
+export const swapEnds = (draft: ConnectorDraft): ConnectorDraft => ({
+  ...draft,
+  sourceId: draft.targetId,
+  targetId: draft.sourceId,
+  sourceMultiplicity: draft.targetMultiplicity,
+  targetMultiplicity: draft.sourceMultiplicity,
+});
 
 /** One line that says what the connector joins and in which direction. */
 export function describeConnector(connector: Pick<Connector, 'type' | 'sourceId' | 'targetId'>, nameOf: (id: string) => string): string {

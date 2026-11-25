@@ -54,3 +54,12 @@ describe('A05.05 multiplicity fields', () => {
     expect(multiplicityProblems({ ...draft, sourceMultiplicity: '0..*', targetMultiplicity: '' })).toEqual({});
   });
 });
+
+describe('A05.05 swapping direction', () => {
+  it('moves each multiplicity along with its element', () => {
+    const counted: Connector = { ...connector, sourceMultiplicity: '1', targetMultiplicity: '0..*' };
+    const swapped = swapEnds(connectorDraftFrom(counted));
+    expect(connectorChanges(counted, swapped)).toEqual({ sourceId: 'b', targetId: 'a', sourceMultiplicity: '0..*', targetMultiplicity: '1' });
+    expect(isConnectorDirty(counted, swapEnds(swapped))).toBe(false);
+  });
+});
