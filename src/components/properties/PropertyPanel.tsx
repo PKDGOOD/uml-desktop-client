@@ -36,17 +36,12 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   const alertRef = useRef<HTMLDivElement>(null);
   const dirty = !!element && !!draft && isDirty(element.properties, draft);
 
-  // Another element, or the saved values changing underneath a clean form (undo, text edit), reloads the draft.
+  // Whenever the saved element changes (another selection, Apply, undo, a text edit) the draft is
+  // reloaded from it, so a stale draft can never be applied over a newer model.
   const savedKey = element ? `${element.id}:${JSON.stringify(element.properties)}` : '';
-  const loadedKey = useRef(savedKey);
-  const loadedId = useRef(element?.id);
   useEffect(() => {
-    if (element?.id !== loadedId.current || !dirty) {
-      setDraft(element ? draftFrom(element.properties) : null);
-      setProblem(null);
-    }
-    loadedKey.current = savedKey;
-    loadedId.current = element?.id;
+    setDraft(element ? draftFrom(element.properties) : null);
+    setProblem(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedKey]);
 
