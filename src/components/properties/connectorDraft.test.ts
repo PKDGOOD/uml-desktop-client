@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Connector } from '../../types';
 import {
-  connectorChanges, connectorDraftFrom, describeConnector, isConnectorDirty, swapEnds,
+  connectorChanges, connectorDraftFrom, describeConnector, isConnectorDirty, multiplicityProblems, swapEnds,
 } from './connectorDraft';
 
 const connector: Connector = { id: 'c', type: 'directed-association', sourceId: 'a', targetId: 'b', label: 'places', properties: {} };
@@ -33,5 +33,33 @@ describe('A05.04 connector form', () => {
 
   it('describes the direction with element names', () => {
     expect(describeConnector(connector, (id) => names[id])).toBe('Customer → Order (directed association)');
+  });
+});
+
+describe('A05.05 multiplicity fields', () => {
+  it('reports changed ends and clears an emptied one', () => {
+    const withMult: Connector = { ...connector, sourceMultiplicity: '1', targetMultiplicity: '*' };
+    const draft = { ...connectorDraftFrom(withMult), sourceMultiplicity: ' 0..1 ', targetMultiplicity: '' };
+    const changes = connectorChanges(withMult, draft);
+    expect(changes.sourceMultiplicity).toBe('0..1');
+    expect('targetMultiplicity' in changes && changes.targetMultiplicity === undefined).toBe(true);
+    expect(isConnectorDirty(withMult, connectorDraftFrom(withMult))).toBe(false);
+  });
+
+  it('names an invalid range and the end it is on', () => {
+    const draft = { ...connectorDraftFrom(connector), sourceMultiplicity: '3..1', targetMultiplicity: 'many' };
+    const problems = multiplicityProblems(draft);
+    expect(problems.sourceMultiplicity).toMatch(/^From multiplicity: .*lower bound 3 is above the upper bound 1/);
+    expect(problems.targetMultiplicity).toMatch(/^To multiplicity: use n, \*, n\.\.m or n\.\.\*/);
+    expect(multiplicityProblems({ ...draft, sourceMultiplicity: '0..*', targetMultiplicity: '' })).toEqual({});
+  });
+});
+
+describe('A05.05 swapping direction', () => {
+  it('moves each multiplicity along with its element', () => {
+    const counted: Connector = { ...connector, sourceMultiplicity: '1', targetMultiplicity: '0..*' };
+    const swapped = swapEnds(connectorDraftFrom(counted));
+    expect(connectorChanges(counted, swapped)).toEqual({ sourceId: 'b', targetId: 'a', sourceMultiplicity: '0..*', targetMultiplicity: '1' });
+    expect(isConnectorDirty(counted, swapEnds(swapped))).toBe(false);
   });
 });

@@ -11,7 +11,7 @@ const elements = [el('a', 'Customer'), el('b', 'Order')];
 const connector: Connector = { id: 'c', type: 'association', sourceId: 'a', targetId: 'b', label: 'places', properties: {} };
 
 describe('A05.04 connector panel', () => {
-  const html = renderToStaticMarkup(createElement(ConnectorPanel, { connector, elements, onConnectorChange: () => null }));
+  const html = renderToStaticMarkup(createElement(ConnectorPanel, { connector, elements, diagramType: 'class', onConnectorChange: () => null }));
 
   it('shows the direction by element name and offers both ends', () => {
     expect(html).toContain('Customer → Order (association)');
@@ -26,8 +26,29 @@ describe('A05.04 connector panel', () => {
   });
 
   it('locks while the DSL has errors', () => {
-    const locked = renderToStaticMarkup(createElement(ConnectorPanel, { connector, elements, onConnectorChange: () => null, disabled: true }));
+    const locked = renderToStaticMarkup(createElement(ConnectorPanel, { connector, elements, diagramType: 'class', onConnectorChange: () => null, disabled: true }));
     expect(locked).toContain('Fix the DSL errors to edit connections.');
     expect(locked).toContain('<fieldset class="property-body" disabled=""');
+  });
+
+  it('offers multiplicity fields only for class relationships that can count', () => {
+    const render = (type: Connector['type'], diagramType: 'class' | 'usecase') => renderToStaticMarkup(createElement(ConnectorPanel, {
+      connector: { ...connector, type }, elements, diagramType, onConnectorChange: () => null,
+    }));
+    for (const type of ['association', 'directed-association', 'aggregation', 'composition'] as const) {
+      expect(render(type, 'class')).toContain('connector-source-multiplicity');
+    }
+    for (const type of ['inheritance', 'realization', 'dependency', 'usage'] as const) {
+      expect(render(type, 'class')).not.toContain('multiplicity');
+    }
+    expect(render('association', 'usecase')).not.toContain('multiplicity');
+  });
+
+  it('shows the stored multiplicities', () => {
+    const html = renderToStaticMarkup(createElement(ConnectorPanel, {
+      connector: { ...connector, sourceMultiplicity: '1', targetMultiplicity: '0..*' }, elements, diagramType: 'class', onConnectorChange: () => null,
+    }));
+    expect(html).toContain('id="connector-source-multiplicity"');
+    expect(html).toContain('value="0..*"');
   });
 });

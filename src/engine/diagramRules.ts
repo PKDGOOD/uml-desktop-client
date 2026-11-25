@@ -23,6 +23,10 @@ const VISIBILITIES = new Set(['public', 'private', 'protected', 'package']);
 const CLASSIFIERS = new Set<ElementType>(['class', 'interface', 'abstract-class', 'enum']);
 /** Class relations whose ends carry a multiplicity (D-01). */
 const MULTIPLICITY_RELATIONS = new Set<ConnectorType>(['association', 'directed-association', 'aggregation', 'composition']);
+
+/** Whether a connector of this type in this kind of diagram can carry multiplicities (class relationships that count). */
+export const multiplicityApplies = (diagramType: DiagramType, connectorType: ConnectorType): boolean =>
+  diagramType === 'class' && MULTIPLICITY_RELATIONS.has(connectorType);
 /** Kinds whose DSL line has no label. */
 const UNLABELED = new Set<ConnectorType>(['include', 'extend']);
 const MESSAGES = new Set<ConnectorType>(['sync-message', 'async-message', 'return-message']);
@@ -192,7 +196,7 @@ export function validateDiagramProperties(diagram: DiagramData): DiagramRuleErro
     for (const end of ['sourceMultiplicity', 'targetMultiplicity'] as const) {
       const value = connector[end];
       if (value === undefined) continue;
-      if (diagram.type !== 'class' || !MULTIPLICITY_RELATIONS.has(connector.type)) {
+      if (!multiplicityApplies(diagram.type, connector.type)) {
         errors.push({ message: `A ${connector.type} in a ${diagram.type} diagram has no multiplicity`, path: `${path}.${end}` });
         continue;
       }
