@@ -26,6 +26,7 @@ Changes are documented here before a tagged release. The package version `0.1.0`
 - When a file's stored text and diagram disagree, Open asks which to keep for each diagram instead of picking one; the project opens unsaved.
 
 ### Known issues
+- Unapplied property edits are no longer lost silently: changing selection, switching tabs, saving, exporting or undoing asks whether to apply, discard or keep editing.
 - The property form now buffers typing: Apply commits all changed fields as one undoable edit, Cancel restores the saved values, and a refused Apply explains why next to the form.
 - Undo and redo cover text edits, including invalid drafts, and canvas edits in one order per diagram.
 - While the DSL text has errors, the canvas is labeled as the last valid version and the property panel is disabled with a note; the draft itself is kept and saved.

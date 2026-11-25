@@ -9,6 +9,8 @@ import { ProjectTree } from './components/project/ProjectTree';
 import { DiagramTabs, type DiagramTabInfo } from './components/tabs/DiagramTabs';
 import { SplitView } from './components/layout/SplitView';
 import { PropertyPanel } from './components/properties/PropertyPanel';
+import { PendingFormDialog } from './components/properties/PendingFormDialog';
+import { resolvePending, type PendingChoice, type PendingFormGuard } from './components/properties/pendingForm';
 import { Toolbar } from './components/toolbar/Toolbar';
 import { UMLCanvas } from './components/canvas/UMLCanvas';
 import { DSLEditor } from './components/editor/DSLEditor';
@@ -87,6 +89,22 @@ const App: React.FC = () => {
   const workspaceRef = useRef<ProjectSession | null>(null);
   const fileBusyRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Unapplied property-form input is settled before selection, tab, save or undo move on (A05.02).
+  const formGuardRef = useRef<PendingFormGuard | null>(null);
+  const registerFormGuard = useCallback((guard: PendingFormGuard | null) => { formGuardRef.current = guard; }, []);
+  const [formPrompt, setFormPrompt] = useState<{ label: string; resolve: (choice: PendingChoice) => void } | null>(null);
+  const formDecision = useRef<Promise<boolean> | null>(null);
+  const resolvePendingForm = useCallback((): Promise<boolean> => {
+    // A second operation while the question is open waits for the same answer instead of replacing it.
+    if (formDecision.current) return formDecision.current;
+    const decision = resolvePending(
+      formGuardRef.current,
+      (label) => new Promise<PendingChoice>((resolve) => setFormPrompt({ label, resolve })),
+    ).finally(() => { formDecision.current = null; });
+    formDecision.current = decision;
+    return decision;
+  }, []);
+  const [restoreSelection, setRestoreSelection] = useState<{ ids: string[]; token: number } | undefined>();
   const canvasObserverRef = useRef<ResizeObserver | null>(null);
 
   const refreshWorkspace = useCallback(() => {
@@ -177,8 +195,9 @@ const App: React.FC = () => {
     if (!fileBusyRef.current) setCreateMode('project');
   }, []);
 
-  const handleCreate = useCallback((name: string, type: DiagramType, folder: string) => {
+  const handleCreate = useCallback(async (name: string, type: DiagramType, folder: string) => {
     if (fileBusyRef.current) return;
+    if (!(await resolvePendingForm())) return;
     if (createMode === 'project') {
       if (!confirmUnsavedChanges()) return;
       const problem = replaceProject(createProject(name), null);
@@ -197,18 +216,19 @@ const App: React.FC = () => {
     }
     setCreateMode(null);
     setFileNotice(null);
-  }, [createMode, confirmUnsavedChanges, replaceProject, refreshWorkspace]);
+  }, [createMode, confirmUnsavedChanges, replaceProject, refreshWorkspace, resolvePendingForm]);
 
-  const handleExamples = useCallback(() => {
-    if (fileBusyRef.current || !confirmUnsavedChanges()) return;
+  const handleExamples = useCallback(async () => {
+    if (fileBusyRef.current || !(await resolvePendingForm()) || !confirmUnsavedChanges()) return;
     const problem = replaceProject(createExampleProject('Example Project'), null);
     setFileNotice(problem ? { text: `Could not load the examples: ${problem}`, error: true } : null);
-  }, [confirmUnsavedChanges, replaceProject]);
+  }, [confirmUnsavedChanges, replaceProject, resolvePendingForm]);
 
   const handleExport = useCallback(async (format: 'svg' | 'png') => {
     const id = useProjectStore.getState().activeDiagramId;
     const session = id ? workspaceRef.current?.getSession(id) : undefined;
     if (!session || fileBusyRef.current) return;
+    if (!(await resolvePendingForm())) return;
     if (!session.sync.flushPendingText()) {
       setFileNotice({ text: 'Fix the DSL errors before exporting. Save still keeps your draft.', error: true });
       return;
@@ -227,7 +247,7 @@ const App: React.FC = () => {
     } catch (error) {
       setFileNotice({ text: `Could not export: ${(error as Error).message}`, error: true });
     } finally { fileBusyRef.current = false; setFileBusy(false); }
-  }, []);
+  }, [resolvePendingForm]);
 
   const rememberProject = async (filePath: string) => {
     try {
@@ -240,6 +260,7 @@ const App: React.FC = () => {
   const handleSaveProject = useCallback(async () => {
     const workspace = workspaceRef.current;
     if (!workspace || fileBusyRef.current) return;
+    if (!(await resolvePendingForm())) return;
     fileBusyRef.current = true;
     setFileBusy(true);
     setFileNotice({ text: 'Saving project…' });
@@ -334,6 +355,7 @@ const App: React.FC = () => {
 
   const handleOpenProject = useCallback(async () => {
     if (fileBusyRef.current) return;
+    if (!(await resolvePendingForm())) return;
     const api = window.electronAPI;
     if (!api) {
       fileInputRef.current?.click();
@@ -354,12 +376,13 @@ const App: React.FC = () => {
       fileBusyRef.current = false;
       setFileBusy(false);
     }
-  }, [loadProjectContent]);
+  }, [loadProjectContent, resolvePendingForm]);
 
   const handleBrowserFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file || fileBusyRef.current) return;
+    if (!(await resolvePendingForm())) return;
     fileBusyRef.current = true;
     setFileBusy(true);
     try {
@@ -370,7 +393,7 @@ const App: React.FC = () => {
       fileBusyRef.current = false;
       setFileBusy(false);
     }
-  }, [loadProjectContent]);
+  }, [loadProjectContent, resolvePendingForm]);
 
   const handleDslChange = useCallback((text: string) => {
     const id = useProjectStore.getState().activeDiagramId;
@@ -397,14 +420,20 @@ const App: React.FC = () => {
   const handleCanvasChange = useCallback((change: CanvasChange) => { applyCanvasChange(change); }, [applyCanvasChange]);
 
   const handleUndo = useCallback(() => {
-    const id = useProjectStore.getState().activeDiagramId;
-    if (id) workspaceRef.current?.undo(id);
-  }, []);
+    void (async () => {
+      if (!(await resolvePendingForm())) return;
+      const id = useProjectStore.getState().activeDiagramId;
+      if (id) workspaceRef.current?.undo(id);
+    })();
+  }, [resolvePendingForm]);
 
   const handleRedo = useCallback(() => {
-    const id = useProjectStore.getState().activeDiagramId;
-    if (id) workspaceRef.current?.redo(id);
-  }, []);
+    void (async () => {
+      if (!(await resolvePendingForm())) return;
+      const id = useProjectStore.getState().activeDiagramId;
+      if (id) workspaceRef.current?.redo(id);
+    })();
+  }, [resolvePendingForm]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -428,35 +457,52 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [handleSaveProject, handleOpenProject, handleUndo, handleRedo]);
 
+  const selectedIdRef = useRef<string | null>(null);
+  selectedIdRef.current = selectedElement?.id ?? null;
   const handleSelectionChange = useCallback((ids: string[]) => {
-    setSelectedElement(ids.length === 1
+    const next = ids.length === 1
       ? useDiagramStore.getState().diagram?.elements.find((element) => element.id === ids[0]) ?? null
-      : null);
-  }, []);
+      : null;
+    const previousId = selectedIdRef.current;
+    if ((next?.id ?? null) === previousId || !formGuardRef.current?.isDirty()) {
+      setSelectedElement(next);
+      return;
+    }
+    // The form has unapplied input: ask first, and put the canvas selection back unless the user lets go of it.
+    void resolvePendingForm().then((proceed) => {
+      if (proceed) setSelectedElement(next);
+      else setRestoreSelection((current) => ({ ids: previousId ? [previousId] : [], token: (current?.token ?? 0) + 1 }));
+    });
+  }, [resolvePendingForm]);
 
   const handleDiagramOpen = useCallback((id: string) => {
-    const workspace = workspaceRef.current;
-    const store = useProjectStore.getState();
-    if (!workspace?.getSession(id) || store.activeDiagramId === id) return;
-    if (store.activeDiagramId) workspace.getSession(store.activeDiagramId)?.sync.flushPendingText();
-    store.openDiagram(id);
-    setSelectedElement(null);
-    setActiveTool(null);
-    refreshWorkspace();
-    return null;
-  }, [refreshWorkspace]);
-
-  const handleTabClose = useCallback((id: string) => {
-    const store = useProjectStore.getState();
-    workspaceRef.current?.getSession(id)?.sync.flushPendingText();
-    const wasActive = store.activeDiagramId === id;
-    store.closeDiagram(id);
-    if (wasActive) {
+    void (async () => {
+      const workspace = workspaceRef.current;
+      const store = useProjectStore.getState();
+      if (!workspace?.getSession(id) || store.activeDiagramId === id) return;
+      if (!(await resolvePendingForm())) return;
+      if (store.activeDiagramId) workspace.getSession(store.activeDiagramId)?.sync.flushPendingText();
+      store.openDiagram(id);
       setSelectedElement(null);
       setActiveTool(null);
       refreshWorkspace();
-    }
-  }, [refreshWorkspace]);
+    })();
+  }, [refreshWorkspace, resolvePendingForm]);
+
+  const handleTabClose = useCallback((id: string) => {
+    void (async () => {
+      const store = useProjectStore.getState();
+      const wasActive = store.activeDiagramId === id;
+      if (wasActive && !(await resolvePendingForm())) return;
+      workspaceRef.current?.getSession(id)?.sync.flushPendingText();
+      store.closeDiagram(id);
+      if (wasActive) {
+        setSelectedElement(null);
+        setActiveTool(null);
+        refreshWorkspace();
+      }
+    })();
+  }, [refreshWorkspace, resolvePendingForm]);
 
   const handleTreeChange = useCallback((tree: ProjectTreeNode[]) => {
     workspaceRef.current?.setTree(tree);
@@ -485,6 +531,8 @@ const App: React.FC = () => {
 
   return (
     <div className="app-shell">
+      {formPrompt && <PendingFormDialog label={formPrompt.label}
+        onChoose={(choice) => { formPrompt.resolve(choice); setFormPrompt(null); }} />}
       {createMode && <CreateDialog mode={createMode} tree={projectStore.tree} onCancel={() => setCreateMode(null)} onCreate={handleCreate} />}
       {conflictReview && <ConflictDialog conflicts={conflictReview.conflicts}
         onCancel={() => conflictReview.decide(null)} onOpen={(choices) => conflictReview.decide(choices)} />}
@@ -526,7 +574,7 @@ const App: React.FC = () => {
         >
           Redo
         </button>
-        <button className="menu-button" disabled={fileBusy} onClick={() => setHistoryOpen(true)}>History</button>
+        <button className="menu-button" disabled={fileBusy} onClick={() => { void resolvePendingForm().then((proceed) => { if (proceed) setHistoryOpen(true); }); }}>History</button>
         <button className="menu-button properties-toggle" aria-expanded={propertiesOpen} onClick={() => setPropertiesOpen((open) => !open)}>Properties</button>
         <button onClick={() => handleExport('svg')} disabled={fileBusy || !activeDiagram?.elements.length || dslErrors.length > 0} className="menu-button">Export SVG</button>
         <button onClick={() => handleExport('png')} disabled={fileBusy || !activeDiagram?.elements.length || dslErrors.length > 0} className="menu-button">Export PNG</button>
@@ -614,6 +662,7 @@ const App: React.FC = () => {
                   onCanvasChange={handleCanvasChange}
                   onElementDoubleClick={(id) => { handleSelectionChange([id]); setPropertiesOpen(true); }}
                   onSelectionChange={handleSelectionChange}
+                  restoreSelection={restoreSelection}
                 />
               </div>
             }
@@ -626,6 +675,7 @@ const App: React.FC = () => {
             element={selectedElement}
             onPropertyChange={handlePropertyChange}
             disabled={dslErrors.length > 0}
+            registerGuard={registerFormGuard}
           />
         </div>
       </div>

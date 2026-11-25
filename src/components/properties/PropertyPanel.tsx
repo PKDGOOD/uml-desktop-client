@@ -4,6 +4,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { changesFrom, draftFrom, isDirty, localProblem, type FormDraft } from './formDraft';
+import type { PendingFormGuard } from './pendingForm';
 import type { DiagramElement, Attribute, Method, ElementProperties } from '../../types';
 
 export interface PropertyPanelProps {
@@ -18,6 +19,8 @@ export interface PropertyPanelProps {
   referencingDiagrams?: { id: string; name: string }[];
   /** Fields cannot be edited, for example while the DSL text has errors. */
   disabled?: boolean;
+  /** Lets the app settle a dirty form before it changes selection or saves. */
+  registerGuard?: (guard: PendingFormGuard | null) => void;
 }
 
 export const PropertyPanel: React.FC<PropertyPanelProps> = ({
@@ -25,6 +28,7 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   onPropertyChange,
   referencingDiagrams = [],
   disabled = false,
+  registerGuard,
 }) => {
   const [attributesExpanded, setAttributesExpanded] = useState(true);
   const [methodsExpanded, setMethodsExpanded] = useState(true);
@@ -50,8 +54,9 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
     setProblem(null);
   }, []);
 
-  const apply = useCallback(() => {
-    if (!element || !draft) return;
+  /** Applies the draft; returns why it was refused, or null. */
+  const apply = useCallback((): string | null => {
+    if (!element || !draft) return null;
     const local = localProblem(draft);
     const refusal = local ? local.message : (() => {
       const changes = changesFrom(element.properties, draft);
@@ -59,9 +64,10 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
     })();
     if (refusal) {
       setProblem({ field: local?.field ?? (/name/i.test(refusal) ? 'name' : undefined), message: refusal });
-      return;
+      return refusal;
     }
     setProblem(null);
+    return null;
   }, [element, draft, onPropertyChange]);
 
   const cancel = useCallback(() => {
@@ -69,6 +75,22 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
     setDraft(draftFrom(element.properties));
     setProblem(null);
   }, [element]);
+
+  const discard = useCallback(() => {
+    setDraft(element ? draftFrom(element.properties) : null);
+    setProblem(null);
+  }, [element]);
+
+  useEffect(() => {
+    if (!registerGuard) return;
+    registerGuard(element && draft ? {
+      label: element.properties.name,
+      isDirty: () => isDirty(element.properties, draft),
+      apply,
+      discard,
+    } : null);
+  }, [registerGuard, element, draft, apply, discard]);
+  useEffect(() => () => registerGuard?.(null), [registerGuard]);
 
   // An invalid Apply moves focus to the field at fault, or to the message.
   useEffect(() => {
@@ -286,7 +308,7 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
         {problem && (
           <div className="form-error" role="alert" tabIndex={-1} ref={alertRef}>{problem.message}</div>
         )}
-        <button className="panel-button" onClick={apply} disabled={!dirty}>Apply</button>
+        <button className="panel-button" onClick={() => { apply(); }} disabled={!dirty}>Apply</button>
         <button className="panel-button" onClick={cancel} disabled={!dirty}>Cancel</button>
       </div>
       </fieldset>
