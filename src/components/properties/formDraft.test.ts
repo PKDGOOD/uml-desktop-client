@@ -45,3 +45,23 @@ describe('A05.01 buffered element form', () => {
     expect(localProblem(draftFrom(saved))).toBeNull();
   });
 });
+
+describe('A05.03 moving members', () => {
+  it('moves an item by one place and clamps at the ends', async () => {
+    const { moveItem } = await import('./formDraft');
+    expect(moveItem(['a', 'b', 'c'], 2, -1)).toEqual(['a', 'c', 'b']);
+    expect(moveItem(['a', 'b', 'c'], 0, -1)).toEqual(['a', 'b', 'c']);
+    expect(moveItem(['a', 'b', 'c'], 2, 1)).toEqual(['a', 'b', 'c']);
+    expect(moveItem(['a', 'b', 'c'], 0, 2)).toEqual(['c', 'b', 'a'].reverse().length ? ['b', 'c', 'a'] : []);
+  });
+
+  it('a reorder alone is a change', () => {
+    const base: ElementProperties = {
+      name: 'C',
+      attributes: [{ name: 'a', type: 'int', visibility: 'private' }, { name: 'b', type: 'int', visibility: 'private' }],
+    };
+    const draft = draftFrom(base);
+    draft.attributes.reverse();
+    expect(changesFrom(base, draft).attributes?.map((a) => a.name)).toEqual(['b', 'a']);
+  });
+});
