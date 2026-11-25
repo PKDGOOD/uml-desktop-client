@@ -48,7 +48,11 @@ describe('A03.03 names, members and multiplicity', () => {
     expect(['order', '_id', 'Größe', '주문번호', 'a1'].map(isIdentifier)).toEqual([true, true, true, true, true]);
     expect(['', '1st', 'two words', 'a-b', 'x:'].map(isIdentifier)).toEqual([false, false, false, false, false]);
     expect(isTypeExpression('Map<String, int>')).toBe(true);
-    expect(isTypeExpression('Map<String, int>', true)).toBe(false);
+    expect(isTypeExpression('Map<String, int>', true)).toBe(true);
+    expect(isTypeExpression('int, int', true)).toBe(false);
+    expect(isTypeExpression('Map<String, List<int>>')).toBe(true);
+    expect(isTypeExpression('List<int')).toBe(false);
+    expect(isTypeExpression('int>')).toBe(false);
     expect(isTypeExpression(' int')).toBe(false);
     expect(isTypeExpression('int?')).toBe(false);
     expect(isTypeExpression('')).toBe(false);
@@ -82,7 +86,7 @@ describe('A03.03 names, members and multiplicity', () => {
       ],
       methods: [{
         name: '1run', returnType: 'void', visibility: 'public',
-        parameters: [{ name: 'a', type: 'Map<K, V>' }, { name: 'a', type: 'int' }],
+        parameters: [{ name: 'a', type: 'int, int' }, { name: 'a', type: 'int' }],
       }],
     })]);
     expect(paths(validateDiagramProperties(model))).toEqual([

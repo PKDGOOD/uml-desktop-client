@@ -65,3 +65,12 @@ describe('A05.03 moving members', () => {
     expect(changesFrom(base, draft).attributes?.map((a) => a.name)).toEqual(['b', 'a']);
   });
 });
+
+describe('A05.03 default names', () => {
+  it('picks the first unused name', async () => {
+    const { unusedName } = await import('./formDraft');
+    expect(unusedName([], 'arg')).toBe('arg1');
+    expect(unusedName(['arg1', 'arg2'], 'arg')).toBe('arg3');
+    expect(unusedName(['arg2'], 'arg')).toBe('arg1');
+  });
+});

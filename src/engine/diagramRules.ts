@@ -29,10 +29,20 @@ const MESSAGES = new Set<ConnectorType>(['sync-message', 'async-message', 'retur
 
 export const isIdentifier = isBareIdentifier;
 
-/** A type the DSL reads back as written. Parameter types also cannot hold a comma. */
-export function isTypeExpression(value: unknown, inParameterList = false): value is string {
-  return typeof value === 'string' && TYPE_EXPR.test(value) && value.trim() === value
-    && !(inParameterList && value.includes(','));
+/**
+ * A type the DSL reads back as written: the allowed characters, balanced `<...>`,
+ * and commas only inside them (`Map<String, int>` is fine, `a, b` is not), the same
+ * shape the grammar accepts. `inParameterList` is kept for callers; the rule is the same there.
+ */
+export function isTypeExpression(value: unknown, _inParameterList = false): value is string {
+  if (typeof value !== 'string' || !TYPE_EXPR.test(value) || value.trim() !== value) return false;
+  let depth = 0;
+  for (const char of value) {
+    if (char === '<') depth++;
+    else if (char === '>') { if (--depth < 0) return false; }
+    else if (char === ',' && depth === 0) return false;
+  }
+  return depth === 0;
 }
 
 /**
@@ -171,7 +181,7 @@ export function validateDiagramProperties(diagram: DiagramData): DiagramRuleErro
         }
         seen.add(parameter.name);
         if (!isTypeExpression(parameter.type, true)) {
-          errors.push({ message: `Parameter ${JSON.stringify(parameter.name)} of ${JSON.stringify(method.name)} has a type the DSL cannot hold (commas end the parameter)`, path: `${pt}.type` });
+          errors.push({ message: `Parameter ${JSON.stringify(parameter.name)} of ${JSON.stringify(method.name)} has a type the DSL cannot hold (commas are only allowed inside <...>)`, path: `${pt}.type` });
         }
       });
     });

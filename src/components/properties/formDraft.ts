@@ -55,3 +55,8 @@ export function moveItem<T>(items: readonly T[], index: number, delta: number): 
   copy.splice(to, 0, item);
   return copy;
 }
+
+/** `prefix1`, `prefix2`, ... the first one not in `taken`. */
+export function unusedName(taken: readonly string[], prefix: string): string {
+  for (let n = 1; ; n++) if (!taken.includes(`${prefix}${n}`)) return `${prefix}${n}`;
+}

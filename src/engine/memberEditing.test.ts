@@ -130,3 +130,14 @@ describe('A05.03 member types in the grammar', () => {
     expect(members(text.split('\n').filter((l) => l.startsWith('  ')).join('\n')).methods).toEqual(before.methods);
   });
 });
+
+describe('A05.03 generic parameter types pass the shared rules', () => {
+  it('accepts an edit that adds a Map<String, int> parameter', () => {
+    const { engine, state, byName } = setup();
+    const order = byName('Order');
+    const methods: Method[] = structuredClone(order.properties.methods!);
+    methods[1].parameters = [{ name: 'tags', type: 'Map<String, int>' }];
+    expect(engine.applyCanvasChange({ type: 'element-update', elementId: order.id, properties: { methods } })).toEqual({ ok: true });
+    expect(state.text).toContain('# audit(tags: Map<String, int>): bool');
+  });
+});

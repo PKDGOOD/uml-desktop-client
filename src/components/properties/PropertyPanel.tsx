@@ -3,7 +3,7 @@
 // =============================================================================
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { changesFrom, draftFrom, isDirty, localProblem, moveItem, type FormDraft } from './formDraft';
+import { changesFrom, draftFrom, isDirty, localProblem, moveItem, unusedName, type FormDraft } from './formDraft';
 import type { PendingFormGuard } from './pendingForm';
 import type { DiagramElement, Attribute, Method, Parameter, ElementProperties } from '../../types';
 
@@ -347,7 +347,7 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
                       <button onClick={() => setParameters(i, (list) => list.filter((_, k) => k !== pi))} className="panel-button danger" aria-label="Remove parameter">×</button>
                     </div>
                   ))}
-                  <button onClick={() => setParameters(i, (list) => [...list, { name: `arg${list.length + 1}`, type: 'string' }])} className="panel-button">
+                  <button onClick={() => setParameters(i, (list) => [...list, { name: unusedName(list.map((p) => p.name), 'arg'), type: 'string' }])} className="panel-button">
                     + Add Parameter
                   </button>
                 </div>
