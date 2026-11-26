@@ -2,7 +2,7 @@
 // App - Main application component integrating all UI and engine components
 // =============================================================================
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useProjectStore } from './store/projectStore';
 import { useDiagramStore } from './store/diagramStore';
 import { ProjectTree } from './components/project/ProjectTree';
@@ -15,6 +15,7 @@ import { resolvePending, type PendingChoice, type PendingFormGuard } from './com
 import { Toolbar } from './components/toolbar/Toolbar';
 import { UMLCanvas } from './components/canvas/UMLCanvas';
 import { DSLEditor } from './components/editor/DSLEditor';
+import { parentCandidates } from './engine/containment';
 import { ProjectSession } from './engine/projectSession';
 import { downloadProject, downloadArtifact } from './engine/browserProjectFile';
 import { createExampleProject, createProject } from './engine/projectFactory';
@@ -529,12 +530,24 @@ const App: React.FC = () => {
     return applyCanvasChange({ type: 'element-update', elementId, properties });
   }, [applyCanvasChange]);
 
+  const handleParentChange = useCallback((elementId: string, parentId: string | null): string | null =>
+    applyCanvasChange({ type: 'element-reparent', elementId, parentId }), [applyCanvasChange]);
+
   const tabs: DiagramTabInfo[] = projectStore.openDiagramIds.map((id) => ({
     id,
     name: projectData?.diagrams[id]?.name ?? id,
     dirty: projectStore.dirty,
   }));
   const activeDiagram = diagramStore.diagram;
+  const selectedOwner = useMemo(() => {
+    if (!activeDiagram || !selectedElement) return undefined;
+    const live = activeDiagram.elements.find((element) => element.id === selectedElement.id);
+    if (!live) return undefined;
+    return {
+      parentId: live.parentId ?? null,
+      choices: parentCandidates(activeDiagram, live.id).map((candidate) => ({ id: candidate.id, name: candidate.properties.name })),
+    };
+  }, [activeDiagram, selectedElement]);
   const selectedConnector = activeDiagram?.connectors.find((connector) => connector.id === selectedConnectorId) ?? null;
   const activeSession = projectStore.activeDiagramId
     ? workspaceRef.current?.getSession(projectStore.activeDiagramId) : undefined;
@@ -704,6 +717,8 @@ const App: React.FC = () => {
             <PropertyPanel
               element={selectedElement}
               onPropertyChange={handlePropertyChange}
+              owner={selectedOwner}
+              onParentChange={handleParentChange}
               disabled={dslErrors.length > 0}
               registerGuard={registerFormGuard}
             />

@@ -24,6 +24,13 @@ export interface PropertyPanelProps {
   onPropertyChange: (elementId: string, properties: Partial<ElementProperties>) => string | null | void;
   /** For Shared_Element: list of diagram names referencing this element */
   referencingDiagrams?: { id: string; name: string }[];
+  /**
+   * Ownership (A05.07): the current owner (null: top level) and the owners the element may be given.
+   * Choosing one is its own edit, so it is offered only while the form has nothing unapplied.
+   */
+  owner?: { parentId: string | null; choices: { id: string; name: string }[] };
+  /** Applies a new owner; returns why it was refused, or null. */
+  onParentChange?: (elementId: string, parentId: string | null) => string | null | void;
   /** Fields cannot be edited, for example while the DSL text has errors. */
   disabled?: boolean;
   /** Lets the app settle a dirty form before it changes selection or saves. */
@@ -34,6 +41,8 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   element,
   onPropertyChange,
   referencingDiagrams = [],
+  owner,
+  onParentChange,
   disabled = false,
   registerGuard,
 }) => {
@@ -373,6 +382,25 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
               </li>
             ))}
           </ul>
+        </>
+      )}
+      {element && owner && onParentChange && (owner.parentId !== null || owner.choices.length > 0) && (
+        <>
+          <label className="field-label" htmlFor="element-parent">Parent</label>
+          <select
+            id="element-parent"
+            className="field-select"
+            value={owner.parentId ?? ''}
+            disabled={dirty}
+            onChange={(e) => {
+              const refusal = onParentChange(element.id, e.target.value === '' ? null : e.target.value) ?? null;
+              setProblem(refusal ? { message: refusal } : null);
+            }}
+          >
+            <option value="">(none, top level)</option>
+            {owner.choices.map((choice) => <option key={choice.id} value={choice.id}>{choice.name}</option>)}
+          </select>
+          {dirty && <div className="panel-note">Apply or cancel your changes to change the parent.</div>}
         </>
       )}
       <div className="form-actions">
