@@ -10,6 +10,7 @@ import { ElementRenderer } from './ElementRenderer';
 import { ConnectorRenderer } from './ConnectorRenderer';
 import { createCanvasConnector, createCanvasElement } from '../../engine/elementFactory';
 import { ClipboardManager } from '../../engine/clipboardManager';
+import { withoutSelectedOwners } from '../../engine/containment';
 import { messageRows } from '../../parser/dsl/messageOrder';
 import type { CanvasTool, Position, Size, CanvasChange } from '../../types';
 
@@ -375,7 +376,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
 
   const alignElements = useCallback(
     (alignment: 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom') => {
-      const selected = elements.filter((el) => selectedElementIds.has(el.id));
+      const selected = withoutSelectedOwners(elements, elements.filter((el) => selectedElementIds.has(el.id)));
       if (selected.length < 2) return;
 
       for (const el of selected) {
@@ -418,7 +419,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
 
   const distributeElements = useCallback(
     (direction: 'horizontal' | 'vertical') => {
-      const selected = elements.filter((el) => selectedElementIds.has(el.id));
+      const selected = withoutSelectedOwners(elements, elements.filter((el) => selectedElementIds.has(el.id)));
       if (selected.length < 3) return;
 
       const sorted = [...selected].sort((a, b) =>

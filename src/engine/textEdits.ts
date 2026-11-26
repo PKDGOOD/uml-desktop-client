@@ -144,6 +144,28 @@ export function patchElementInText(text: string, model: DiagramData, after: Diag
   return applyTextEdits(text, edits);
 }
 
+/**
+ * The text after several elements changed position only (a container moved with
+ * what it owns, A05.08): each `@pos` is edited in place, so comments and spacing
+ * stay. Null when an element cannot be mapped or something else differs.
+ */
+export function patchMovesInText(text: string, model: DiagramData, afters: DiagramElement[]): string | null {
+  const parsed = mapToModel(text, model);
+  if (!parsed) return null;
+  const { diagram, spans } = parsed;
+  const edits: TextEdit[] = [];
+  for (const after of afters) {
+    const index = diagram.elements.findIndex((element) => element.id === after.id);
+    const before = model.elements.find((element) => element.id === after.id);
+    if (index < 0 || !before || before.type !== after.type || before.parentId !== after.parentId) return null;
+    if (same(before.position, after.position)) continue;
+    const s = spans.elements[index];
+    if (s.pos) edits.push({ span: s.pos, text: formatPosition(after.position) });
+    else edits.push({ span: { start: s.posInsertAt, end: s.posInsertAt }, text: ` ${formatPosition(after.position)}` });
+  }
+  return applyTextEdits(text, edits);
+}
+
 function patchMembers(text: string, eol: string, s: ElementSpansLike, before: DiagramElement, after: DiagramElement): TextEdit[] | null {
   const lists = (['attribute', 'method'] as const).map((kind) => ({
     kind,

@@ -14,13 +14,13 @@ import type {
   ElementProperties,
 } from '../types';
 import { parseDSL } from '../parser/dsl';
-import { applyReparent, coordinateProblem, reparentProblem } from './containment';
+import { applyReparent, descendantsOf, coordinateProblem, reparentProblem } from './containment';
 import { isMessage, renumberMessages } from '../parser/dsl/messageOrder';
 import { serializeDSL } from '../parser/dsl/serializer';
 import { UndoManager } from './undoManager';
 import { parseCheckedDSL, validateDiagramRules, type DiagramRuleError } from './diagramRules';
 import {
-  patchAddConnectorInText, patchAddElementInText, patchConnectorInText, patchDeleteConnectorInText, patchDeleteElementInText, patchElementInText, patchMessageOrderInText,
+  patchAddConnectorInText, patchAddElementInText, patchConnectorInText, patchDeleteConnectorInText, patchDeleteElementInText, patchElementInText, patchMessageOrderInText, patchMovesInText,
 } from './textEdits';
 
 export interface SyncEngineOptions {
@@ -234,7 +234,13 @@ export class SyncEngine {
             break;
           case 'element-move': {
             const el = d.elements.find(e => e.id === ch.elementId);
-            if (el) el.position = { ...ch.position };
+            if (el) {
+              // What the element owns moves by the same amount (A05.08); ownership itself never changes.
+              const dx = ch.position.x - el.position.x;
+              const dy = ch.position.y - el.position.y;
+              for (const below of descendantsOf(d, el.id)) below.position = { x: below.position.x + dx, y: below.position.y + dy };
+              el.position = { ...ch.position };
+            }
             break;
           }
           case 'element-resize': {
@@ -334,7 +340,17 @@ export class SyncEngine {
    */
   private patchedText(change: CanvasChange, oldDiagram: DiagramData, oldText: string, newDiagram: DiagramData): string | null {
     let patched: string | null = null;
-    if (change.type === 'element-update' || change.type === 'element-move' || change.type === 'element-resize') {
+    if (change.type === 'element-move') {
+      const moved = newDiagram.elements.filter((element) => {
+        const was = oldDiagram.elements.find((candidate) => candidate.id === element.id);
+        return was && (was.position.x !== element.position.x || was.position.y !== element.position.y);
+      });
+      patched = moved.length > 1 ? patchMovesInText(oldText, oldDiagram, moved) : null;
+      if (patched === null && moved.length <= 1) {
+        const after = newDiagram.elements.find((element) => element.id === change.elementId);
+        if (after) patched = patchElementInText(oldText, oldDiagram, after);
+      }
+    } else if (change.type === 'element-update' || change.type === 'element-resize') {
       const after = newDiagram.elements.find((element) => element.id === change.elementId);
       if (after) patched = patchElementInText(oldText, oldDiagram, after);
     } else if (change.type === 'element-add') {
