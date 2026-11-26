@@ -237,7 +237,7 @@ BodyItem
 // ============ Annotations: @pos(x,y) @size(w,h) ============
 
 PosAnnotation
-  = "@pos" _ "(" _ x:Integer _ "," _ y:Integer _ ")" {
+  = "@pos" _ "(" _ x:SignedInteger _ "," _ y:SignedInteger _ ")" {
       return { value: { x, y }, span: spanOf(location()) };
     }
 
@@ -530,6 +530,9 @@ LabelToken
       const start = location().start.offset + lead;
       return { value, span: { start, end: start + value.length } };
     }
+
+SignedInteger
+  = sign:"-"? digits:[0-9]+ { const n = parseInt(digits.join(''), 10); return sign ? -n : n; }
 
 Integer
   = digits:[0-9]+ { return parseInt(digits.join(''), 10); }
