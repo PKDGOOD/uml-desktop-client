@@ -255,12 +255,13 @@ export class SyncEngine {
             reparentFault ??= reparentProblem(d, ch.elementId, ch.parentId);
             if (!reparentFault) applyReparent(d, ch.elementId, ch.parentId);
             break;
-          case 'element-delete':
-            d.elements = d.elements.filter(e => e.id !== ch.elementId);
-            d.connectors = d.connectors.filter(
-              c => c.sourceId !== ch.elementId && c.targetId !== ch.elementId,
-            );
+          case 'element-delete': {
+            // An element takes what it owns with it, and every connection to any of them (A05.10).
+            const gone = new Set([ch.elementId, ...descendantsOf(d, ch.elementId).map(e => e.id)]);
+            d.elements = d.elements.filter(e => !gone.has(e.id));
+            d.connectors = d.connectors.filter(c => !gone.has(c.sourceId) && !gone.has(c.targetId));
             break;
+          }
           case 'element-update': {
             const el = d.elements.find(e => e.id === ch.elementId);
             if (el) {

@@ -212,3 +212,33 @@ export function withoutSelectedOwners(elements: DiagramElement[], selected: Diag
     return true;
   });
 }
+
+/** What deleting some elements takes with it (A05.10). */
+export interface DeletionImpact {
+  /** Elements that go because they sit inside a deleted one, not because they were chosen. */
+  owned: DiagramElement[];
+  /** Connections that end at any element that goes. */
+  connectors: DiagramData['connectors'];
+}
+
+export function deletionImpact(diagram: DiagramData, ids: readonly string[]): DeletionImpact {
+  const chosen = new Set(ids);
+  const gone = new Set(chosen);
+  const owned: DiagramElement[] = [];
+  for (const id of chosen) {
+    for (const below of descendantsOf(diagram, id)) {
+      if (!gone.has(below.id)) { gone.add(below.id); owned.push(below); }
+    }
+  }
+  return { owned, connectors: diagram.connectors.filter((c) => gone.has(c.sourceId) || gone.has(c.targetId)) };
+}
+
+/** The question shown before deleting a container, or null when only the chosen leaves go. */
+export function deletionPrompt(diagram: DiagramData, ids: readonly string[]): string | null {
+  const { owned, connectors } = deletionImpact(diagram, ids);
+  if (owned.length === 0) return null;
+  const names = (list: DiagramElement[]) => list.slice(0, 8).map((e) => `"${e.properties.name}"`).join(', ') + (list.length > 8 ? `, and ${list.length - 8} more` : '');
+  const chosen = diagram.elements.filter((e) => ids.includes(e.id));
+  return `Delete ${names(chosen)} together with ${owned.length} element${owned.length === 1 ? '' : 's'} inside (${names(owned)})`
+    + ` and ${connectors.length} connection${connectors.length === 1 ? '' : 's'}? You can undo this.`;
+}

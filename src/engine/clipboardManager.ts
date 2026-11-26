@@ -64,6 +64,8 @@ export class ClipboardManager {
     const newElements: DiagramElement[] = storedElements.map((el) => {
       const cloned = deepClone(el);
       cloned.id = idMap.get(el.id)!;
+      // A copied container's contents follow their copied owner, not the original.
+      if (el.parentId !== undefined && idMap.has(el.parentId)) cloned.parentId = idMap.get(el.parentId)!;
       cloned.position = {
         x: el.position.x + offsetX,
         y: el.position.y + offsetY,

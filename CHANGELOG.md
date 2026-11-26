@@ -31,6 +31,7 @@ Changes are documented here before a tagged release. The package version `0.1.0`
 - The element form has a Parent choice for states and use cases: only valid owners are listed, the element and its subtree are laid out with the new owner, and one undo restores both. Loops and wrong kinds are refused with the reason.
 - Moving a container on the canvas moves everything it owns by the same amount in one undo step; ownership does not change, and DSL comments are kept.
 - Each drag, resize, align or distribute is one undo step, and Escape cancels a drag or resize in progress. Positions and sizes that are not finite, are out of range or are not above zero are refused; dropped values are rounded to whole numbers and `@pos` accepts negative values.
+- Deleting a container removes what it owns and every connection to it in one undo step, after a confirmation that lists what goes; undo restores all of it. Deleted containers no longer leave children pointing at a missing parent.
 - Selecting a connector shows its direction, endpoints and label in the right panel; edits are applied as one undoable change, and an incompatible endpoint is refused while the original connection stays.
 - Methods with several parameters can be read from DSL text (a type no longer swallows the next parameter), and the property form edits visibility, parameters and member order.
 - Unapplied property edits are no longer lost silently: changing selection, switching tabs, saving, exporting or undoing asks whether to apply, discard or keep editing.
