@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Connector, ConnectorUpdate, DiagramElement, DiagramType } from '../../types';
 import { multiplicityApplies } from '../../engine/diagramRules';
 import {
-  connectorChanges, connectorDraftFrom, describeConnector, isConnectorDirty, multiplicityProblems, swapEnds, type ConnectorDraft,
+  connectorChanges, connectorDraftFrom, describeConnector, isConnectorDirty, messagePosition, multiplicityProblems, stepTarget, swapEnds, type ConnectorDraft,
 } from './connectorDraft';
 import type { PendingFormGuard } from './pendingForm';
 
@@ -16,6 +16,8 @@ export interface ConnectorPanelProps {
   elements: DiagramElement[];
   /** Decides whether multiplicity fields are offered. */
   diagramType: DiagramType;
+  /** Every connector of the diagram; with a sequence message selected it gives the order controls their place. */
+  connectors?: Connector[];
   /** Applies the edit; returns why it was refused, or null. */
   onConnectorChange: (connectorId: string, changes: ConnectorUpdate) => string | null | void;
   disabled?: boolean;
@@ -23,7 +25,7 @@ export interface ConnectorPanelProps {
 }
 
 export const ConnectorPanel: React.FC<ConnectorPanelProps> = ({
-  connector, elements, diagramType, onConnectorChange, disabled = false, registerGuard,
+  connector, elements, diagramType, connectors = [], onConnectorChange, disabled = false, registerGuard,
 }) => {
   const nameOf = useCallback(
     (id: string) => elements.find((element) => element.id === id)?.properties.name ?? id,
@@ -72,6 +74,14 @@ export const ConnectorPanel: React.FC<ConnectorPanelProps> = ({
 
   useEffect(() => { if (problem) alertRef.current?.focus(); }, [problem]);
 
+  // Reordering is its own edit (one undo step), so it waits for the other fields to be applied or cancelled.
+  const place = diagramType === 'sequence' ? messagePosition(connectors, connector.id) : null;
+  const move = (direction: 'up' | 'down') => {
+    if (!place || dirty) return;
+    const to = stepTarget(place, direction);
+    if (to !== null) setProblem(onConnectorChange(connector.id, { messageOrder: to }) ?? null);
+  };
+
   const withMultiplicity = multiplicityApplies(diagramType, connector.type);
   const invalid = multiplicityProblems(draft);
   const options = elements.map((element) => <option key={element.id} value={element.id}>{element.properties.name}</option>);
@@ -112,6 +122,15 @@ export const ConnectorPanel: React.FC<ConnectorPanelProps> = ({
               value={draft.targetMultiplicity} onChange={(e) => update({ targetMultiplicity: e.target.value })}
               aria-invalid={!!invalid.targetMultiplicity || undefined} />
           </>
+        )}
+
+        {place && (
+          <div className="message-order" role="group" aria-label="Message order">
+            <div className="field-label">Message order: {place.position} of {place.total}</div>
+            <button className="panel-button" onClick={() => move('up')} disabled={dirty || stepTarget(place, 'up') === null}>Move earlier</button>
+            <button className="panel-button" onClick={() => move('down')} disabled={dirty || stepTarget(place, 'down') === null}>Move later</button>
+            {dirty && <div className="panel-note">Apply or cancel your changes to reorder.</div>}
+          </div>
         )}
 
         <div className="form-actions">

@@ -4,6 +4,7 @@ import { parseCheckedDSL } from './diagramRules';
 import { parseDSL } from '../parser/dsl';
 import { serializeDSL } from '../parser/dsl/serializer';
 import { SyncEngine } from './syncEngine';
+import { UndoManager } from './undoManager';
 
 const SRC = `@sequence-diagram "Checkout"
 lifeline Client
@@ -97,5 +98,32 @@ describe('A04.08 message order', () => {
     expect(labels(state.diagram!)).toEqual(['place   // first', 'ping', 'charge', 'receipt', 'confirm']);
     const parsed = parseCheckedDSL(state.text);
     expect(parsed.success && parsed.diagram.connectors.map((c) => c.label)).toEqual(['place   // first', 'ping', 'charge', 'receipt', 'confirm']);
+  });
+});
+
+describe('A05.06 one-step reorder with undo', () => {
+  it('moves a message up as a single undoable edit and keeps every id', () => {
+    const state = { text: SRC, diagram: null as DiagramData | null };
+    const history = new UndoManager();
+    const engine = new SyncEngine({
+      onDiagramUpdate: (d) => { state.diagram = d; }, onTextUpdate: (t) => { state.text = t; },
+      onErrors: vi.fn(), undoManager: history, debounceMs: 0,
+    });
+    const parsed = parseDSL(SRC);
+    if (!parsed.success) throw new Error('fixture');
+    engine.setDiagram(parsed.diagram, SRC);
+    state.diagram = engine.getDiagram();
+    const ids = state.diagram!.connectors.map((c) => c.id);
+    const receipt = state.diagram!.connectors.find((c) => c.label === 'receipt')!;
+
+    expect(engine.applyCanvasChange({ type: 'connector-update', connectorId: receipt.id, changes: { messageOrder: 2 } })).toEqual({ ok: true });
+    expect(labels(state.diagram!)).toEqual(['place   // first', 'receipt', 'charge', 'confirm']);
+    expect(state.diagram!.connectors.map((c) => c.id)).toEqual(ids);
+
+    history.undo();
+    expect(state.text).toBe(SRC);
+    expect(labels(state.diagram!)).toEqual(['place   // first', 'charge', 'receipt', 'confirm']);
+    history.redo();
+    expect(labels(state.diagram!)).toEqual(['place   // first', 'receipt', 'charge', 'confirm']);
   });
 });
