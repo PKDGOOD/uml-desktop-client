@@ -177,12 +177,26 @@ export function applyReparent(diagram: DiagramData, id: string, parentId: string
   diagram.elements = [...diagram.elements.filter((e) => !moved.has(e.id)), ...diagram.elements.filter((e) => moved.has(e.id))];
 }
 
-/** Why a diagram has a coordinate or size outside the project limits (A05.07), or null. */
-export function coordinateProblem(diagram: DiagramData): string | null {
+/**
+ * Why the elements that `before` and `after` differ on have unusable geometry (A05.07, A05.09), or null:
+ * a position or size that is not a finite number, a position outside the project's coordinate range,
+ * or a size that is not positive or exceeds the allowed extent. Untouched elements are not judged.
+ */
+export function coordinateProblem(after: DiagramData, before?: DiagramData): string | null {
   const limit = PROJECT_LIMITS.coordinate;
-  const bad = diagram.elements.find((e) => Math.abs(e.position.x) > limit || Math.abs(e.position.y) > limit
-    || e.size.width > PROJECT_LIMITS.extent || e.size.height > PROJECT_LIMITS.extent);
-  return bad ? `"${bad.properties.name}" would end up outside the allowed canvas area.` : null;
+  const old = new Map((before?.elements ?? []).map((e) => [e.id, e]));
+  for (const e of after.elements) {
+    const was = old.get(e.id);
+    if (was && was.position.x === e.position.x && was.position.y === e.position.y
+      && was.size.width === e.size.width && was.size.height === e.size.height) continue;
+    const numbers = [e.position.x, e.position.y, e.size.width, e.size.height];
+    const name = `"${e.properties.name}"`;
+    if (!numbers.every(Number.isFinite)) return `${name} would get a position or size that is not a number.`;
+    if (Math.abs(e.position.x) > limit || Math.abs(e.position.y) > limit) return `${name} would end up outside the allowed canvas area.`;
+    if (e.size.width <= 0 || e.size.height <= 0) return `${name} needs a width and height above zero.`;
+    if (e.size.width > PROJECT_LIMITS.extent || e.size.height > PROJECT_LIMITS.extent) return `${name} would be larger than the allowed ${PROJECT_LIMITS.extent} units.`;
+  }
+  return null;
 }
 
 /** The selected elements that no other selected element owns; those ride along when their owner moves (A05.08). */

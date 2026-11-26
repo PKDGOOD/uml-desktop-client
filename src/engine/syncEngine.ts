@@ -235,17 +235,19 @@ export class SyncEngine {
           case 'element-move': {
             const el = d.elements.find(e => e.id === ch.elementId);
             if (el) {
+              // The DSL holds whole numbers, so a dropped position is rounded (a non-number is left for the limits to refuse).
+              const target = whole(ch.position);
               // What the element owns moves by the same amount (A05.08); ownership itself never changes.
-              const dx = ch.position.x - el.position.x;
-              const dy = ch.position.y - el.position.y;
+              const dx = target.x - el.position.x;
+              const dy = target.y - el.position.y;
               for (const below of descendantsOf(d, el.id)) below.position = { x: below.position.x + dx, y: below.position.y + dy };
-              el.position = { ...ch.position };
+              el.position = target;
             }
             break;
           }
           case 'element-resize': {
             const el = d.elements.find(e => e.id === ch.elementId);
-            if (el) el.size = { ...ch.size };
+            if (el) el.size = { width: whole1(ch.size.width), height: whole1(ch.size.height) };
             break;
           }
           case 'element-reparent':
@@ -299,7 +301,7 @@ export class SyncEngine {
       };
 
       const newDiagram = applyChange(this.currentDiagram, change);
-      reparentFault ??= change.type === 'element-reparent' || change.type === 'element-move' || change.type === 'batch' ? coordinateProblem(newDiagram) : null;
+      reparentFault ??= change.type === 'element-reparent' || change.type === 'element-move' || change.type === 'element-resize' || change.type === 'batch' ? coordinateProblem(newDiagram, oldDiagram) : null;
       if (reparentFault) return refuse('rules', [{ message: reparentFault, path: 'elements' }]);
       renumberMessages(newDiagram);
       // Reject commands that break a diagram rule the model did not already break,
@@ -340,7 +342,14 @@ export class SyncEngine {
    */
   private patchedText(change: CanvasChange, oldDiagram: DiagramData, oldText: string, newDiagram: DiagramData): string | null {
     let patched: string | null = null;
-    if (change.type === 'element-move') {
+    if (change.type === 'batch' && change.changes.length > 0 && change.changes.every((item) => item.type === 'element-move')) {
+      // Align/distribute: only positions changed, so patch each `@pos` in place.
+      const moved = newDiagram.elements.filter((element) => {
+        const was = oldDiagram.elements.find((candidate) => candidate.id === element.id);
+        return was && (was.position.x !== element.position.x || was.position.y !== element.position.y);
+      });
+      patched = patchMovesInText(oldText, oldDiagram, moved);
+    } else if (change.type === 'element-move') {
       const moved = newDiagram.elements.filter((element) => {
         const was = oldDiagram.elements.find((candidate) => candidate.id === element.id);
         return was && (was.position.x !== element.position.x || was.position.y !== element.position.y);
@@ -413,6 +422,10 @@ function sameContainment(a: DiagramData, b: DiagramData): boolean {
   const right = parents(b);
   return left.size === right.size && [...left].every(([name, parent]) => right.get(name) === parent);
 }
+
+/** Whole numbers for the DSL; anything that is not a finite number is left as it is for the limits to refuse. */
+const whole1 = (value: number): number => (Number.isFinite(value) ? Math.round(value) : value);
+const whole = (point: { x: number; y: number }) => ({ x: whole1(point.x), y: whole1(point.y) });
 
 function deepClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));

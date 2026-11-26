@@ -378,6 +378,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
     (alignment: 'left' | 'center-h' | 'right' | 'top' | 'center-v' | 'bottom') => {
       const selected = withoutSelectedOwners(elements, elements.filter((el) => selectedElementIds.has(el.id)));
       if (selected.length < 2) return;
+      const moves: CanvasChange[] = [];
 
       for (const el of selected) {
         let newPos: Position | null = null;
@@ -410,9 +411,12 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
           }
         }
         if (newPos && (newPos.x !== el.position.x || newPos.y !== el.position.y)) {
-          onCanvasChange?.({ type: 'element-move', elementId: el.id, position: newPos });
+          moves.push({ type: 'element-move', elementId: el.id, position: newPos });
         }
       }
+      // One gesture, one undo step.
+      if (moves.length === 1) onCanvasChange?.(moves[0]);
+      else if (moves.length > 1) onCanvasChange?.({ type: 'batch', changes: moves });
     },
     [elements, selectedElementIds, onCanvasChange],
   );
@@ -421,6 +425,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
     (direction: 'horizontal' | 'vertical') => {
       const selected = withoutSelectedOwners(elements, elements.filter((el) => selectedElementIds.has(el.id)));
       if (selected.length < 3) return;
+      const moves: CanvasChange[] = [];
 
       const sorted = [...selected].sort((a, b) =>
         direction === 'horizontal' ? a.position.x - b.position.x : a.position.y - b.position.y,
@@ -436,7 +441,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
         let currentX = first.position.x;
         for (const el of sorted) {
           if (el.position.x !== currentX) {
-            onCanvasChange?.({ type: 'element-move', elementId: el.id, position: { x: currentX, y: el.position.y } });
+            moves.push({ type: 'element-move', elementId: el.id, position: { x: currentX, y: el.position.y } });
           }
           currentX += el.size.width + gap;
         }
@@ -447,11 +452,14 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
         let currentY = first.position.y;
         for (const el of sorted) {
           if (el.position.y !== currentY) {
-            onCanvasChange?.({ type: 'element-move', elementId: el.id, position: { x: el.position.x, y: currentY } });
+            moves.push({ type: 'element-move', elementId: el.id, position: { x: el.position.x, y: currentY } });
           }
           currentY += el.size.height + gap;
         }
       }
+      // One gesture, one undo step.
+      if (moves.length === 1) onCanvasChange?.(moves[0]);
+      else if (moves.length > 1) onCanvasChange?.({ type: 'batch', changes: moves });
     },
     [elements, selectedElementIds, onCanvasChange],
   );

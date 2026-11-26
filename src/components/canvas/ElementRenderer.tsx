@@ -55,7 +55,30 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
   const colors = COLORS[type] ?? { fill: '#FFFFFF', stroke: '#333333' };
   const stroke = isSelected ? SELECTED_STROKE : colors.stroke;
 
+  // Escape during a drag or resize puts everything back and records nothing (A05.09).
+  const cancelled = useRef(false);
+  const stopListening = useRef<(() => void) | null>(null);
+  const beginGesture = (restore: (node: any) => void) => (e: any) => {
+    e.cancelBubble = true; // a handle's gesture is not the element's
+    const node = e.target;
+    cancelled.current = false;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      cancelled.current = true;
+      node.stopDrag();
+      restore(node);
+      node.getLayer()?.batchDraw();
+    };
+    window.addEventListener('keydown', onKey);
+    stopListening.current = () => window.removeEventListener('keydown', onKey);
+  };
+  const endGesture = () => { stopListening.current?.(); stopListening.current = null; };
+  useEffect(() => endGesture, []);
+
   const handleDragEnd = (e: any) => {
+    if (e.target !== e.currentTarget) return; // a resize handle's drag ended inside this group
+    endGesture();
+    if (cancelled.current) { cancelled.current = false; e.target.position({ x: position.x, y: position.y }); return; }
     onDragEnd(id, { x: e.target.x(), y: e.target.y() });
   };
 
@@ -79,6 +102,13 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
 
   const handleResizeDragEnd = (e: any) => {
     const node = e.target;
+    e.cancelBubble = true;
+    endGesture();
+    if (cancelled.current) {
+      cancelled.current = false;
+      node.position({ x: size.width - HANDLE_SIZE, y: size.height - HANDLE_SIZE });
+      return;
+    }
     const group = node.getParent();
     const newWidth = Math.max(40, node.x() + HANDLE_SIZE);
     const newHeight = Math.max(30, node.y() + HANDLE_SIZE);
@@ -123,12 +153,14 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
       onTap={handleClick}
       onDblClick={handleDblClick}
       onDblTap={handleDblClick}
+      onDragStart={beginGesture((node) => node.position({ x: position.x, y: position.y }))}
       onDragEnd={handleDragEnd}
     >
       {renderShape()}
       {isSelected && (
         <ResizeHandles
           size={size}
+          onDragStart={beginGesture((node) => node.position({ x: size.width - HANDLE_SIZE, y: size.height - HANDLE_SIZE }))}
           onDrag={handleResizeDrag}
           onDragEnd={handleResizeDragEnd}
         />
@@ -321,9 +353,10 @@ const EllipseShape: React.FC<{
 
 const ResizeHandles: React.FC<{
   size: Size;
+  onDragStart: (e: any) => void;
   onDrag: (e: any) => void;
   onDragEnd: (e: any) => void;
-}> = ({ size, onDrag, onDragEnd }) => (
+}> = ({ size, onDragStart, onDrag, onDragEnd }) => (
   <Rect
     x={size.width - HANDLE_SIZE}
     y={size.height - HANDLE_SIZE}
@@ -333,6 +366,7 @@ const ResizeHandles: React.FC<{
     stroke="#0D47A1"
     strokeWidth={1}
     draggable
+    onDragStart={onDragStart}
     onDragMove={onDrag}
     onDragEnd={onDragEnd}
     cursor="nwse-resize"
