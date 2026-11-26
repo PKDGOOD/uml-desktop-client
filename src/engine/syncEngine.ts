@@ -18,7 +18,7 @@ import { isMessage, renumberMessages } from '../parser/dsl/messageOrder';
 import { serializeDSL } from '../parser/dsl/serializer';
 import { UndoManager } from './undoManager';
 import { parseCheckedDSL, validateDiagramRules, type DiagramRuleError } from './diagramRules';
-import { descendantIds, reparentProblem } from './containment';
+import { deleteSubtree, descendantIds, reparentProblem } from './containment';
 import { validateGeometry } from './geometry';
 import {
   patchAddConnectorInText, patchAddElementInText, patchConnectorInText, patchDeleteConnectorInText, patchDeleteElementInText, patchElementInText, patchMessageOrderInText,
@@ -261,10 +261,8 @@ export class SyncEngine {
             break;
           }
           case 'element-delete':
-            d.elements = d.elements.filter(e => e.id !== ch.elementId);
-            d.connectors = d.connectors.filter(
-              c => c.sourceId !== ch.elementId && c.targetId !== ch.elementId,
-            );
+            // An element goes with everything inside it and every link that touches any of them (A05.10).
+            deleteSubtree(d, ch.elementId);
             break;
           case 'element-update': {
             const el = d.elements.find(e => e.id === ch.elementId);
@@ -357,6 +355,22 @@ export class SyncEngine {
         patched = patchElementInText(patched, step, after);
         if (patched === null) return null;
         step.elements[index] = deepClone(after);
+      }
+    } else if (change.type === 'batch' && change.changes.length > 0 && change.changes.every((item) => item.type === 'element-delete' || item.type === 'connector-delete')) {
+      // A deleted selection: remove each item in turn; one already gone with its container is skipped (A05.10).
+      patched = oldText;
+      const step = deepClone(oldDiagram);
+      for (const item of change.changes) {
+        if (item.type === 'element-delete') {
+          if (!step.elements.some((element) => element.id === item.elementId)) continue;
+          patched = patchDeleteElementInText(patched, step, item.elementId);
+          deleteSubtree(step, item.elementId);
+        } else if (item.type === 'connector-delete') {
+          if (!step.connectors.some((connector) => connector.id === item.connectorId)) continue;
+          patched = patchDeleteConnectorInText(patched, step, item.connectorId);
+          step.connectors = step.connectors.filter((connector) => connector.id !== item.connectorId);
+        }
+        if (patched === null) return null;
       }
     } else if (change.type === 'element-update' || change.type === 'element-move' || change.type === 'element-resize') {
       const after = newDiagram.elements.find((element) => element.id === change.elementId);

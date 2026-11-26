@@ -11,7 +11,7 @@ import { ConnectorRenderer } from './ConnectorRenderer';
 import { createCanvasConnector, createCanvasElement } from '../../engine/elementFactory';
 import { ClipboardManager } from '../../engine/clipboardManager';
 import { messageRows } from '../../parser/dsl/messageOrder';
-import { moveWithDescendants } from '../../engine/containment';
+import { deleteConfirmation, moveWithDescendants } from '../../engine/containment';
 import type { CanvasTool, Position, Size, CanvasChange } from '../../types';
 
 export interface UMLCanvasProps {
@@ -183,6 +183,9 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
     setCopiedType(diagram.type);
     pasteOffset.current = 24;
     if (cut) {
+      // A cut container takes its contents along; ask first, as Delete does (A05.10).
+      const question = deleteConfirmation(diagram, selected.map((element) => element.id));
+      if (question && !window.confirm(question)) return;
       onCanvasChange?.({ type: 'batch', changes: selected.map((element) => ({ type: 'element-delete', elementId: element.id })) });
       clearSelection();
     }
@@ -232,6 +235,9 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
       if (selectedElementIds.size === 0 && selectedConnectorIds.size === 0) return;
 
       event.preventDefault();
+      // Deleting a container lists what goes with it; Cancel changes nothing (A05.10).
+      const question = diagram ? deleteConfirmation(diagram, selectedElementIds, selectedConnectorIds) : null;
+      if (question && !window.confirm(question)) return;
       onCanvasChange?.({ type: 'batch', changes: [
         ...[...selectedConnectorIds].map((connectorId): CanvasChange => ({ type: 'connector-delete', connectorId })),
         ...[...selectedElementIds].map((elementId): CanvasChange => ({ type: 'element-delete', elementId })),
@@ -241,7 +247,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [clearSelection, onCanvasChange, readOnly, selectedConnectorIds, selectedElementIds, copySelection, pasteSelection, copiedType, diagram?.type]);
+  }, [clearSelection, onCanvasChange, readOnly, selectedConnectorIds, selectedElementIds, copySelection, pasteSelection, copiedType, diagram]);
 
   // --- Drag selection box ---
 

@@ -13,6 +13,7 @@ import type { Connector, DiagramElement } from '../types';
 import type { SourceSpan } from '../parser/dsl/sourceSpans';
 import { inDisplayOrder } from '../parser/dsl/messageOrder';
 import { preserveIds } from './syncEngine';
+import { descendantIds } from './containment';
 
 export interface TextEdit {
   span: SourceSpan;
@@ -332,20 +333,24 @@ export function patchAddElementInText(text: string, model: DiagramData, element:
 }
 
 /**
- * The text after deleting an element: its declaration lines and every
- * connector line that refers to it, comments on those lines included. An
- * element that contains others returns null (the caller decides what happens to
- * the children).
+ * The text after deleting an element: its declaration lines (a container's
+ * whole block, so everything inside it) and every connector line that refers to
+ * it or to something inside it, comments on those lines included.
  */
 export function patchDeleteElementInText(text: string, model: DiagramData, elementId: string): string | null {
   const parsed = mapToModel(text, model);
   if (!parsed) return null;
   const { diagram, spans } = parsed;
   const index = diagram.elements.findIndex((element) => element.id === elementId);
-  if (index < 0 || diagram.elements.some((element) => element.parentId === elementId)) return null;
-  const edits = [removeItem(text, spans.elements[index].declaration)];
+  if (index < 0) return null;
+  // A container goes with its whole block (A05.10); connector lines inside the block go with it.
+  const declaration = spans.elements[index].declaration;
+  const removed = new Set([elementId, ...descendantIds(diagram, elementId)]);
+  const edits = [removeItem(text, declaration)];
   diagram.connectors.forEach((connector, i) => {
-    if (connector.sourceId === elementId || connector.targetId === elementId) edits.push(removeItem(text, spans.connectors[i].line));
+    const line = spans.connectors[i].line;
+    const insideBlock = declaration.start <= line.start && line.end <= declaration.end;
+    if (!insideBlock && (removed.has(connector.sourceId) || removed.has(connector.targetId))) edits.push(removeItem(text, line));
   });
   return applyTextEdits(text, edits);
 }

@@ -2,7 +2,7 @@
 // Containment helpers - explicit parents, descendants and reparenting (A05.07)
 // =============================================================================
 
-import type { CanvasChange, DiagramData, DiagramElement, Position } from '../types';
+import type { CanvasChange, Connector, DiagramData, DiagramElement, Position } from '../types';
 import { canContain } from './diagramRules';
 
 /** IDs of every element below `id`, at any depth. A cycle in a bad model stops the walk. */
@@ -96,4 +96,41 @@ export function moveWithDescendants(diagram: DiagramData, id: string, position: 
         .map((item): CanvasChange => ({ type: 'element-move', elementId: item.id, position: { x: item.position.x + dx, y: item.position.y + dy } })),
     ],
   };
+}
+
+/** Remove an element, everything inside it and every link touching any of them (A05.10). Mutates `diagram`. */
+export function deleteSubtree(diagram: DiagramData, id: string): void {
+  const removed = descendantIds(diagram, id).add(id);
+  diagram.elements = diagram.elements.filter((element) => !removed.has(element.id));
+  diagram.connectors = diagram.connectors.filter((connector) => !removed.has(connector.sourceId) && !removed.has(connector.targetId));
+}
+
+export interface DeleteImpact {
+  /** Elements that go because they are inside a selected container, not because they were selected. */
+  inside: DiagramElement[];
+  /** Every connection that goes: selected ones and those touching a removed element. */
+  connectors: Connector[];
+}
+
+/** What deleting the selection takes with it, so a container delete can be confirmed first. */
+export function deleteImpact(diagram: DiagramData, elementIds: Iterable<string>, connectorIds: Iterable<string> = []): DeleteImpact {
+  const selected = new Set(elementIds);
+  const removed = new Set(selected);
+  for (const id of selected) for (const below of descendantIds(diagram, id)) removed.add(below);
+  const links = new Set(connectorIds);
+  return {
+    inside: diagram.elements.filter((element) => removed.has(element.id) && !selected.has(element.id)),
+    connectors: diagram.connectors.filter((connector) => links.has(connector.id) || removed.has(connector.sourceId) || removed.has(connector.targetId)),
+  };
+}
+
+/** The confirmation question for a delete that takes contents along, or null when nothing extra goes. */
+export function deleteConfirmation(diagram: DiagramData, elementIds: Iterable<string>, connectorIds: Iterable<string> = []): string | null {
+  const ids = [...elementIds];
+  const { inside, connectors } = deleteImpact(diagram, ids, connectorIds);
+  if (inside.length === 0) return null;
+  const names = (list: DiagramElement[]) => list.map((element) => JSON.stringify(element.properties.name)).join(', ');
+  const containers = diagram.elements.filter((element) => ids.includes(element.id));
+  const links = connectors.length === 0 ? '' : ` and ${connectors.length} connection${connectors.length === 1 ? '' : 's'}`;
+  return `Delete ${names(containers)} with ${inside.length} element${inside.length === 1 ? '' : 's'} inside (${names(inside)})${links}? Undo restores them.`;
 }
