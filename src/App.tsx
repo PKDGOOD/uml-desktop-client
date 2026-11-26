@@ -695,6 +695,7 @@ const App: React.FC = () => {
               connector={selectedConnector}
               elements={activeDiagram?.elements ?? []}
               diagramType={activeDiagram?.type ?? 'class'}
+              connectors={activeDiagram?.connectors ?? []}
               onConnectorChange={handleConnectorChange}
               disabled={dslErrors.length > 0}
               registerGuard={registerFormGuard}

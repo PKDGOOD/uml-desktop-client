@@ -1,5 +1,6 @@
 import type { Connector, ConnectorUpdate } from '../../types';
 import { multiplicityProblem } from '../../engine/diagramRules';
+import { inDisplayOrder, isMessage } from '../../parser/dsl/messageOrder';
 
 /** What the connector form edits as one buffered draft (A05.04). */
 export interface ConnectorDraft {
@@ -57,4 +58,20 @@ export const swapEnds = (draft: ConnectorDraft): ConnectorDraft => ({
 /** One line that says what the connector joins and in which direction. */
 export function describeConnector(connector: Pick<Connector, 'type' | 'sourceId' | 'targetId'>, nameOf: (id: string) => string): string {
   return `${nameOf(connector.sourceId)} → ${nameOf(connector.targetId)} (${connector.type.replace(/-/g, ' ')})`;
+}
+
+/** A message's place in its sequence diagram (A05.06). */
+export interface MessagePosition { position: number; total: number }
+
+/** 1-based position of a message among the diagram's messages, or null for a non-message. */
+export function messagePosition(connectors: readonly Connector[], id: string): MessagePosition | null {
+  const messages = inDisplayOrder(connectors.filter(isMessage));
+  const index = messages.findIndex((connector) => connector.id === id);
+  return index < 0 ? null : { position: index + 1, total: messages.length };
+}
+
+/** The position one step earlier/later, or null when the message is already at that end. */
+export function stepTarget({ position, total }: MessagePosition, direction: 'up' | 'down'): number | null {
+  const target = direction === 'up' ? position - 1 : position + 1;
+  return target < 1 || target > total ? null : target;
 }

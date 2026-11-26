@@ -52,3 +52,24 @@ describe('A05.04 connector panel', () => {
     expect(html).toContain('value="0..*"');
   });
 });
+
+describe('A05.06 message order controls', () => {
+  const m = (id: string, order: number): Connector => ({ id, type: 'sync-message', sourceId: 'a', targetId: 'b', label: id, messageOrder: order, properties: {} });
+  const messages = [m('one', 1), m('two', 2), m('three', 3)];
+  const render = (selected: Connector, diagramType: 'sequence' | 'class' = 'sequence') => renderToStaticMarkup(createElement(ConnectorPanel, {
+    connector: selected, elements, diagramType, connectors: messages, onConnectorChange: () => null,
+  }));
+
+  it('shows the position and enables only the possible moves', () => {
+    const middle = render(messages[1]);
+    expect(middle).toContain('Message order: 2 of 3');
+    expect(middle).toMatch(/<button class="panel-button">Move earlier<\/button>/);
+    expect(middle).toMatch(/<button class="panel-button">Move later<\/button>/);
+    expect(render(messages[0])).toMatch(/<button class="panel-button" disabled="">Move earlier<\/button>/);
+    expect(render(messages[2])).toMatch(/<button class="panel-button" disabled="">Move later<\/button>/);
+  });
+
+  it('is offered for sequence messages only', () => {
+    expect(render(connector, 'class')).not.toContain('Message order');
+  });
+});

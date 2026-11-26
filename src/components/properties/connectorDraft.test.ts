@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Connector } from '../../types';
 import {
-  connectorChanges, connectorDraftFrom, describeConnector, isConnectorDirty, multiplicityProblems, swapEnds,
+  connectorChanges, connectorDraftFrom, describeConnector, isConnectorDirty, messagePosition, multiplicityProblems, stepTarget, swapEnds,
 } from './connectorDraft';
 
 const connector: Connector = { id: 'c', type: 'directed-association', sourceId: 'a', targetId: 'b', label: 'places', properties: {} };
@@ -61,5 +61,23 @@ describe('A05.05 swapping direction', () => {
     const swapped = swapEnds(connectorDraftFrom(counted));
     expect(connectorChanges(counted, swapped)).toEqual({ sourceId: 'b', targetId: 'a', sourceMultiplicity: '0..*', targetMultiplicity: '1' });
     expect(isConnectorDirty(counted, swapEnds(swapped))).toBe(false);
+  });
+});
+
+describe('A05.06 message position', () => {
+  const msg = (id: string, order?: number): Connector => ({ id, type: 'sync-message', sourceId: 'a', targetId: 'b', messageOrder: order, properties: {} });
+  const list = [msg('late', 2), msg('early', 1), msg('last', 3), { id: 'x', type: 'association', sourceId: 'a', targetId: 'b', properties: {} } as Connector];
+
+  it('reports the display position, not the array position', () => {
+    expect(messagePosition(list, 'early')).toEqual({ position: 1, total: 3 });
+    expect(messagePosition(list, 'last')).toEqual({ position: 3, total: 3 });
+    expect(messagePosition(list, 'x')).toBeNull();
+  });
+
+  it('steps one place and stops at the ends', () => {
+    expect(stepTarget({ position: 2, total: 3 }, 'up')).toBe(1);
+    expect(stepTarget({ position: 2, total: 3 }, 'down')).toBe(3);
+    expect(stepTarget({ position: 1, total: 3 }, 'up')).toBeNull();
+    expect(stepTarget({ position: 3, total: 3 }, 'down')).toBeNull();
   });
 });
