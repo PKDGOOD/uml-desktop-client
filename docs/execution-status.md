@@ -59,7 +59,7 @@ Updated: **2026-11-11**. This is the live ledger for the [145-task backlog](atom
 | A05.08 | Done | Dropping a container on the canvas moves every descendant by the same delta in one `element-move` (one undo step); unrelated elements stay, and ownership never changes, including when the container lands over another element. The text edit changes only the affected `@pos` values, so comments stay. Align and distribute leave out elements whose owner is also selected, so nothing moves twice. Tests: `moveContainer.test.ts`. The descendants jump on drop; they do not follow the pointer while dragging. No automated UI test of the drag. |
 | A01.13 | Planned | Needs A01.12 and actual remote CI evidence. |
 
-Every task not named above remains **Planned**. **48 of 145 local tasks are Done**, including reproduction tasks, not 45 shipped features. G0 (local baseline) is satisfied; M0 is still incomplete until baseline commits and remote CI are verified. G1–G4 remain unmet. Current validation: **41 test files, 735 passing tests and no expected failures**; `npm run check` and `npm run build:app` passed after A05.08. Notices, package and the packaged smoke were last run at the A01 baseline.
+Every task not named above remains **Planned**. **48 of 145 local tasks are Done**, including reproduction tasks, not 45 shipped features. G0 (local baseline) is satisfied; M0 is still incomplete until baseline commits and remote CI are verified. G1–G4 remain unmet. Current validation: **41 test files, 736 passing tests and no expected failures**; `npm run check` and `npm run build:app` passed after A05.08. Notices, package and the packaged smoke were last run at the A01 baseline.
 
 ## Dependency correction
 

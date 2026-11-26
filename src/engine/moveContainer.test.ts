@@ -75,6 +75,15 @@ describe('A05.08 moving a container', () => {
   });
 });
 
+describe('A05.08 canvas limits', () => {
+  it('refuses a move that would push a descendant outside the allowed area', () => {
+    const { engine, state, find } = setup();
+    const result = engine.applyCanvasChange({ type: 'element-move', elementId: find('Active').id, position: { x: 999_950, y: 40 } });
+    expect(result).toMatchObject({ ok: false, reason: 'rules' });
+    expect(state.text).toBe(SRC);
+  });
+});
+
 describe('A05.08 aligning a selection', () => {
   it('leaves out elements whose owner is also selected', () => {
     const { state, find } = setup();

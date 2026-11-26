@@ -299,7 +299,7 @@ export class SyncEngine {
       };
 
       const newDiagram = applyChange(this.currentDiagram, change);
-      reparentFault ??= change.type === 'element-reparent' || change.type === 'batch' ? coordinateProblem(newDiagram) : null;
+      reparentFault ??= change.type === 'element-reparent' || change.type === 'element-move' || change.type === 'batch' ? coordinateProblem(newDiagram) : null;
       if (reparentFault) return refuse('rules', [{ message: reparentFault, path: 'elements' }]);
       renumberMessages(newDiagram);
       // Reject commands that break a diagram rule the model did not already break,
