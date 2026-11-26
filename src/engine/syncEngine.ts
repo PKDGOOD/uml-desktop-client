@@ -19,6 +19,7 @@ import { serializeDSL } from '../parser/dsl/serializer';
 import { UndoManager } from './undoManager';
 import { parseCheckedDSL, validateDiagramRules, type DiagramRuleError } from './diagramRules';
 import { descendantIds, reparentProblem } from './containment';
+import { validateGeometry } from './geometry';
 import {
   patchAddConnectorInText, patchAddElementInText, patchConnectorInText, patchDeleteConnectorInText, patchDeleteElementInText, patchElementInText, patchMessageOrderInText,
 } from './textEdits';
@@ -308,8 +309,10 @@ export class SyncEngine {
       renumberMessages(newDiagram);
       // Reject commands that break a diagram rule the model did not already break,
       // before touching state or history (A03.07).
-      const before = new Set(validateDiagramRules(oldDiagram).map((error) => error.message));
-      const added = validateDiagramRules(newDiagram).filter((error) => !before.has(error.message));
+      // Geometry too: a command must not create a position or size the file could not hold (A05.09).
+      const rules = (diagram: DiagramData) => [...validateDiagramRules(diagram), ...validateGeometry(diagram)];
+      const before = new Set(rules(oldDiagram).map((error) => error.message));
+      const added = rules(newDiagram).filter((error) => !before.has(error.message));
       if (added.length > 0) return refuse('rules', added);
       // Then anything else the DSL cannot write and read back.
       const newText = this.patchedText(change, oldDiagram, oldText, newDiagram) ?? serializeDSL(newDiagram);

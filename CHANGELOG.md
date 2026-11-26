@@ -26,6 +26,7 @@ Changes are documented here before a tagged release. The package version `0.1.0`
 - When a file's stored text and diagram disagree, Open asks which to keep for each diagram instead of picking one; the project opens unsaved.
 
 ### Known issues
+- A drag or resize is one undo step, Escape cancels it mid-gesture, and resizing no longer also moves the element; align and distribute are one undo step; sizes and positions the file could not hold are refused.
 - Dragging a composite state or system boundary moves everything inside it by the same amount, in one undoable step; dragging an element across its container border does not change its owner.
 - States and use cases can be moved into or out of a composite state or system boundary from the element form; the element and its contents move with it in one undoable edit, and cycles or wrong container kinds are refused.
 - A selected sequence message can be moved earlier or later from the connection form; each move is one undoable edit and the message keeps its identity.

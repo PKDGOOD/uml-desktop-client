@@ -376,6 +376,8 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
       const selected = elements.filter((el) => selectedElementIds.has(el.id));
       if (selected.length < 2) return;
 
+      // One alignment is one command, so one undo step (A05.09).
+      const moves: CanvasChange[] = [];
       for (const el of selected) {
         let newPos: Position | null = null;
         switch (alignment) {
@@ -407,9 +409,10 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
           }
         }
         if (newPos && (newPos.x !== el.position.x || newPos.y !== el.position.y)) {
-          onCanvasChange?.({ type: 'element-move', elementId: el.id, position: newPos });
+          moves.push({ type: 'element-move', elementId: el.id, position: newPos });
         }
       }
+      if (moves.length > 0) onCanvasChange?.({ type: 'batch', changes: moves });
     },
     [elements, selectedElementIds, onCanvasChange],
   );
@@ -425,6 +428,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
 
       const first = sorted[0];
       const last = sorted[sorted.length - 1];
+      const moves: CanvasChange[] = [];
 
       if (direction === 'horizontal') {
         const totalSpace = last.position.x + last.size.width - first.position.x;
@@ -433,7 +437,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
         let currentX = first.position.x;
         for (const el of sorted) {
           if (el.position.x !== currentX) {
-            onCanvasChange?.({ type: 'element-move', elementId: el.id, position: { x: currentX, y: el.position.y } });
+            moves.push({ type: 'element-move', elementId: el.id, position: { x: currentX, y: el.position.y } });
           }
           currentX += el.size.width + gap;
         }
@@ -444,11 +448,12 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
         let currentY = first.position.y;
         for (const el of sorted) {
           if (el.position.y !== currentY) {
-            onCanvasChange?.({ type: 'element-move', elementId: el.id, position: { x: el.position.x, y: currentY } });
+            moves.push({ type: 'element-move', elementId: el.id, position: { x: el.position.x, y: currentY } });
           }
           currentY += el.size.height + gap;
         }
       }
+      if (moves.length > 0) onCanvasChange?.({ type: 'batch', changes: moves });
     },
     [elements, selectedElementIds, onCanvasChange],
   );

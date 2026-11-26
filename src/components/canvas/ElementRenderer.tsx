@@ -5,6 +5,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Group, Rect, Text, Circle, Ellipse, Line } from 'react-konva';
 import type { DiagramElement, Position, Size, CanvasChange } from '../../types';
+import { clampSize, gestureResult } from '../../engine/geometry';
 
 export interface ElementRendererProps {
   element: DiagramElement;
@@ -55,8 +56,35 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
   const colors = COLORS[type] ?? { fill: '#FFFFFF', stroke: '#333333' };
   const stroke = isSelected ? SELECTED_STROKE : colors.stroke;
 
+  // One gesture commits at most one command (A05.09). Escape during a drag or resize
+  // cancels it and puts the shape back; a gesture that ends where it began commits nothing.
+  const gesture = useRef<{ node: any; cancelled: boolean } | null>(null);
+  useEffect(() => {
+    const cancel = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !gesture.current) return;
+      gesture.current.cancelled = true;
+      gesture.current.node.stopDrag();
+    };
+    window.addEventListener('keydown', cancel);
+    return () => window.removeEventListener('keydown', cancel);
+  }, []);
+  const begin = (e: any) => { gesture.current = { node: e.target, cancelled: false }; };
+  const finish = (): boolean => {
+    const cancelled = gesture.current?.cancelled ?? false;
+    gesture.current = null;
+    return cancelled;
+  };
+
+  const handleDragStart = (e: any) => {
+    if (e.target === e.currentTarget) begin(e);
+  };
+
   const handleDragEnd = (e: any) => {
-    onDragEnd(id, { x: e.target.x(), y: e.target.y() });
+    // The resize handle's own drag events also reach the group; they are not a move.
+    if (e.target !== e.currentTarget) return;
+    const moved = gestureResult(position, { x: e.target.x(), y: e.target.y() }, finish());
+    if (moved) onDragEnd(id, moved);
+    else e.target.position(position);
   };
 
   const handleClick = (e: any) => {
@@ -67,22 +95,28 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
     onDoubleClick(id);
   };
 
+  const handlePosition = (box: Size) => ({ x: box.width - HANDLE_SIZE, y: box.height - HANDLE_SIZE });
+
+  const handleResizeStart = (e: any) => {
+    e.cancelBubble = true;
+    begin(e);
+  };
+
   // Resize handle drag
   const handleResizeDrag = (e: any) => {
+    e.cancelBubble = true;
     const node = e.target;
-    const newWidth = Math.max(40, node.x() + HANDLE_SIZE);
-    const newHeight = Math.max(30, node.y() + HANDLE_SIZE);
-    // Reset handle position to bottom-right of new size
-    node.x(newWidth - HANDLE_SIZE);
-    node.y(newHeight - HANDLE_SIZE);
+    // Reset handle position to bottom-right of the clamped size
+    node.position(handlePosition(clampSize({ width: node.x() + HANDLE_SIZE, height: node.y() + HANDLE_SIZE })));
   };
 
   const handleResizeDragEnd = (e: any) => {
+    e.cancelBubble = true;
     const node = e.target;
     const group = node.getParent();
-    const newWidth = Math.max(40, node.x() + HANDLE_SIZE);
-    const newHeight = Math.max(30, node.y() + HANDLE_SIZE);
-    onResize(id, { width: newWidth, height: newHeight }, { x: group.x(), y: group.y() });
+    const resized = gestureResult(size, clampSize({ width: node.x() + HANDLE_SIZE, height: node.y() + HANDLE_SIZE }), finish());
+    if (resized) onResize(id, resized, { x: group.x(), y: group.y() });
+    else node.position(handlePosition(size));
   };
 
   const renderShape = () => {
@@ -123,12 +157,14 @@ export const ElementRenderer: React.FC<ElementRendererProps> = ({
       onTap={handleClick}
       onDblClick={handleDblClick}
       onDblTap={handleDblClick}
+      onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
       {renderShape()}
       {isSelected && (
         <ResizeHandles
           size={size}
+          onDragStart={handleResizeStart}
           onDrag={handleResizeDrag}
           onDragEnd={handleResizeDragEnd}
         />
@@ -322,8 +358,9 @@ const EllipseShape: React.FC<{
 const ResizeHandles: React.FC<{
   size: Size;
   onDrag: (e: any) => void;
+  onDragStart: (e: any) => void;
   onDragEnd: (e: any) => void;
-}> = ({ size, onDrag, onDragEnd }) => (
+}> = ({ size, onDragStart, onDrag, onDragEnd }) => (
   <Rect
     x={size.width - HANDLE_SIZE}
     y={size.height - HANDLE_SIZE}
@@ -333,6 +370,7 @@ const ResizeHandles: React.FC<{
     stroke="#0D47A1"
     strokeWidth={1}
     draggable
+    onDragStart={onDragStart}
     onDragMove={onDrag}
     onDragEnd={onDragEnd}
     cursor="nwse-resize"
