@@ -50,6 +50,18 @@ describe('ClipboardManager', () => {
     });
   });
 
+  describe('copied containers', () => {
+    it('points pasted contents at the pasted owner, not the original', () => {
+      const owner = makeElement('o', 0, 0, 'Owner');
+      const child = { ...makeElement('c', 10, 10, 'Child'), parentId: 'o' };
+      clipboard.copy([owner, child], []);
+      const pasted = clipboard.paste({ x: 100, y: 100 });
+      const [newOwner, newChild] = pasted.elements;
+      expect(newChild.parentId).toBe(newOwner.id);
+      expect(newOwner.id).not.toBe('o');
+    });
+  });
+
   describe('copy()', () => {
     it('stores deep clones of elements', () => {
       const el = makeElement('e1', 10, 20, 'MyClass');

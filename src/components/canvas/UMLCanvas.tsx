@@ -10,7 +10,7 @@ import { ElementRenderer } from './ElementRenderer';
 import { ConnectorRenderer } from './ConnectorRenderer';
 import { createCanvasConnector, createCanvasElement } from '../../engine/elementFactory';
 import { ClipboardManager } from '../../engine/clipboardManager';
-import { deletionPrompt, withoutSelectedOwners } from '../../engine/containment';
+import { deletionPrompt, descendantsOf, withoutSelectedOwners } from '../../engine/containment';
 import { messageRows } from '../../parser/dsl/messageOrder';
 import type { CanvasTool, Position, Size, CanvasChange } from '../../types';
 
@@ -195,9 +195,12 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
 
   const copySelection = useCallback((cut = false) => {
     if (readOnly || !diagram) return;
-    const selected = elements.filter((element) => selectedElementIds.has(element.id));
+    // A container is copied or cut with everything it owns, so nothing that a cut deletes is lost to a paste.
+    const chosen = elements.filter((element) => selectedElementIds.has(element.id));
+    const ids = new Set(chosen.map((element) => element.id));
+    const selected = [...chosen, ...chosen.flatMap((element) => descendantsOf(diagram, element.id)).filter((below) => !ids.has(below.id) && ids.add(below.id))];
     if (!selected.length) return;
-    clipboard.current.copy(selected, connectors.filter((connector) => selectedElementIds.has(connector.sourceId) && selectedElementIds.has(connector.targetId)));
+    clipboard.current.copy(selected, connectors.filter((connector) => ids.has(connector.sourceId) && ids.has(connector.targetId)));
     setCopiedType(diagram.type);
     pasteOffset.current = 24;
     if (cut) {
