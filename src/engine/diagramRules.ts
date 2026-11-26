@@ -314,6 +314,19 @@ export function validateDiagramConnections(diagram: DiagramData): DiagramRuleErr
   return errors;
 }
 
+/**
+ * Which element may own which (A03.05, `DiagramElement.parentId`): a composite
+ * state owns states, pseudostates and composite states; a system boundary owns
+ * use cases. Composite chains are acyclic and at most 8 levels deep (A01.10).
+ */
+const CONTAINMENT: Partial<Record<ElementType, readonly ElementType[]>> = {
+  'composite-state': ['state', 'initial-state', 'final-state', 'composite-state'],
+  'system-boundary': ['usecase'],
+};
+
+export const canContain = (parent: ElementType, child: ElementType): boolean =>
+  Object.prototype.hasOwnProperty.call(CONTAINMENT, parent) && CONTAINMENT[parent]!.includes(child);
+
 /** A container may sit at most this many levels below the top (A01.10); the file format refuses deeper chains. */
 export const MAX_CONTAINMENT_DEPTH = 8;
 

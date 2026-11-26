@@ -317,6 +317,8 @@ export type CanvasChange =
   | { type: 'element-resize'; elementId: string; size: Size }
   | { type: 'element-delete'; elementId: string }
   | { type: 'element-update'; elementId: string; properties: Partial<ElementProperties> }
+  /** Put an element under `parentId` (absent = top level) and move it and its descendants so it sits at `position` (A05.07). */
+  | { type: 'element-reparent'; elementId: string; parentId?: string; position: Position }
   | { type: 'connector-add'; connector: Connector }
   | { type: 'connector-delete'; connectorId: string }
   | { type: 'connector-update'; connectorId: string; changes: ConnectorUpdate }

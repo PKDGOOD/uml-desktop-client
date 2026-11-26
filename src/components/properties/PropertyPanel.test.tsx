@@ -28,3 +28,19 @@ describe('A04.09 property panel while the DSL has errors', () => {
     expect(html).toMatch(/<button class="panel-button" disabled="">Cancel<\/button>/);
   });
 });
+
+describe('A05.07 parent field', () => {
+  const state: DiagramElement = { id: 's', type: 'state', position: { x: 0, y: 0 }, size: { width: 100, height: 60 }, properties: { name: 'Idle' } };
+  const options = [{ id: 'c1', name: 'Active' }, { id: 'c2', name: 'Spare' }];
+
+  it('offers top level and every allowed container, with the current parent selected', () => {
+    const html = renderToStaticMarkup(createElement(PropertyPanel, { element: { ...state, parentId: 'c2' }, onPropertyChange: () => {}, parentOptions: options, onParentChange: () => null }));
+    expect(html).toContain('<label class="field-label" for="element-parent">Inside</label>');
+    expect(html).toMatch(/<option value="">\(top level\)<\/option><option value="c1">Active<\/option><option value="c2" selected="">Spare<\/option>/);
+  });
+
+  it('is hidden when the element has no parent and no container could take it', () => {
+    const html = renderToStaticMarkup(createElement(PropertyPanel, { element, onPropertyChange: () => {}, parentOptions: [], onParentChange: () => null }));
+    expect(html).not.toContain('element-parent');
+  });
+});

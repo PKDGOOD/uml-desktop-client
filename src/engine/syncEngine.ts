@@ -18,6 +18,7 @@ import { isMessage, renumberMessages } from '../parser/dsl/messageOrder';
 import { serializeDSL } from '../parser/dsl/serializer';
 import { UndoManager } from './undoManager';
 import { parseCheckedDSL, validateDiagramRules, type DiagramRuleError } from './diagramRules';
+import { descendantIds, reparentProblem } from './containment';
 import {
   patchAddConnectorInText, patchAddElementInText, patchConnectorInText, patchDeleteConnectorInText, patchDeleteElementInText, patchElementInText, patchMessageOrderInText,
 } from './textEdits';
@@ -215,6 +216,12 @@ export class SyncEngine {
     // Keep an invalid draft intact instead of replacing it with generated text.
     if (!this.flushPendingText()) return refuse('draft');
 
+    // Containment is checked up front so a cycle or wrong kind is refused with the reason (A05.07).
+    if (change.type === 'element-reparent') {
+      const problem = reparentProblem(this.currentDiagram, change.elementId, change.parentId);
+      if (problem) return refuse('rules', [{ message: problem, path: 'parentId' }]);
+    }
+
     this.syncing = true;
 
     try {
@@ -237,6 +244,19 @@ export class SyncEngine {
           case 'element-resize': {
             const el = d.elements.find(e => e.id === ch.elementId);
             if (el) el.size = { ...ch.size };
+            break;
+          }
+          case 'element-reparent': {
+            const el = d.elements.find(e => e.id === ch.elementId);
+            if (!el) break;
+            const dx = ch.position.x - el.position.x;
+            const dy = ch.position.y - el.position.y;
+            const moving = descendantIds(d, el.id).add(el.id);
+            for (const item of d.elements) {
+              if (moving.has(item.id)) item.position = { x: item.position.x + dx, y: item.position.y + dy };
+            }
+            if (ch.parentId === undefined) delete el.parentId;
+            else el.parentId = ch.parentId;
             break;
           }
           case 'element-delete':

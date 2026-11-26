@@ -24,6 +24,7 @@ import { ConflictDialog } from './components/project/ConflictDialog';
 import { findTextModelConflicts, resolveTextModelConflicts, type ConflictChoice, type TextModelConflict } from './engine/textModelConflicts';
 import { ExportEngine } from './engine/exportEngine';
 import { isMessage } from './parser/dsl/messageOrder';
+import { parentCandidates, reparentChange } from './engine/containment';
 import { checkProjectData, readProjectFile, writeProjectFile } from './parser/project/projectFileIO';
 import { version as appVersion } from '../package.json';
 import type {
@@ -491,6 +492,12 @@ const App: React.FC = () => {
   const handleConnectorChange = useCallback((connectorId: string, changes: ConnectorUpdate): string | null =>
     applyCanvasChange({ type: 'connector-update', connectorId, changes }), [applyCanvasChange]);
 
+  const handleParentChange = useCallback((elementId: string, parentId: string | undefined): string | null => {
+    const id = useProjectStore.getState().activeDiagramId;
+    const diagram = id ? workspaceRef.current?.project.diagrams[id] : undefined;
+    return diagram ? applyCanvasChange(reparentChange(diagram, elementId, parentId)) : null;
+  }, [applyCanvasChange]);
+
   const handleDiagramOpen = useCallback((id: string) => {
     void (async () => {
       const workspace = workspaceRef.current;
@@ -707,6 +714,10 @@ const App: React.FC = () => {
               onPropertyChange={handlePropertyChange}
               disabled={dslErrors.length > 0}
               registerGuard={registerFormGuard}
+              parentOptions={activeDiagram && selectedElement
+                ? parentCandidates(activeDiagram, selectedElement.id).map((element) => ({ id: element.id, name: element.properties.name }))
+                : []}
+              onParentChange={handleParentChange}
             />
           )}
         </div>

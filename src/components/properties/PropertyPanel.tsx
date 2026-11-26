@@ -28,6 +28,10 @@ export interface PropertyPanelProps {
   disabled?: boolean;
   /** Lets the app settle a dirty form before it changes selection or saves. */
   registerGuard?: (guard: PendingFormGuard | null) => void;
+  /** Containers the element may be moved into (A05.07); the parent field shows only when there is a choice. */
+  parentOptions?: { id: string; name: string }[];
+  /** Moves the element under another parent (undefined = top level) as one command; returns why it was refused, or null. */
+  onParentChange?: (elementId: string, parentId: string | undefined) => string | null | void;
 }
 
 export const PropertyPanel: React.FC<PropertyPanelProps> = ({
@@ -36,6 +40,8 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
   referencingDiagrams = [],
   disabled = false,
   registerGuard,
+  parentOptions = [],
+  onParentChange,
 }) => {
   const [attributesExpanded, setAttributesExpanded] = useState(true);
   const [methodsExpanded, setMethodsExpanded] = useState(true);
@@ -221,6 +227,26 @@ export const PropertyPanel: React.FC<PropertyPanelProps> = ({
         <option value="protected">protected (#)</option>
         <option value="package">package (~)</option>
       </select>
+
+      {/* Parent: a command of its own, offered only while the form has nothing pending (A05.07) */}
+      {onParentChange && (parentOptions.length > 0 || element.parentId !== undefined) && (
+        <>
+          <label className="field-label" htmlFor="element-parent">Inside</label>
+          <select
+            id="element-parent"
+            value={element.parentId ?? ''}
+            disabled={dirty}
+            onChange={(e) => {
+              const refusal = onParentChange(element.id, e.target.value === '' ? undefined : e.target.value) ?? null;
+              setProblem(refusal ? { message: refusal } : null);
+            }}
+            className="field-select"
+          >
+            <option value="">(top level)</option>
+            {parentOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+          </select>
+        </>
+      )}
 
       {/* Attributes section */}
       {hasAttributes && (
