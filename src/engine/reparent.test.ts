@@ -124,4 +124,32 @@ describe('A05.07 reparenting through the engine', () => {
     expect(parentName('Outside')).toBeNull();
     expect(history.canUndo()).toBe(false);
   });
+
+  it('draws the owner behind the moved element and its subtree', () => {
+    const { engine, state, find } = setup();
+    engine.applyCanvasChange({ type: 'element-reparent', elementId: find('Nested').id, parentId: find('Other').id });
+    const order = state.diagram!.elements.map((e) => e.properties.name);
+    expect(order.indexOf('Other')).toBeLessThan(order.indexOf('Nested'));
+    expect(order.indexOf('Nested')).toBeLessThan(order.indexOf('Deep'));
+  });
+
+  it('judges each reparent of a batch against what the batch has done so far', () => {
+    const { engine, find, parentName } = setup();
+    // Move Nested out, then put its former owner inside Nested: valid in that order only.
+    const result = engine.applyCanvasChange({ type: 'batch', changes: [
+      { type: 'element-reparent', elementId: find('Nested').id, parentId: null },
+      { type: 'element-reparent', elementId: find('Active').id, parentId: find('Nested').id },
+    ] });
+    expect(result).toEqual({ ok: true });
+    expect(parentName('Active')).toBe('Nested');
+    expect(parentName('Nested')).toBeNull();
+  });
+
+  it('refuses a move that would leave the allowed canvas area', () => {
+    const { engine, state, find } = setup();
+    engine.applyCanvasChange({ type: 'element-move', elementId: find('Other').id, position: { x: 999_999, y: 40 } });
+    const result = engine.applyCanvasChange({ type: 'element-reparent', elementId: find('Outside').id, parentId: find('Other').id });
+    expect(result).toMatchObject({ ok: false, reason: 'rules' });
+    expect(state.diagram!.elements.find((e) => e.properties.name === 'Outside')!.parentId).toBeUndefined();
+  });
 });

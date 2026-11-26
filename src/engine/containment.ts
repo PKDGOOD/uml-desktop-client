@@ -4,6 +4,7 @@
 // =============================================================================
 
 import type { DiagramData, DiagramElement } from '../types';
+import { PROJECT_LIMITS } from '../parser/project/projectFileLimits';
 
 /**
  * Which element may own which (A03.05, `DiagramElement.parentId`): a composite
@@ -87,9 +88,28 @@ export function reparentProblem(diagram: DiagramData, id: string, parentId: stri
   return null;
 }
 
-/** Elements that may own `id` right now, for the Parent choices (never itself or anything below it). */
+/**
+ * Elements that may own `id` right now, for the Parent choices (never itself or anything below it).
+ * The subtree and depths are worked out once, so a diagram near the element limit stays fast.
+ */
 export function parentCandidates(diagram: DiagramData, id: string): DiagramElement[] {
-  return diagram.elements.filter((candidate) => reparentProblem(diagram, id, candidate.id) === null && candidate.id !== id);
+  const element = diagram.elements.find((candidate) => candidate.id === id);
+  if (!element) return [];
+  const below = new Set(descendantsOf(diagram, id).map((e) => e.id));
+  const height = subtreeHeight(diagram, id);
+  const byId = new Map(diagram.elements.map((e) => [e.id, e]));
+  const depths = new Map<string, number>();
+  const depth = (target: DiagramElement): number => {
+    const known = depths.get(target.id);
+    if (known !== undefined) return known;
+    depths.set(target.id, 0); // a cycle in bad data ends here
+    const parent = target.parentId === undefined ? undefined : byId.get(target.parentId);
+    const value = parent ? depth(parent) + 1 : 0;
+    depths.set(target.id, value);
+    return value;
+  };
+  return diagram.elements.filter((candidate) => candidate.id !== id && !below.has(candidate.id)
+    && canContain(candidate.type, element.type) && depth(candidate) + 1 + height <= MAX_DEPTH);
 }
 
 const PADDING = 16;
@@ -152,4 +172,15 @@ export function applyReparent(diagram: DiagramData, id: string, parentId: string
     }
   }
   shift(below, element.position.x - from.x, element.position.y - from.y);
+  // Canvas draws in array order: the element and what it owns go last so an opaque owner never hides them.
+  const moved = new Set([id, ...below.map((e) => e.id)]);
+  diagram.elements = [...diagram.elements.filter((e) => !moved.has(e.id)), ...diagram.elements.filter((e) => moved.has(e.id))];
+}
+
+/** Why a diagram has a coordinate or size outside the project limits (A05.07), or null. */
+export function coordinateProblem(diagram: DiagramData): string | null {
+  const limit = PROJECT_LIMITS.coordinate;
+  const bad = diagram.elements.find((e) => Math.abs(e.position.x) > limit || Math.abs(e.position.y) > limit
+    || e.size.width > PROJECT_LIMITS.extent || e.size.height > PROJECT_LIMITS.extent);
+  return bad ? `"${bad.properties.name}" would end up outside the allowed canvas area.` : null;
 }
