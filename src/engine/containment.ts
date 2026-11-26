@@ -75,3 +75,25 @@ function inside(element: DiagramElement, container: DiagramElement): boolean {
     && element.position.x + element.size.width <= container.position.x + container.size.width
     && element.position.y + element.size.height <= container.position.y + container.size.height;
 }
+
+/**
+ * Moving an element to `position` as one canvas gesture (A05.08): everything
+ * inside it moves by the same delta, in one command. Ownership never changes
+ * here, even when the element ends up outside its parent's border.
+ */
+export function moveWithDescendants(diagram: DiagramData, id: string, position: Position): CanvasChange {
+  const element = diagram.elements.find((candidate) => candidate.id === id);
+  const below = descendantIds(diagram, id);
+  if (!element || below.size === 0) return { type: 'element-move', elementId: id, position: { ...position } };
+  const dx = position.x - element.position.x;
+  const dy = position.y - element.position.y;
+  return {
+    type: 'batch',
+    changes: [
+      { type: 'element-move', elementId: id, position: { ...position } },
+      ...diagram.elements
+        .filter((item) => below.has(item.id))
+        .map((item): CanvasChange => ({ type: 'element-move', elementId: item.id, position: { x: item.position.x + dx, y: item.position.y + dy } })),
+    ],
+  };
+}

@@ -344,7 +344,18 @@ export class SyncEngine {
    */
   private patchedText(change: CanvasChange, oldDiagram: DiagramData, oldText: string, newDiagram: DiagramData): string | null {
     let patched: string | null = null;
-    if (change.type === 'element-update' || change.type === 'element-move' || change.type === 'element-resize') {
+    if (change.type === 'batch' && change.changes.length > 0 && change.changes.every((item) => item.type === 'element-move' || item.type === 'element-resize')) {
+      // Several elements moved or resized by one gesture: patch each one in turn (A05.08).
+      patched = oldText;
+      const step = deepClone(oldDiagram);
+      for (const after of newDiagram.elements) {
+        const index = step.elements.findIndex((element) => element.id === after.id);
+        if (index < 0 || JSON.stringify(step.elements[index]) === JSON.stringify(after)) continue;
+        patched = patchElementInText(patched, step, after);
+        if (patched === null) return null;
+        step.elements[index] = deepClone(after);
+      }
+    } else if (change.type === 'element-update' || change.type === 'element-move' || change.type === 'element-resize') {
       const after = newDiagram.elements.find((element) => element.id === change.elementId);
       if (after) patched = patchElementInText(oldText, oldDiagram, after);
     } else if (change.type === 'element-add') {

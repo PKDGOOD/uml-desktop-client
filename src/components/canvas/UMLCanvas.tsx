@@ -11,6 +11,7 @@ import { ConnectorRenderer } from './ConnectorRenderer';
 import { createCanvasConnector, createCanvasElement } from '../../engine/elementFactory';
 import { ClipboardManager } from '../../engine/clipboardManager';
 import { messageRows } from '../../parser/dsl/messageOrder';
+import { moveWithDescendants } from '../../engine/containment';
 import type { CanvasTool, Position, Size, CanvasChange } from '../../types';
 
 export interface UMLCanvasProps {
@@ -333,13 +334,10 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
 
   const handleElementDragEnd = useCallback(
     (elementId: string, position: Position) => {
-      const change: CanvasChange = { type: 'element-move', elementId, position };
-      onCanvasChange?.(change);
-
-      // Auto-recalculate connector paths is implicit since connectors
-      // reference element positions from the store
+      // A container takes everything inside it along, as one undo step (A05.08).
+      if (diagram) onCanvasChange?.(moveWithDescendants(diagram, elementId, position));
     },
-    [onCanvasChange],
+    [diagram, onCanvasChange],
   );
 
   const handleElementResize = useCallback(
