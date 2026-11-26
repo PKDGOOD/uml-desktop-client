@@ -51,6 +51,24 @@ describe('A05.09 one gesture, one undo step', () => {
   });
 });
 
+describe('A05.09 comments survive an aligned batch', () => {
+  it('edits only the moved positions', () => {
+    const text = SRC.replace('class A', '// first\nclass A');
+    const state = { text, diagram: null as DiagramData | null };
+    const engine = new SyncEngine({ onDiagramUpdate: (d) => { state.diagram = d; }, onTextUpdate: (t) => { state.text = t; }, onErrors: vi.fn(), undoManager: new UndoManager(), debounceMs: 0 });
+    const parsed = parseDSL(text);
+    if (!parsed.success) throw new Error('fixture');
+    engine.setDiagram(parsed.diagram, text);
+    state.diagram = engine.getDiagram();
+    const moves = ['A', 'C'].map((n) => {
+      const e = state.diagram!.elements.find((x) => x.properties.name === n)!;
+      return { type: 'element-move' as const, elementId: e.id, position: { x: e.position.x, y: 200 } };
+    });
+    expect(engine.applyCanvasChange({ type: 'batch', changes: moves })).toEqual({ ok: true });
+    expect(state.text).toBe(text.replace('@pos(40, 40)', '@pos(40, 200)').replace('@pos(560, 40)', '@pos(560, 200)'));
+  });
+});
+
 describe('A05.09 geometry limits', () => {
   const refused = (make: (id: string) => Parameters<SyncEngine['applyCanvasChange']>[0]) => {
     const { engine, state, history, find } = setup();

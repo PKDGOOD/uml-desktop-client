@@ -342,7 +342,14 @@ export class SyncEngine {
    */
   private patchedText(change: CanvasChange, oldDiagram: DiagramData, oldText: string, newDiagram: DiagramData): string | null {
     let patched: string | null = null;
-    if (change.type === 'element-move') {
+    if (change.type === 'batch' && change.changes.length > 0 && change.changes.every((item) => item.type === 'element-move')) {
+      // Align/distribute: only positions changed, so patch each `@pos` in place.
+      const moved = newDiagram.elements.filter((element) => {
+        const was = oldDiagram.elements.find((candidate) => candidate.id === element.id);
+        return was && (was.position.x !== element.position.x || was.position.y !== element.position.y);
+      });
+      patched = patchMovesInText(oldText, oldDiagram, moved);
+    } else if (change.type === 'element-move') {
       const moved = newDiagram.elements.filter((element) => {
         const was = oldDiagram.elements.find((candidate) => candidate.id === element.id);
         return was && (was.position.x !== element.position.x || was.position.y !== element.position.y);
