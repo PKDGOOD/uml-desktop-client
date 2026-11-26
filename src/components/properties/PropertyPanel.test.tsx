@@ -28,3 +28,22 @@ describe('A04.09 property panel while the DSL has errors', () => {
     expect(html).toMatch(/<button class="panel-button" disabled="">Cancel<\/button>/);
   });
 });
+
+describe('A05.07 parent choice', () => {
+  const state: DiagramElement = { id: 's', type: 'state', position: { x: 0, y: 0 }, size: { width: 80, height: 40 }, properties: { name: 'Idle' } };
+  const render = (owner?: { parentId: string | null; choices: { id: string; name: string }[] }) => renderToStaticMarkup(
+    createElement(PropertyPanel, { element: state, onPropertyChange: () => null, owner, onParentChange: () => null }),
+  );
+
+  it('lists the valid owners with the current one selected', () => {
+    const html = render({ parentId: 'c1', choices: [{ id: 'c1', name: 'Active' }, { id: 'c2', name: 'Other' }] });
+    expect(html).toContain('<option value="">(none, top level)</option>');
+    expect(html).toMatch(/<option value="c1" selected="">Active<\/option>/);
+    expect(html).toContain('<option value="c2">Other</option>');
+  });
+
+  it('is left out when the element has no owner and none could own it', () => {
+    expect(render({ parentId: null, choices: [] })).not.toContain('element-parent');
+    expect(render(undefined)).not.toContain('element-parent');
+  });
+});

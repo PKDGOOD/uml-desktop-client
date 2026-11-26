@@ -14,6 +14,7 @@ import type {
   ElementProperties,
 } from '../types';
 import { parseDSL } from '../parser/dsl';
+import { applyReparent, reparentProblem } from './containment';
 import { isMessage, renumberMessages } from '../parser/dsl/messageOrder';
 import { serializeDSL } from '../parser/dsl/serializer';
 import { UndoManager } from './undoManager';
@@ -221,6 +222,14 @@ export class SyncEngine {
       const oldDiagram = deepClone(this.currentDiagram);
       const oldText = this.currentText;
 
+      // A bad owner is named before anything else is tried (A05.07).
+      const reparents = change.type === 'batch' ? change.changes : [change];
+      for (const item of reparents) {
+        if (item.type !== 'element-reparent') continue;
+        const problem = reparentProblem(oldDiagram, item.elementId, item.parentId);
+        if (problem) return refuse('rules', [{ message: problem, path: `elements.${item.elementId}.parentId` }]);
+      }
+
       const applyChange = (diagram: DiagramData, ch: CanvasChange): DiagramData => {
         const d = deepClone(diagram);
         switch (ch.type) {
@@ -239,6 +248,9 @@ export class SyncEngine {
             if (el) el.size = { ...ch.size };
             break;
           }
+          case 'element-reparent':
+            applyReparent(d, ch.elementId, ch.parentId);
+            break;
           case 'element-delete':
             d.elements = d.elements.filter(e => e.id !== ch.elementId);
             d.connectors = d.connectors.filter(

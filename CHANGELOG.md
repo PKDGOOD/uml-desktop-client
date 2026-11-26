@@ -28,6 +28,7 @@ Changes are documented here before a tagged release. The package version `0.1.0`
 ### Known issues
 - Class associations, aggregations and compositions show From and To multiplicity fields in the connection form; invalid ranges are refused before anything changes.
 - Selecting a sequence message offers Move earlier and Move later in the connection form; each move is one undo step and the message keeps its identity.
+- The element form has a Parent choice for states and use cases: only valid owners are listed, the element and its subtree are laid out with the new owner, and one undo restores both. Loops and wrong kinds are refused with the reason.
 - Selecting a connector shows its direction, endpoints and label in the right panel; edits are applied as one undoable change, and an incompatible endpoint is refused while the original connection stays.
 - Methods with several parameters can be read from DSL text (a type no longer swallows the next parameter), and the property form edits visibility, parameters and member order.
 - Unapplied property edits are no longer lost silently: changing selection, switching tabs, saving, exporting or undoing asks whether to apply, discard or keep editing.

@@ -6,6 +6,7 @@ import type {
   DiagramElement,
 } from '@/types';
 import { validateContainmentDepth, validateDiagramRules } from '@/engine/diagramRules';
+import { canContain } from '@/engine/containment';
 
 export interface ProjectFileParseError {
   message: string;
@@ -188,16 +189,6 @@ function validateMetadata(
   return errors;
 }
 
-/**
- * Which element may own which (A03.05, `DiagramElement.parentId`): a composite
- * state owns states, pseudostates and composite states; a system boundary owns
- * use cases. Composite chains are acyclic and at most 8 levels deep (A01.10).
- */
-const CONTAINMENT: Partial<Record<string, readonly string[]>> = {
-  'composite-state': ['state', 'initial-state', 'final-state', 'composite-state'],
-  'system-boundary': ['usecase'],
-};
-
 /** Schema-1 files carry a semver `metadata.version`; only major version 1 is understood. */
 const SUPPORTED_MAJOR_VERSION = 1;
 
@@ -292,7 +283,7 @@ export function validateProjectReferences(project: ProjectData, options: Referen
       const parent = elementsById.get(element.parentId);
       if (element.parentId === element.id || !parent) {
         errors.push({ message: `Element ${element.id} has an unknown parent ${element.parentId}`, path: `${path}.parentId` });
-      } else if (!Object.prototype.hasOwnProperty.call(CONTAINMENT, parent.type) || !CONTAINMENT[parent.type]!.includes(element.type)) {
+      } else if (!canContain(parent.type, element.type)) {
         errors.push({ message: `A ${parent.type} cannot contain a ${element.type} (element ${element.id})`, path: `${path}.parentId` });
       }
     });

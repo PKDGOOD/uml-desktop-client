@@ -315,6 +315,8 @@ export type CanvasChange =
   | { type: 'element-add'; element: DiagramElement }
   | { type: 'element-move'; elementId: string; position: Position }
   | { type: 'element-resize'; elementId: string; size: Size }
+  /** Give an element a new owner (null: top level) and lay the result out with it (A05.07). */
+  | { type: 'element-reparent'; elementId: string; parentId: string | null }
   | { type: 'element-delete'; elementId: string }
   | { type: 'element-update'; elementId: string; properties: Partial<ElementProperties> }
   | { type: 'connector-add'; connector: Connector }
