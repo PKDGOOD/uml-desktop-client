@@ -10,7 +10,7 @@ import { ElementRenderer } from './ElementRenderer';
 import { ConnectorRenderer } from './ConnectorRenderer';
 import { createCanvasConnector, createCanvasElement } from '../../engine/elementFactory';
 import { ClipboardManager } from '../../engine/clipboardManager';
-import { withoutSelectedOwners } from '../../engine/containment';
+import { deletionPrompt, withoutSelectedOwners } from '../../engine/containment';
 import { messageRows } from '../../parser/dsl/messageOrder';
 import type { CanvasTool, Position, Size, CanvasChange } from '../../types';
 
@@ -19,6 +19,8 @@ export interface UMLCanvasProps {
   height: number;
   /** Called when a canvas change occurs (for SyncEngine integration) */
   onCanvasChange?: (change: CanvasChange) => void;
+  /** Asks before a container is deleted with its contents; true goes ahead. Defaults to the browser's confirm. */
+  confirmDelete?: (question: string) => boolean;
   /** Called when an element is double-clicked (for Property Panel) */
   onElementDoubleClick?: (elementId: string) => void;
   /** Called when selection changes */
@@ -35,6 +37,7 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
   width,
   height,
   onCanvasChange,
+  confirmDelete,
   onElementDoubleClick,
   onSelectionChange,
   restoreSelection,
@@ -175,6 +178,21 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
   const diagramId = diagram?.id;
   useEffect(() => { clearSelection(); setConnectorSourceId(null); }, [diagramId, clearSelection]);
 
+  /** Deletes elements and connections as one step; a container's contents are listed and confirmed first (A05.10). */
+  const deleteItems = useCallback((elementIds: string[], connectorIds: string[]): boolean => {
+    if (diagram) {
+      const question = deletionPrompt(diagram, elementIds);
+      if (question && !(confirmDelete ?? ((text: string) => window.confirm(text)))(question)) return false;
+    }
+    const changes: CanvasChange[] = [
+      ...connectorIds.map((connectorId): CanvasChange => ({ type: 'connector-delete', connectorId })),
+      ...elementIds.map((elementId): CanvasChange => ({ type: 'element-delete', elementId })),
+    ];
+    if (changes.length > 0) onCanvasChange?.({ type: 'batch', changes });
+    clearSelection();
+    return true;
+  }, [diagram, confirmDelete, onCanvasChange, clearSelection]);
+
   const copySelection = useCallback((cut = false) => {
     if (readOnly || !diagram) return;
     const selected = elements.filter((element) => selectedElementIds.has(element.id));
@@ -183,10 +201,9 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
     setCopiedType(diagram.type);
     pasteOffset.current = 24;
     if (cut) {
-      onCanvasChange?.({ type: 'batch', changes: selected.map((element) => ({ type: 'element-delete', elementId: element.id })) });
-      clearSelection();
+      deleteItems(selected.map((element) => element.id), []);
     }
-  }, [readOnly, diagram, elements, connectors, selectedElementIds, onCanvasChange, clearSelection]);
+  }, [readOnly, diagram, elements, connectors, selectedElementIds, deleteItems]);
 
   const pasteSelection = useCallback(() => {
     if (readOnly || !diagram || copiedType !== diagram.type || !clipboard.current.hasContent()) return;
@@ -232,16 +249,12 @@ export const UMLCanvas: React.FC<UMLCanvasProps> = ({
       if (selectedElementIds.size === 0 && selectedConnectorIds.size === 0) return;
 
       event.preventDefault();
-      onCanvasChange?.({ type: 'batch', changes: [
-        ...[...selectedConnectorIds].map((connectorId): CanvasChange => ({ type: 'connector-delete', connectorId })),
-        ...[...selectedElementIds].map((elementId): CanvasChange => ({ type: 'element-delete', elementId })),
-      ] });
-      clearSelection();
+      deleteItems([...selectedElementIds], [...selectedConnectorIds]);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [clearSelection, onCanvasChange, readOnly, selectedConnectorIds, selectedElementIds, copySelection, pasteSelection, copiedType, diagram?.type]);
+  }, [deleteItems, readOnly, selectedConnectorIds, selectedElementIds, copySelection, pasteSelection, copiedType, diagram?.type]);
 
   // --- Drag selection box ---
 
