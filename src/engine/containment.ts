@@ -184,3 +184,17 @@ export function coordinateProblem(diagram: DiagramData): string | null {
     || e.size.width > PROJECT_LIMITS.extent || e.size.height > PROJECT_LIMITS.extent);
   return bad ? `"${bad.properties.name}" would end up outside the allowed canvas area.` : null;
 }
+
+/** The selected elements that no other selected element owns; those ride along when their owner moves (A05.08). */
+export function withoutSelectedOwners(elements: DiagramElement[], selected: DiagramElement[]): DiagramElement[] {
+  const byId = new Map(elements.map((element) => [element.id, element]));
+  const ids = new Set(selected.map((element) => element.id));
+  return selected.filter((element) => {
+    const seen = new Set<string>([element.id]);
+    for (let parent = element.parentId === undefined ? undefined : byId.get(element.parentId); parent && !seen.has(parent.id); parent = parent.parentId === undefined ? undefined : byId.get(parent.parentId)) {
+      if (ids.has(parent.id)) return false;
+      seen.add(parent.id);
+    }
+    return true;
+  });
+}
