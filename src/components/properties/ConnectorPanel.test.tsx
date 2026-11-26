@@ -52,3 +52,26 @@ describe('A05.04 connector panel', () => {
     expect(html).toContain('value="0..*"');
   });
 });
+
+describe('A05.06 message order control', () => {
+  const lifelines = [{ ...el('a', 'Client'), type: 'lifeline' as const }, { ...el('b', 'Order'), type: 'lifeline' as const }];
+  const message = (messageOrder: number): Connector => ({ id: 'm', type: 'sync-message', sourceId: 'a', targetId: 'b', label: 'place', messageOrder, properties: {} });
+  const render = (connector: Connector, messageCount: number) => renderToStaticMarkup(createElement(ConnectorPanel, {
+    connector, elements: lifelines, diagramType: 'sequence', messageCount, onConnectorChange: () => null,
+  }));
+
+  it('shows the position of a message among all messages', () => {
+    expect(render(message(2), 3)).toContain('Order 2 of 3');
+    expect(render(message(2), 3)).toMatch(/<button class="panel-button">Move earlier<\/button><button class="panel-button">Move later<\/button>/);
+  });
+
+  it('cannot move the first message earlier or the last one later', () => {
+    expect(render(message(1), 3)).toMatch(/disabled="">Move earlier/);
+    expect(render(message(3), 3)).toMatch(/disabled="">Move later/);
+  });
+
+  it('offers no reorder control for connectors that are not messages', () => {
+    const association = renderToStaticMarkup(createElement(ConnectorPanel, { connector, elements, diagramType: 'class', messageCount: 3, onConnectorChange: () => null }));
+    expect(association).not.toContain('Message order');
+  });
+});

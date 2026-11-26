@@ -755,6 +755,14 @@ button {
   box-shadow: var(--shadow-soft);
 }
 
+.message-order {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
 .form-actions {
   display: flex;
   flex-wrap: wrap;

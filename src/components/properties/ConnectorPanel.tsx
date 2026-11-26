@@ -1,10 +1,11 @@
 // =============================================================================
-// ConnectorPanel - Endpoints and label of the selected connector (A05.04)
+// ConnectorPanel - Endpoints, label, multiplicity and message order of the selected connector (A05.04-A05.06)
 // =============================================================================
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { Connector, ConnectorUpdate, DiagramElement, DiagramType } from '../../types';
 import { multiplicityApplies } from '../../engine/diagramRules';
+import { isMessage } from '../../parser/dsl/messageOrder';
 import {
   connectorChanges, connectorDraftFrom, describeConnector, isConnectorDirty, multiplicityProblems, swapEnds, type ConnectorDraft,
 } from './connectorDraft';
@@ -16,6 +17,8 @@ export interface ConnectorPanelProps {
   elements: DiagramElement[];
   /** Decides whether multiplicity fields are offered. */
   diagramType: DiagramType;
+  /** Number of messages in a sequence diagram, for the reorder control (A05.06). */
+  messageCount?: number;
   /** Applies the edit; returns why it was refused, or null. */
   onConnectorChange: (connectorId: string, changes: ConnectorUpdate) => string | null | void;
   disabled?: boolean;
@@ -23,7 +26,7 @@ export interface ConnectorPanelProps {
 }
 
 export const ConnectorPanel: React.FC<ConnectorPanelProps> = ({
-  connector, elements, diagramType, onConnectorChange, disabled = false, registerGuard,
+  connector, elements, diagramType, messageCount = 0, onConnectorChange, disabled = false, registerGuard,
 }) => {
   const nameOf = useCallback(
     (id: string) => elements.find((element) => element.id === id)?.properties.name ?? id,
@@ -57,6 +60,9 @@ export const ConnectorPanel: React.FC<ConnectorPanelProps> = ({
     return refusal;
   }, [connector, draft, onConnectorChange]);
 
+  // A move is one command of its own, so it is offered only while the form has nothing pending.
+  const move = (to: number) => setProblem(onConnectorChange(connector.id, { messageOrder: to }) ?? null);
+
   const discard = useCallback(() => { setDraft(connectorDraftFrom(connector)); setProblem(null); }, [connector]);
 
   useEffect(() => {
@@ -72,6 +78,7 @@ export const ConnectorPanel: React.FC<ConnectorPanelProps> = ({
 
   useEffect(() => { if (problem) alertRef.current?.focus(); }, [problem]);
 
+  const order = isMessage(connector) ? connector.messageOrder : undefined;
   const withMultiplicity = multiplicityApplies(diagramType, connector.type);
   const invalid = multiplicityProblems(draft);
   const options = elements.map((element) => <option key={element.id} value={element.id}>{element.properties.name}</option>);
@@ -85,6 +92,14 @@ export const ConnectorPanel: React.FC<ConnectorPanelProps> = ({
       {disabled && <div className="panel-note" role="status">Fix the DSL errors to edit connections.</div>}
       <fieldset className="property-body" disabled={disabled} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
         <div className="connector-summary" aria-label="Direction">{describeConnector(connector, nameOf)}</div>
+
+        {order !== undefined && (
+          <div className="message-order" role="group" aria-label="Message order">
+            <span className="field-label">Order {order} of {messageCount}</span>
+            <button className="panel-button" onClick={() => move(order - 1)} disabled={dirty || order <= 1}>Move earlier</button>
+            <button className="panel-button" onClick={() => move(order + 1)} disabled={dirty || order >= messageCount}>Move later</button>
+          </div>
+        )}
 
         <label className="field-label" htmlFor="connector-source">From</label>
         <select id="connector-source" className="field-select" value={draft.sourceId} onChange={(e) => update({ sourceId: e.target.value })}>

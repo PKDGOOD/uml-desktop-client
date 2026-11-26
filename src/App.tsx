@@ -23,6 +23,7 @@ import { HistoryDialog } from './components/project/HistoryDialog';
 import { ConflictDialog } from './components/project/ConflictDialog';
 import { findTextModelConflicts, resolveTextModelConflicts, type ConflictChoice, type TextModelConflict } from './engine/textModelConflicts';
 import { ExportEngine } from './engine/exportEngine';
+import { isMessage } from './parser/dsl/messageOrder';
 import { checkProjectData, readProjectFile, writeProjectFile } from './parser/project/projectFileIO';
 import { version as appVersion } from '../package.json';
 import type {
@@ -695,6 +696,7 @@ const App: React.FC = () => {
               connector={selectedConnector}
               elements={activeDiagram?.elements ?? []}
               diagramType={activeDiagram?.type ?? 'class'}
+              messageCount={activeDiagram?.connectors.filter(isMessage).length ?? 0}
               onConnectorChange={handleConnectorChange}
               disabled={dslErrors.length > 0}
               registerGuard={registerFormGuard}

@@ -26,6 +26,7 @@ Changes are documented here before a tagged release. The package version `0.1.0`
 - When a file's stored text and diagram disagree, Open asks which to keep for each diagram instead of picking one; the project opens unsaved.
 
 ### Known issues
+- A selected sequence message can be moved earlier or later from the connection form; each move is one undoable edit and the message keeps its identity.
 - Class associations, aggregations and compositions show From and To multiplicity fields in the connection form; invalid ranges are refused before anything changes.
 - Selecting a connector shows its direction, endpoints and label in the right panel; edits are applied as one undoable change, and an incompatible endpoint is refused while the original connection stays.
 - Methods with several parameters can be read from DSL text (a type no longer swallows the next parameter), and the property form edits visibility, parameters and member order.

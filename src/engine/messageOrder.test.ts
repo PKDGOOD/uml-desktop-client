@@ -99,3 +99,29 @@ describe('A04.08 message order', () => {
     expect(parsed.success && parsed.diagram.connectors.map((c) => c.label)).toEqual(['place   // first', 'ping', 'charge', 'receipt', 'confirm']);
   });
 });
+
+describe('A05.06 moving one message', () => {
+  it('is one undoable edit that keeps the message identity', async () => {
+    const { UndoManager } = await import('./undoManager');
+    const history = new UndoManager();
+    const state = { text: SRC, diagram: null as DiagramData | null };
+    const engine = new SyncEngine({
+      onDiagramUpdate: (d) => { state.diagram = d; }, onTextUpdate: (t) => { state.text = t; },
+      onErrors: vi.fn(), undoManager: history, debounceMs: 0,
+    });
+    const parsed = parseDSL(SRC);
+    if (!parsed.success) throw new Error('bad fixture');
+    engine.setDiagram(parsed.diagram, SRC);
+    const charge = engine.getDiagram()!.connectors.find((c) => c.label === 'charge')!;
+
+    expect(engine.applyCanvasChange({ type: 'connector-update', connectorId: charge.id, changes: { messageOrder: 1 } })).toEqual({ ok: true });
+
+    expect(history.undoStackSize).toBe(1);
+    expect(labels(state.diagram!)).toEqual(['charge', 'place   // first', 'receipt', 'confirm']);
+    expect(state.diagram!.connectors.find((c) => c.label === 'charge')!.id).toBe(charge.id);
+    expect(state.text.indexOf('Order ->> Payment : charge')).toBeLessThan(state.text.indexOf('Client -> Order'));
+    history.undo();
+    expect(state.text).toBe(SRC);
+    expect(labels(state.diagram!)).toEqual(['place   // first', 'charge', 'receipt', 'confirm']);
+  });
+});
